@@ -1,21 +1,86 @@
 # Unreal Engine generated files
 Binaries/
-Build/
 DerivedDataCache/
 Intermediate/
 Saved/
 .vs/
-.idea/
-.vscode/
-*.VC.db
-*.VC.opendb
+
+# Visual Studio generated files
 *.sln
 *.suo
 *.opensdf
 *.sdf
+*.VC.db
+*.VC.opendb
+*.user
+*.userprefs
+*.sln.docstates
+.vscode/
+
+# Rider
+.idea/
+*.sln.iml
+
+# Build and temporary files
 *.tmp
+*.temp
 *.log
+*.obj
+*.pdb
+*.ipch
+*.tlog
+*.lastbuildstate
+*.opensdf
+*.cache
+*.ilk
+*.exp
+*.lib
 
-# Local packaged builds
-PackagedBuilds/
+# Unreal generated project files
+*.xcodeproj
+*.xcworkspace
+Makefile
+CMakeLists.txt
+cmake-build-*/
 
+# Packaging output
+Build/
+Dist/
+StagedBuilds/
+Packaged/
+Releases/
+
+# Crash and diagnostic data
+Crashes/
+Profiling/
+Autosaves/
+Logs/
+
+# Local backups
+Backup/
+Backups/
+*.bak
+*.backup
+*.old
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Unreal transient content
+Content/__ExternalActors__/
+Content/__ExternalObjects__/
+
+# Local developer output
+outputs/
+work/
+
+# Keep project source and configuration
+!Source/
+!Config/
+!Content/
+!Scripts/
+!*.uproject
+!*.uplugin
+!*.md
