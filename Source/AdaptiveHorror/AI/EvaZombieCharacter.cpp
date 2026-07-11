@@ -13,14 +13,17 @@
 #include "Engine/World.h"
 #include "Engine/DamageEvents.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Engine/Engine.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 
 AEvaZombieCharacter::AEvaZombieCharacter()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickInterval = 0.10f;
     Tags.Add(TEXT("Zombie"));
 
     GetCapsuleComponent()->InitCapsuleSize(42.0f, 88.0f);
@@ -41,11 +44,23 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     HeadVisual->SetRelativeLocation(FVector(0.0f, 0.0f, 105.0f));
     HeadVisual->SetRelativeScale3D(FVector(0.35f));
 
+    LeftArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArmVisual"));
+    LeftArmVisual->SetupAttachment(GetCapsuleComponent());
+    LeftArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftArmVisual->SetRelativeLocation(FVector(0.0f, -42.0f, 46.0f));
+    LeftArmVisual->SetRelativeScale3D(FVector(0.16f, 0.16f, 0.58f));
+
+    RightArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArmVisual"));
+    RightArmVisual->SetupAttachment(GetCapsuleComponent());
+    RightArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightArmVisual->SetRelativeLocation(FVector(0.0f, 42.0f, 46.0f));
+    RightArmVisual->SetRelativeScale3D(FVector(0.16f, 0.16f, 0.58f));
+
     TypeLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("TypeLabel"));
     TypeLabel->SetupAttachment(GetCapsuleComponent());
     TypeLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     TypeLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 165.0f));
-    TypeLabel->SetRelativeRotation(FRotator(0.0f, 180.0f, 0.0f));
+    TypeLabel->SetRelativeRotation(FRotator::ZeroRotator);
     TypeLabel->SetHorizontalAlignment(EHTA_Center);
     TypeLabel->SetVerticalAlignment(EVRTA_TextCenter);
     TypeLabel->SetText(FText::FromString(TEXT("ZOMBIE")));
@@ -57,6 +72,8 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     if (CubeMesh.Succeeded())
     {
         BodyVisual->SetStaticMesh(CubeMesh.Object);
+        LeftArmVisual->SetStaticMesh(CubeMesh.Object);
+        RightArmVisual->SetStaticMesh(CubeMesh.Object);
     }
     if (SphereMesh.Succeeded())
     {
@@ -84,6 +101,12 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     AIControllerClass = AEvaZombieAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
     GetCharacterMovement()->MaxWalkSpeed = MovementSpeed;
+}
+
+void AEvaZombieCharacter::Tick(const float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    UpdatePrototypeDebugLabelFacing();
 }
 
 void AEvaZombieCharacter::BeginPlay()
@@ -163,7 +186,9 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     CurrentAttackDamage = BaseAttackDamage;
     FVector BodyScale(0.55f, 0.45f, 0.9f);
     FVector HeadScale(0.35f);
-    FVector ActorScale(1.0f);
+    FVector ArmScale(0.16f, 0.16f, 0.58f);
+    FVector LeftArmLocation(0.0f, -42.0f, 46.0f);
+    FVector RightArmLocation(0.0f, 42.0f, 46.0f);
     FString DebugLabel(TEXT("ZOMBIE"));
     FColor DebugLabelColor = FColor::Green;
 
@@ -174,7 +199,11 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     if (bFast)
     {
         MovementSpeed *= 1.25f;
-        BodyScale = FVector(0.45f, 0.35f, 1.05f);
+        BodyScale = FVector(0.42f, 0.32f, 1.12f);
+        HeadScale = FVector(0.30f);
+        ArmScale = FVector(0.12f, 0.12f, 0.70f);
+        LeftArmLocation = FVector(0.0f, -36.0f, 48.0f);
+        RightArmLocation = FVector(0.0f, 36.0f, 48.0f);
         DebugLabel = TEXT("FAST");
         DebugLabelColor = FColor::Cyan;
     }
@@ -182,8 +211,11 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     {
         NewMaxHealth *= 1.30f;
         HeadDamageMultiplier = 0.5f;
-        BodyScale = FVector(FMath::Max(BodyScale.X, 0.7f), FMath::Max(BodyScale.Y, 0.55f), FMath::Max(BodyScale.Z, 1.05f));
-        HeadScale = FVector(0.45f);
+        BodyScale = FVector(FMath::Max(BodyScale.X, 0.82f), FMath::Max(BodyScale.Y, 0.66f), FMath::Max(BodyScale.Z, 1.10f));
+        HeadScale = FVector(FMath::Max(HeadScale.X, 0.48f));
+        ArmScale = FVector(FMath::Max(ArmScale.X, 0.28f), FMath::Max(ArmScale.Y, 0.24f), FMath::Max(ArmScale.Z, 0.72f));
+        LeftArmLocation = FVector(0.0f, -58.0f, 46.0f);
+        RightArmLocation = FVector(0.0f, 58.0f, 46.0f);
         DebugLabel = TEXT("ARMORED");
         DebugLabelColor = FColor::Yellow;
     }
@@ -191,7 +223,10 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     {
         CurrentAttackRange += 250.0f;
         CurrentAttackDamage *= 1.15f;
-        ActorScale = FVector(1.05f, 1.05f, 1.15f);
+        BodyScale = FVector(FMath::Max(BodyScale.X, 0.58f), FMath::Max(BodyScale.Y, 0.42f), FMath::Max(BodyScale.Z, 1.04f));
+        ArmScale = FVector(FMath::Max(ArmScale.X, 0.18f), FMath::Max(ArmScale.Y, 0.18f), 1.24f);
+        LeftArmLocation = FVector(0.0f, -56.0f, 34.0f);
+        RightArmLocation = FVector(0.0f, 56.0f, 34.0f);
         DebugLabel = TEXT("LONG ARM");
         DebugLabelColor = FColor(170, 90, 255);
     }
@@ -214,7 +249,17 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     {
         HeadVisual->SetRelativeScale3D(HeadScale);
     }
-    SetActorScale3D(ActorScale);
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetRelativeLocation(LeftArmLocation);
+        LeftArmVisual->SetRelativeScale3D(ArmScale);
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetRelativeLocation(RightArmLocation);
+        RightArmVisual->SetRelativeScale3D(ArmScale);
+    }
+    SetActorScale3D(FVector::OneVector);
     SetPrototypeDebugLabel(DebugLabel, DebugLabelColor);
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
@@ -233,6 +278,41 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
     TypeLabel->SetText(FText::FromString(Label));
     TypeLabel->SetTextRenderColor(Color);
     TypeLabel->SetWorldSize(WorldSize);
+}
+
+void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
+{
+    if (!TypeLabel || !GetWorld())
+    {
+        return;
+    }
+
+    if (HealthComponent && HealthComponent->IsDead())
+    {
+        TypeLabel->SetVisibility(false, true);
+        return;
+    }
+
+    APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0);
+    if (!CameraManager)
+    {
+        return;
+    }
+
+    const FVector LabelLocation = TypeLabel->GetComponentLocation();
+    const FVector ToCamera = CameraManager->GetCameraLocation() - LabelLocation;
+    const float DistanceSq = ToCamera.SizeSquared();
+    const bool bShouldShow = DistanceSq <= FMath::Square(4500.0f);
+    TypeLabel->SetVisibility(bShouldShow, true);
+    if (!bShouldShow || ToCamera.IsNearlyZero())
+    {
+        return;
+    }
+
+    // TextRender faces along its local +X axis. Use yaw-only billboarding so the label stays readable
+    // from normal FPS angles and never inherits the enemy's left/right rotation.
+    const FRotator FacingRotation(0.0f, ToCamera.Rotation().Yaw, 0.0f);
+    TypeLabel->SetWorldRotation(FacingRotation);
 }
 
 void AEvaZombieCharacter::ApplyEvolutionToController()
@@ -299,6 +379,14 @@ void AEvaZombieCharacter::OnDefeated()
     if (HeadVisual)
     {
         HeadVisual->SetVisibility(false, true);
+    }
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetVisibility(false, true);
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetVisibility(false, true);
     }
     if (TypeLabel)
     {

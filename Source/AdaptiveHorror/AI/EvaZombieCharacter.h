@@ -18,6 +18,7 @@ class ADAPTIVEHORROR_API AEvaZombieCharacter : public ACharacter
 
 public:
     AEvaZombieCharacter();
+    virtual void Tick(float DeltaSeconds) override;
 
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
         class AController* EventInstigator, AActor* DamageCauser) override;
@@ -37,6 +38,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Evolution")
     void ApplyEvolutionToController();
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UTextRenderComponent* GetTypeLabelComponent() const { return TypeLabel; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UStaticMeshComponent* GetBodyVisualComponent() const { return BodyVisual; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UStaticMeshComponent* GetLeftArmVisualComponent() const { return LeftArmVisual; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UStaticMeshComponent* GetRightArmVisualComponent() const { return RightArmVisual; }
+
 protected:
     virtual void BeginPlay() override;
 
@@ -45,6 +58,7 @@ protected:
 
     virtual void OnDefeated();
     void SetPrototypeDebugLabel(const FString& Label, const FColor& Color, float WorldSize = 42.0f);
+    void UpdatePrototypeDebugLabelFacing();
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -54,6 +68,12 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UStaticMeshComponent> HeadVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> LeftArmVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> RightArmVisual;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> TypeLabel;

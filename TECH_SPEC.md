@@ -1,5 +1,32 @@
 # Technical Specification — Adaptive Horror FPS Demo
 
+## Cycle 009 実装仕様メモ
+
+### AI障害物回避リカバリ
+
+- 既存のAIController Tick制御を維持し、Behavior Tree全面移行は行わない。
+- `MoveTo` accepted後でも実移動が止まる場合があるため、一定時間進捗がない場合は `TrySidestepAroundObstacle()` を実行する。
+- Direct fallbackの前方traceが壁を検出した場合、前進を押し付けず左右のsidestep候補を交互に試す。
+- fallback移動が発生した場合は `AEvaPrototypeGameMode::NotifyFallbackMovementUsed()` でHUD/Debug counterに反映する。
+
+### 敵Visual識別
+
+- Runtime Graybox用の仮モデルは正式アセットではなく、StaticMeshのBody/Head/Armパーツで敵タイプを識別する。
+- `AEvaZombieCharacter` は `BodyVisual` / `HeadVisual` / `LeftArmVisual` / `RightArmVisual` / `TypeLabel` を持つ。
+- LongArmやCompositeでもActorScaleは変更しない。Capsule CollisionとNavigation Agentを壊さないため、見た目差は相対パーツのみで表現する。
+- HUNTER / ADAM / ADAM Phase2は派生クラス側でBody/Head/Armサイズとラベルを上書きする。
+
+### 頭上ラベル
+
+- `UTextRenderComponent` の固定Yaw 180度は使わない。
+- Tickでプレイヤーカメラ方向へのYaw-only Billboardを行い、左右反転を避ける。
+- 死亡時は非表示。遠距離では邪魔にならないよう非表示。
+
+### Automation
+
+- `Scripts/RunBuildCheck.ps1` は `Automation RunTests AdaptiveHorror` を実行する。
+- 2026-07-12時点のテスト数は15件。
+
 ## Cycle 007 実装仕様メモ
 
 ### Runtime Graybox Navigation

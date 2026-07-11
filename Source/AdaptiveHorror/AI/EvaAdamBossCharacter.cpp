@@ -55,6 +55,16 @@ void AEvaAdamBossCharacter::BeginPlay()
     {
         HeadVisual->SetRelativeScale3D(FVector(0.75f));
     }
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetRelativeLocation(FVector(0.0f, -86.0f, 48.0f));
+        LeftArmVisual->SetRelativeScale3D(FVector(0.34f, 0.30f, 1.38f));
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetRelativeLocation(FVector(0.0f, 86.0f, 48.0f));
+        RightArmVisual->SetRelativeScale3D(FVector(0.34f, 0.30f, 1.38f));
+    }
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor(255, 128, 0), 78.0f);
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
@@ -97,6 +107,16 @@ void AEvaAdamBossCharacter::EnterPhaseTwo()
     if (HeadVisual)
     {
         HeadVisual->SetRelativeScale3D(FVector(0.85f));
+    }
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetRelativeLocation(FVector(0.0f, -96.0f, 44.0f));
+        LeftArmVisual->SetRelativeScale3D(FVector(0.40f, 0.34f, 1.55f));
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetRelativeLocation(FVector(0.0f, 96.0f, 44.0f));
+        RightArmVisual->SetRelativeScale3D(FVector(0.40f, 0.34f, 1.55f));
     }
     SetPrototypeDebugLabel(TEXT("ADAM P2"), FColor::Red, 82.0f);
 

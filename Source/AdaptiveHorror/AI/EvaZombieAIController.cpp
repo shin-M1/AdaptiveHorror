@@ -70,6 +70,7 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
     }
 
     const FVector CurrentPawnLocation = GetPawn()->GetActorLocation();
+    bool bPerformedStuckRecovery = false;
     if (LastObservedPawnLocation.IsNearlyZero())
     {
         LastObservedPawnLocation = CurrentPawnLocation;
@@ -92,7 +93,13 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
                 TargetActor ? FVector::Dist(CurrentPawnLocation, TargetActor->GetActorLocation()) : -1.0f,
                 ConsecutiveMoveFailures);
             StopMovement();
+            LastMoveRequestTime = -1000.0f;
+            if (TargetActor)
+            {
+                bPerformedStuckRecovery = TrySidestepAroundObstacle(TargetActor->GetActorLocation());
+            }
             TimeSinceMeaningfulMovement = 0.0f;
+            LastObservedPawnLocation = CurrentPawnLocation;
         }
     }
     else
@@ -108,6 +115,10 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
         TryAttackTarget();
     }
     else if (TryHandleLearningAdaptation())
+    {
+        SetFocus(TargetActor);
+    }
+    else if (bPerformedStuckRecovery)
     {
         SetFocus(TargetActor);
     }
@@ -467,11 +478,88 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
 #if !UE_BUILD_SHIPPING
         DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 0.35f, 0, 2.0f);
 #endif
-        return false;
+        return TrySidestepAroundObstacle(GoalLocation);
     }
 
     // PIE runtime graybox may not have a baked NavMesh yet. Direct movement keeps the vertical slice playable
     // instead of leaving enemies idle until a proper authored map/nav volume replaces the runtime prototype.
+    return ApplyDirectFallbackMovement(MoveDirection, FColor::Yellow);
+}
+
+bool AEvaZombieAIController::TrySidestepAroundObstacle(const FVector& GoalLocation)
+{
+    APawn* ControlledPawn = GetPawn();
+    if (!ControlledPawn || !GetWorld())
+    {
+        return false;
+    }
+
+    const FVector DirectionToGoal = (GoalLocation - ControlledPawn->GetActorLocation()).GetSafeNormal2D();
+    if (DirectionToGoal.IsNearlyZero())
+    {
+        return false;
+    }
+
+    const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, DirectionToGoal).GetSafeNormal2D();
+    const FVector FirstSide = bPreferRightDetour ? RightDirection : -RightDirection;
+    const FVector SecondSide = -FirstSide;
+    bPreferRightDetour = !bPreferRightDetour;
+
+    const FVector CandidateDirections[] =
+    {
+        (DirectionToGoal * 0.30f + FirstSide).GetSafeNormal2D(),
+        (DirectionToGoal * 0.30f + SecondSide).GetSafeNormal2D(),
+        FirstSide,
+        SecondSide,
+        (DirectionToGoal * -0.20f + FirstSide).GetSafeNormal2D(),
+        (DirectionToGoal * -0.20f + SecondSide).GetSafeNormal2D()
+    };
+
+    for (const FVector& CandidateDirection : CandidateDirections)
+    {
+        if (ApplyDirectFallbackMovement(CandidateDirection, FColor::Cyan))
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[AI] Sidestep detour Controller=%s Pawn=%s Goal=%s Direction=%s"),
+                *GetName(),
+                *ControlledPawn->GetName(),
+                *GoalLocation.ToCompactString(),
+                *CandidateDirection.ToCompactString());
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool AEvaZombieAIController::ApplyDirectFallbackMovement(const FVector& DesiredDirection, const FColor& DebugColor)
+{
+    APawn* ControlledPawn = GetPawn();
+    if (!ControlledPawn || !GetWorld())
+    {
+        return false;
+    }
+
+    const FVector MoveDirection = DesiredDirection.GetSafeNormal2D();
+    if (MoveDirection.IsNearlyZero())
+    {
+        return false;
+    }
+
+    FHitResult WallHit;
+    const FVector TraceStart = ControlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+    const FVector TraceEnd = TraceStart + MoveDirection * 115.0f;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaDirectMoveFallback), false, ControlledPawn);
+    const bool bBlockedAhead = GetWorld()->LineTraceSingleByChannel(WallHit, TraceStart, TraceEnd,
+        ECC_WorldStatic, QueryParams);
+    if (bBlockedAhead)
+    {
+#if !UE_BUILD_SHIPPING
+        DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 0.35f, 0, 2.0f);
+#endif
+        return false;
+    }
+
     ControlledPawn->AddMovementInput(MoveDirection, 1.0f);
     if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
     {
@@ -479,7 +567,7 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
     }
 #if !UE_BUILD_SHIPPING
     DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
-        ControlledPawn->GetActorLocation() + MoveDirection * 160.0f, FColor::Yellow, false, 0.35f, 0, 2.0f);
+        ControlledPawn->GetActorLocation() + MoveDirection * 160.0f, DebugColor, false, 0.35f, 0, 2.0f);
 #endif
     return true;
 }

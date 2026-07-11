@@ -1,5 +1,72 @@
 # Next Codex Prompt
 
+## 最新引き継ぎ — 2026-07-12 Cycle 009
+
+あなたはこのプロジェクトのゲームディレクター兼リードエンジニアです。既存設計と現在の `main` ブランチを正として、UE5.8 C++体験版の安定化を続けてください。
+
+### 現在の検証済み状態
+
+- Development Editor / Win64 Build: Succeeded
+- `Scripts/RunBuildCheck.ps1 -MaxParallelActions 1`: Succeeded
+- Automation RunTests `AdaptiveHorror`: 15件すべてSuccess
+- Runtime smoke:
+  - `/Engine/Maps/Entry` が `EvaPrototypeGameMode` で起動
+  - Runtime Navigation Build開始を確認
+  - 初期ゾンビBeginPlayログを確認
+  - Fatal / crashなし
+- ユーザー報告によるPIE確認:
+  - Runtime NavMesh Ready
+  - 通常ゾンビの出現、追跡、接近攻撃
+  - MoveToActor accepted / PathValid=true
+  - 壁上スポーン再発なし
+
+### 今回入った主な修正
+
+- 通常ゾンビの障害物挟み停止対策:
+  - 詰まり検知時に `TrySidestepAroundObstacle()` で左右迂回を試す。
+  - Direct fallback前方ブロック時に、押し付けではなく側方候補へ逃がす。
+- 頭上ラベル:
+  - 固定Yaw 180度を廃止。
+  - プレイヤーカメラ方向へのYaw-only Billboardに変更。
+  - 死亡時と極端な遠距離では非表示。
+- 敵タイプの見た目差:
+  - `LeftArmVisual` / `RightArmVisual` を追加。
+  - LongArmはActorScaleではなく腕パーツを伸ばす。
+  - Fast / Armored / LongArm / Composite / HUNTER / ADAM / ADAM Phase2のBody/Head/Arm相対サイズを変更。
+  - Capsule Collision / Navigation Agentを壊さないため通常進化ではActorScaleを固定。
+- Automation:
+  - `RunBuildCheck.ps1` は `Automation RunTests AdaptiveHorror` を実行する。
+  - Visual系テスト2件を追加し、合計15件。
+
+### 次回の最優先タスク
+
+新規機能追加より、必ずUE5.8 PIEで実際の見た目と挙動を確認してください。
+
+1. 通常ゾンビ障害物回避
+   - 障害物を挟んでも停止し続けず、左右迂回してプレイヤーへ再接近すること。
+   - EnemyStuckが連続発生しないこと。
+2. 頭上ラベル
+   - 左右反転しないこと。
+   - プレイヤーカメラ方向を向くこと。
+   - 遠距離/死亡時の表示が邪魔にならないこと。
+3. 敵タイプ識別
+   - Fast / Armored / LongArm / Composite / HUNTER / ADAMがプレイ中に見分けられること。
+4. HUNTER
+   - F2強制出現、追跡、攻撃、撃破、解析コアDrop、学習倍率0.3、30秒後Tier+1再投入。
+5. ADAM
+   - F4でAdam Arenaへ移動、追跡、近接、突進、攻撃後再追跡、Phase2、撃破Stage Clear。
+6. HUD / Debug
+   - NAV DEBUG、Active Enemy、Spawn結果、Fallback/Stuck count、Hunter Tier、Adam Phaseが読めること。
+   - F9 Navigation Debug切替がPIEで機能すること。
+7. ライト
+   - Runtime debug lightが暗すぎず明るすぎず、敵とNavMesh確認を妨げないこと。
+
+### 注意点
+
+- この環境ではEditor viewportの目視PIE確認は未実施。Automation成功だけで「見た目」「実際に歩いた」は完了扱いにしない。
+- 複雑な障害物回避はBehavior Tree全面移行ではなく、現AIController構造内の軽量リカバリで対応している。
+- 正式 `.umap` 化後は保存済みNavMeshBoundsVolumeとNavMesh品質を優先して再調整する。
+
 ## 最新引き継ぎ — 2026-07-11 Cycle 007
 
 あなたはこのプロジェクトのゲームディレクター兼リードエンジニアです。既存設計に従い、UE5.8 C++体験版の開発を継続してください。

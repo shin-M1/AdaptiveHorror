@@ -43,6 +43,8 @@ protected:
     virtual void ApplyAdaptivePerception();
     bool MoveToActorOrDirect(AActor* GoalActor, float AcceptanceRadius);
     bool MoveToLocationOrDirect(const FVector& GoalLocation, float AcceptanceRadius);
+    bool TrySidestepAroundObstacle(const FVector& GoalLocation);
+    bool ApplyDirectFallbackMovement(const FVector& DesiredDirection, const FColor& DebugColor);
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
@@ -76,4 +78,5 @@ private:
     float LastMoveDiagnosticLogTime = -1000.0f;
     FVector LastMoveRequestGoal = FVector::ZeroVector;
     int32 ConsecutiveMoveFailures = 0;
+    bool bPreferRightDetour = true;
 };

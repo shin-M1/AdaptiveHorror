@@ -40,6 +40,16 @@ void AEvaHunterCharacter::BeginPlay()
     {
         HeadVisual->SetRelativeScale3D(FVector(0.48f));
     }
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetRelativeLocation(FVector(0.0f, -58.0f, 44.0f));
+        LeftArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 1.05f));
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetRelativeLocation(FVector(0.0f, 58.0f, 44.0f));
+        RightArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 1.05f));
+    }
     SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d"), HunterTier), FColor::Red, 54.0f);
 
     if (UGameInstance* GameInstance = GetGameInstance())

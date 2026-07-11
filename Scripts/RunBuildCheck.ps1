@@ -172,7 +172,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Step "Automation Test"
 $EditorCmd = Join-Path (Split-Path $UnrealEditor -Parent) "UnrealEditor-Cmd.exe"
 if ((Test-Path -LiteralPath $EditorCmd) -and -not $SkipAutomation) {
-    & $EditorCmd "$($ResolvedProject.Path)" -ExecCmds="Automation RunTests AdaptiveHorror.EVA; Quit" -unattended -nop4 -nosplash
+    & $EditorCmd "$($ResolvedProject.Path)" -ExecCmds="Automation RunTests AdaptiveHorror; Quit" -unattended -nop4 -nosplash
     if ($LASTEXITCODE -ne 0) {
         Write-Host "FAIL: Automation Test failed with exit code $LASTEXITCODE" -ForegroundColor Red
         exit $LASTEXITCODE

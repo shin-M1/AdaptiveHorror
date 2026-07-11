@@ -6,6 +6,7 @@
 #include "AI/EvaZombieCharacter.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
@@ -312,6 +313,65 @@ bool FEvaDebugCountersUpdateTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Fallback counter increments"), GameMode->GetFallbackMovementCount(), 1);
     TestEqual(TEXT("Stuck counter increments"), GameMode->GetStuckEnemyCount(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaEnemyVisualLongArmUsesPartsTest,
+    "AdaptiveHorror.Visual.Enemy.LongArmUsesPartScale",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaEnemyVisualLongArmUsesPartsTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+    TestNotNull(TEXT("Zombie spawns for visual test"), Zombie);
+    if (!Zombie)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Zombie->ConfigureEvolution(EEvaEvolutionType::LongArm);
+    TestTrue(TEXT("LongArm keeps actor scale stable for capsule/navigation"),
+        Zombie->GetActorScale3D().Equals(FVector::OneVector, KINDA_SMALL_NUMBER));
+    TestNotNull(TEXT("LongArm has left arm visual"), Zombie->GetLeftArmVisualComponent());
+    TestNotNull(TEXT("LongArm has body visual"), Zombie->GetBodyVisualComponent());
+    if (Zombie->GetLeftArmVisualComponent() && Zombie->GetBodyVisualComponent())
+    {
+        TestTrue(TEXT("LongArm arm is visibly longer than body baseline"),
+            Zombie->GetLeftArmVisualComponent()->GetRelativeScale3D().Z >
+            Zombie->GetBodyVisualComponent()->GetRelativeScale3D().Z);
+    }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaEnemyDebugLabelReadableDefaultTest,
+    "AdaptiveHorror.Visual.Enemy.DebugLabelReadableDefault",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaEnemyDebugLabelReadableDefaultTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+    TestNotNull(TEXT("Zombie spawns for label test"), Zombie);
+    if (!Zombie)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    UTextRenderComponent* Label = Zombie->GetTypeLabelComponent();
+    TestNotNull(TEXT("Enemy debug label component exists"), Label);
+    if (Label)
+    {
+        TestFalse(TEXT("Enemy debug label no longer starts with fixed mirrored yaw"),
+            FMath::IsNearlyEqual(FRotator::NormalizeAxis(Label->GetRelativeRotation().Yaw), 180.0f, 0.1f));
+        TestEqual(TEXT("Enemy debug label starts as ZOMBIE"), Label->Text.ToString(), FString(TEXT("ZOMBIE")));
+    }
+
+    World->DestroyWorld(false);
     return true;
 }
 

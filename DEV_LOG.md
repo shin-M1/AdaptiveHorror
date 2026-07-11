@@ -1,5 +1,89 @@
 # Development Log
 
+## 2026-07-12 - Cycle 009: 障害物回避リカバリ / 敵識別表示 / 全Automation導線
+
+### 実装・修正内容
+
+- 通常ゾンビの障害物挟み停止対策を強化した。
+  - `MoveTo` がacceptedでも実移動が止まった場合、停止ログだけで終わらず、短い側方迂回 `TrySidestepAroundObstacle()` を実行する。
+  - Direct fallbackで前方が壁に塞がれている場合、左右候補を交互に試し、押し付けではなく迂回方向へ移動する。
+  - fallback使用時のログとDebug lineを継続し、EnemyStuckが連続発生した際の追跡原因を見やすくした。
+- 頭上ラベルの左右反転を修正した。
+  - 固定Yaw 180度を廃止し、プレイヤーカメラ方向へYaw-only Billboardする方式に変更。
+  - 死亡時は非表示、極端な遠距離では非表示にして、Runtime Grayboxで読みやすさを優先した。
+- 敵タイプごとの見た目差を強化した。
+  - `LeftArmVisual` / `RightArmVisual` を追加し、LongArmはActorScaleではなく腕パーツを長くする。
+  - Fast / Armored / LongArm / Composite / HUNTER / ADAM / ADAM Phase2でBody/Head/Armの相対サイズを変更。
+  - Capsule CollisionやNavigation Agentを見た目Scaleで壊さないよう、通常進化ではActorScaleを `OneVector` に固定した。
+- HUNTER / ADAMの見た目識別を最低限強化した。
+  - HUNTERは高身長・細長い腕・赤ラベル。
+  - ADAMは大型Body/Head/Arm、Phase2でさらに大型化。
+- `Scripts/RunBuildCheck.ps1` のAutomation対象を `AdaptiveHorror.EVA` から `AdaptiveHorror` 全体へ変更した。
+  - EVA / Spawn / Visualの全テストが標準ビルド確認導線で走る。
+- Automation Testを2件追加した。
+  - `AdaptiveHorror.Visual.Enemy.DebugLabelReadableDefault`
+  - `AdaptiveHorror.Visual.Enemy.LongArmUsesPartScale`
+
+### 変更したファイル
+
+- `Scripts/RunBuildCheck.ps1`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Build / Automation / Runtime Smoke結果
+
+- 初回 `RunBuildCheck.ps1 -MaxParallelActions 2`
+  - Development Editor Build中に `GameFramework/PlayerCameraManager.h` includeパス不備で失敗。
+  - UE5.8では `Camera/PlayerCameraManager.h` が正しいため修正。
+  - 同時にUBAがLow memoryで一部compile processをkill/retryしたため、以降は `-MaxParallelActions 1` を使用。
+- 修正後 `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 1`
+  - Static source sanity: PASS
+  - Generate Project Files: Succeeded
+  - Development Editor / Win64 Build: Succeeded
+  - Automation RunTests `AdaptiveHorror`: 15件すべてSuccess
+  - `TEST COMPLETE. EXIT CODE: 0`
+- Runtime Smoke:
+  - `/Engine/Maps/Entry` が `EvaPrototypeGameMode` で起動。
+  - `UNavigationSystemV1::Build started` を確認。
+  - 初期ゾンビ `EnemyVisual` ログを確認。
+  - Fatal / crashなし。
+  - プロセスは15秒後に手動停止したため終了コードは `-1`。
+
+### PIE確認結果
+
+- ユーザー報告により確認済み:
+  - Runtime NavMesh表示/Ready。
+  - 通常ゾンビの出現、追跡、接近攻撃。
+  - MoveToActor accepted / PathValid=true。
+  - 壁上スポーン再発なし。
+- このCodex環境ではEditor viewportの目視操作ができないため未確認:
+  - 障害物を挟んだ際にゾンビが実際に迂回してプレイヤーへ再接近すること。
+  - 頭上ラベルがPIE画面上で左右反転せず読めること。
+  - 敵タイプ差がプレイ中に十分見分けられること。
+  - HUNTER / ADAMの実PIE追跡、攻撃後の再追跡、撃破/再出現。
+
+### 既知の未解決・リスク
+
+- Runtime Graybox環境のため、正式 `.umap` と保存済みNavMeshBoundsVolumeではない。NavMesh品質はPIEで継続確認が必要。
+- 障害物回避はBehavior Tree全面移行ではなく、既存AIController内の軽量リカバリ。複雑な迷路では限界がある。
+- TextRenderラベルのBillboardはYaw-only。通常FPS角度での読みやすさ優先で、極端な上下角では未確認。
+
+### 次にやるべきこと
+
+- UE5.8 PIEで、障害物を挟んだゾンビが停止せず迂回・再接近できるか確認する。
+- F2でHUNTERの追跡・攻撃・撃破・30秒Tier+1再投入を確認する。
+- F4でADAMの追跡・攻撃後の再追跡・Phase2・撃破Stage Clearを確認する。
+- 敵タイプ差、頭上ラベル、HUD NAV DEBUG、ライトの見え方を実画面で調整する。
+
 ## 2026-07-12 - Cycle 008: Safe Enemy Spawn / Spawn Telemetry / Marker Lighting
 
 ### Implemented

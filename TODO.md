@@ -1,5 +1,33 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 009 状態メモ
+
+障害物回避リカバリ、頭上ラベル、敵タイプ識別、全Automation導線を改善した。
+
+- [x] 作業前に `git status` / branch / logを確認した。
+- [x] 通常ゾンビの詰まり検知後に側方迂回を試すようにした。
+- [x] Direct fallback前方ブロック時に左右迂回候補を試すようにした。
+- [x] 頭上ラベルの固定Yaw 180度を廃止した。
+- [x] 頭上ラベルをプレイヤーカメラ方向へのYaw-only Billboardにした。
+- [x] LongArmの見た目をActorScaleではなく腕パーツで表現するようにした。
+- [x] Fast / Armored / LongArm / Compositeの体格差を相対パーツで強化した。
+- [x] HUNTER / ADAM / ADAM Phase2の仮モデル差を強化した。
+- [x] `RunBuildCheck.ps1` のAutomation対象を `AdaptiveHorror` 全体へ拡張した。
+- [x] Automation Testを15件に拡張し、全件Successを確認した。
+- [x] Development Editor / Win64 Build成功を確認した。
+- [x] Runtime smokeでGameMode起動、Navigation Build、初期ゾンビBeginPlay、Fatalなしを確認した。
+
+### 次回最優先TODO
+
+- [ ] UE5.8 PIEで、障害物を挟んだ通常ゾンビが停止せず迂回・再接近することを確認する。
+- [ ] PIEで頭上ラベルが左右反転せず読めることを確認する。
+- [ ] PIEでFast / Armored / LongArm / Composite / HUNTER / ADAMの見た目差が分かるか確認する。
+- [ ] F2でHUNTERの追跡、攻撃、撃破、解析コアDrop、30秒Tier+1再投入を確認する。
+- [ ] F4でADAMの追跡、近接、突進、攻撃後再追跡、Phase2、撃破Stage Clearを確認する。
+- [ ] HUD NAV DEBUGの視認性とF9切替をPIEで確認する。
+- [ ] Runtime debug lightの明るさが強すぎないか、敵/NAV確認がしやすいか調整する。
+- [ ] 可能なら障害物回避のPIE結果に応じてAcceptanceRadius / stuck判定秒数 / sidestep距離を微調整する。
+
 ## Cycle 007 状態メモ
 
 ゲームループ安定化として、Runtime GrayboxのNavMesh問題とAI追跡停止リスクを修正した。

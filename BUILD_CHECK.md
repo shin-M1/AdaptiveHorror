@@ -1,5 +1,29 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 009 実行結果 — 全Automation導線更新後
+
+2026-07-12に、UE5.8環境で以下を実行しました。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 1
+```
+
+結果:
+
+- Static source sanity: PASS
+- Generate Project Files: Succeeded
+- Development Editor / Win64 Build: Succeeded
+- Automation RunTests `AdaptiveHorror`: 15件すべてSuccess
+- `TEST COMPLETE. EXIT CODE: 0`
+
+補足:
+
+- `RunBuildCheck.ps1` のAutomation対象を `AdaptiveHorror.EVA` から `AdaptiveHorror` 全体へ変更しました。
+- `-MaxParallelActions 2` 実行時にUBAがLow memoryでcompile processをkill/retryしたため、メモリに余裕がない場合は `-MaxParallelActions 1` を推奨します。
+- 初回ビルドでは `GameFramework/PlayerCameraManager.h` includeパス不備が出ましたが、UE5.8向けに `Camera/PlayerCameraManager.h` へ修正済みです。
+- Runtime smokeでは `/Engine/Maps/Entry` 起動、GameMode、Navigation Build、初期ゾンビBeginPlay、Fatalなしを確認しました。
+- PIE目視確認はEditor上で継続してください。特に障害物回避、頭上ラベル、敵タイプ識別、HUNTER、ADAMはAutomation成功だけでは完了扱いにしません。
+
 ## Cycle 007 実行結果 — ゲームループ安定化後
 
 2026-07-11に、UE5.8環境で以下を実行しました。
