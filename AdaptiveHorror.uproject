@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "Category": "Games",
+  "Description": "Adaptive survival-horror FPS vertical slice.",
+  "Modules": [
+    {
+      "Name": "AdaptiveHorror",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    }
+  ]
+}
