@@ -109,3 +109,37 @@ Enemy spawning now uses a shared safe-spawn flow in `AEvaPrototypeGameMode`.
 - Runtime graybox lighting includes directional, sky, and point lights so the first zombie should be visible without extra map setup.
 
 Build note: if `RunBuildCheck.ps1` fails with `LNK1104` for `UnrealEditor-AdaptiveHorror.dll`, close Unreal Editor and Live Coding Console, then re-run the build check.
+
+## Debug key list - Cycle 009
+
+Current bindings are generated in `AEvaPlayerCharacter::CreateRuntimeInputAssets()` and routed through `AEvaPrototypeGameMode`.
+
+F2:
+
+- Force HUNTER deployment via `DebugForceHunterSpawn()`.
+
+F3:
+
+- Force an infected wave via `DebugForceZombieWave()`.
+- Skips if the game mode is not in active combat.
+
+F4:
+
+- Warp to the ADAM arena via `DebugWarpPlayerToAdamArena()`.
+
+F7/F9/N:
+
+- F7 prints a telemetry snapshot.
+- F9 and N both toggle navigation debug visualization.
+- F9/N are intentionally duplicated.
+
+P:
+
+- No current game-side binding found.
+
+その他:
+
+- F1: EVA analysis +20.
+- F5: full player heal/ammo restore.
+- F6: force Stage Clear.
+- F8: not assigned by game code because it conflicts with PIE Eject.

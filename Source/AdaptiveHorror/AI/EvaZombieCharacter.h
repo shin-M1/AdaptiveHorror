@@ -41,6 +41,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UTextRenderComponent* GetTypeLabelComponent() const { return TypeLabel; }
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void EnsurePrototypeDebugLabelInitialized();
+
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UStaticMeshComponent* GetBodyVisualComponent() const { return BodyVisual; }
 
@@ -59,6 +62,7 @@ protected:
     virtual void OnDefeated();
     void SetPrototypeDebugLabel(const FString& Label, const FColor& Color, float WorldSize = 42.0f);
     void UpdatePrototypeDebugLabelFacing();
+    void LogPrototypeDebugLabelState(const FString& Context) const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -77,6 +81,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> TypeLabel;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
+    float DebugLabelMaxVisibleDistance = 12000.0f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Combat")
     TObjectPtr<UBoxComponent> TorsoHitbox;

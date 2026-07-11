@@ -743,3 +743,62 @@ powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParalle
 Unresolved risk:
 
 - Runtime graybox still depends on `bWholeWorldNavigable`; a saved `.umap` with authored NavMeshBoundsVolume remains the long-term fix.
+
+## Latest Handoff - 2026-07-12 Cycle 009
+
+Continue from the obstacle-pursuit and enemy-label stabilization pass.
+
+Current important state:
+
+- Development Editor / Win64 build succeeds after closing Unreal Editor/Live Coding.
+- `Automation RunTests AdaptiveHorror` succeeds; latest run confirmed 15 successful tests.
+- Runtime smoke using `UnrealEditor-Cmd.exe -game -NullRHI -ExecCmds="Quit"` exits with code 0.
+- `AEvaZombieAIController` now logs detailed pursuit/path diagnostics:
+  - MoveRequest result.
+  - PathFollowing state.
+  - PathValid / IsPartial / PathPoints.
+  - CurrentPathPointIndex.
+  - player/enemy NavProjection results.
+  - left/right detour NavProjection results.
+  - enemy-to-player trace result.
+  - MoveCompleted ResultCode.
+  - capsule radius versus Nav Agent radius.
+- Direct fallback is now restricted to no-valid-nav-path + clear line-of-sight + clear forward trace.
+- Sidestep recovery now uses only NavProjection-successful destinations and returns to MoveToActor(Player).
+- Debug labels now use a common initialization path and log final state for normal zombies, evolved zombies, HUNTER, and ADAM.
+- README/DEV_LOG contain the current debug key list:
+  - F2 HUNTER
+  - F3 zombie wave
+  - F4 ADAM arena warp
+  - F7 telemetry
+  - F9/N navigation visualization
+  - P unbound
+  - F8 intentionally unbound because of PIE Eject.
+
+Immediate next PIE checks:
+
+1. Open the editor after the successful build.
+2. PIE in the runtime graybox.
+3. Place or use an obstacle that still has a real NavMesh route around it.
+4. Confirm a normal zombie follows the NavPath around the obstacle rather than stopping.
+5. Confirm that when no NavMesh detour exists, the AI does not force through the obstacle.
+6. Confirm labels are visible for:
+   - InitialVisibleZombie.
+   - F3 wave spawn.
+   - Adaptive/evolved spawn.
+   - HUNTER.
+   - ADAM.
+   - ADAM roar minions.
+   - HUNTER reinsertion.
+7. Test F2/F3/F4/F7/F9/N in PIE and confirm P is unbound.
+
+If issues remain:
+
+- Use `[AIPath]` logs first; do not add another blind sidestep loop.
+- Check whether `DiagnosticPathValid=true` and `DiagnosticIsPartial=false`.
+- If `DiagnosticPathValid=false`, fix map/NavMesh authoring before forcing AI code.
+- If label component exists but is hidden, inspect `HiddenInGame`, `OwnerNoSee`, `OnlyOwnerSee`, `DistanceHideCondition`, and `CameraAcquired` in `[EnemyVisual]` logs.
+
+Recommended next task:
+
+- PIE visual verification and targeted fixes only. Avoid new content until obstacle pursuit and all-enemy labels are confirmed in the viewport.

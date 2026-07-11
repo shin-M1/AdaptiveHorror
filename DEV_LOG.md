@@ -711,3 +711,149 @@
 - Visual green NavMesh display via Show Navigation in the editor viewport.
 - Visual confirmation that one normal zombie walks all the way toward the player over several seconds.
 - Visual confirmation of HUD NAV DEBUG display, overhead labels, and enemy size differences.
+
+## 2026-07-12 - Cycle 009: Obstacle pursuit diagnostics and enemy label unification
+
+### Scope
+
+- No new gameplay features were added.
+- Focused only on:
+  - Obstacle-side pursuit diagnosis/fix.
+  - Consistent debug label generation for every enemy type/spawn path.
+
+### Changes
+
+- `AEvaZombieAIController`
+  - Added detailed path diagnostics for blocked/stuck pursuit:
+    - MoveRequest result.
+    - PathFollowing state.
+    - active PathValid / IsPartial / PathPoints.
+    - CurrentPathPointIndex.
+    - diagnostic path valid/partial/point count.
+    - player and enemy NavProjection result.
+    - left/right detour candidate NavProjection result.
+    - enemy-to-player WorldStatic trace result.
+    - capsule radius and Nav Agent radius.
+  - Added `OnMoveCompleted` logging with ResultCode split into Success / Blocked / OffPath / Aborted / Invalid.
+  - Direct fallback is now allowed only when:
+    - no valid nav path exists,
+    - line trace to the player is clear,
+    - the forward movement trace is clear.
+  - Direct fallback no longer overwrites valid Path Following detours.
+  - Sidestep recovery now accepts only `ProjectPointToNavigation`-successful destinations and moves via `MoveToLocation`.
+  - Partial-path recovery now searches candidate detours from the partial path end when available.
+  - After a projected sidestep completes, the AI returns to `MoveToActor(Player)`.
+  - Repeated `MoveToActor` calls are throttled so pursuit is not overwritten every tick.
+
+- `AEvaZombieCharacter` / `AEvaHunterCharacter` / `AEvaAdamBossCharacter`
+  - Added common `EnsurePrototypeDebugLabelInitialized()` path.
+  - Label component is always registered, attached to the capsule, visible, not HiddenInGame, and not OwnerNoSee/OnlyOwnerSee.
+  - Camera acquisition failure no longer prevents label component creation or leaves labels hidden.
+  - Debug label visibility range is now exposed as `DebugLabelMaxVisibleDistance` and defaults to `12000`.
+  - Enemy label state logs now include:
+    - Actor name.
+    - class.
+    - EnemyType.
+    - DebugLabelComponent presence.
+    - LabelText.
+    - Visible.
+    - HiddenInGame.
+    - OwnerNoSee / OnlyOwnerSee.
+    - distance hide condition.
+    - camera acquisition result.
+  - HUNTER and ADAM now emit final label logs after their subclass-specific label text is applied.
+  - `ConfigureEvolution()` emits final label logs for evolved/AdaptiveSpawn/Adam-minion paths.
+
+### Build / test verification
+
+- First build attempt:
+  - GenerateProjectFiles: Success.
+  - Development Editor Build: failed at compile due UE5.8 API const mismatch in `ProjectPointToNavigation` and `FindPathToLocationSynchronously`.
+  - Fixed without deleting functionality by aligning local pointers to UE5.8 non-const overload requirements.
+- Second build attempt:
+  - Compile succeeded.
+  - Link failed with unresolved `FPathFollowingResultFlags::ToString`; UE5.8 header symbol was visible but not link-safe for this module usage.
+  - Fixed by logging path-following result flags as numeric `0x%04x`.
+- Third build attempt:
+  - Link failed because `UnrealEditor-AdaptiveHorror.dll` was locked by a running `UnrealEditor.exe`.
+  - Closed the editor normally and reran.
+- Final build check:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`
+  - Static source sanity: PASS.
+  - GenerateProjectFiles: Success.
+  - Development Editor / Win64 build without Live Coding: Success.
+  - Automation RunTests AdaptiveHorror: exit code 0.
+  - Automation log confirms 15 successful tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -NullRHI -unattended -nop4 -nosplash -ExecCmds="Quit"`
+  - Result: exit code 0.
+
+### Runtime smoke observations from logs
+
+- Initial zombie spawn path produced label logs with:
+  - `DebugLabelComponent=true`
+  - `LabelText=ZOMBIE`
+  - `Visible=true`
+  - `HiddenInGame=false`
+  - `OwnerNoSee=false`
+  - `OnlyOwnerSee=false`
+  - `DistanceHideCondition=false`
+  - `CameraAcquired=true`
+- Initial zombie pursuit produced:
+  - `MoveToActor accepted`
+  - `PathValid=true`
+  - `IsPartial=false`
+  - `PathPoints=3`
+  - `PlayerNavProjection=true`
+  - `EnemyNavProjection=true`
+  - left/right detour NavProjection both true.
+  - enemy-to-player trace blocked false in the smoke setup.
+  - `CapsuleRadius=42.0`
+  - `NavAgentRadius=42.0`
+
+### Debug key list from code
+
+F2:
+
+- `DebugForceHunterSpawn()` / `AEvaPrototypeGameMode::DebugForceHunterSpawn()`
+- Forces HUNTER deployment through the game mode debug path.
+
+F3:
+
+- `DebugForceZombieWave()` / `AEvaPrototypeGameMode::DebugForceZombieWave()`
+- Spawns a forced infected wave when the game is in active combat.
+
+F4:
+
+- `DebugWarpPlayerToAdamArena()` / `AEvaPrototypeGameMode::DebugWarpPlayerToAdamArena()`
+- Warps player to ADAM arena and starts/sets up ADAM arena flow.
+
+F7/F9/N:
+
+- F7: `DebugPrintTelemetrySnapshot()` prints telemetry snapshot.
+- F9 and N: `DebugToggleNavigationVisualization()` toggle navigation debug visualization.
+- F9 and N are intentionally duplicated for the same nav debug function.
+
+P:
+
+- No current game-side binding found in `AEvaPlayerCharacter` runtime Enhanced Input setup.
+
+その他:
+
+- F1: EVA analysis +20.
+- F5: restore player health/ammo.
+- F6: force Stage Clear.
+- F8: not bound by game code; intentionally reserved because it conflicts with PIE Eject.
+
+### PIE/manual verification status
+
+- Not visually confirmed in this environment:
+  - Obstacle-between-player-and-zombie pursuit behavior in PIE.
+  - Mixed-label issue across every live spawn route in a human-visible PIE session.
+  - F2/F3/F4/F7/F9/N runtime keypress behavior in the viewport.
+- The next PIE pass should specifically place an obstacle with a real NavMesh route around it and confirm that the AI follows Path Following rather than direct fallback.
+
+### Remaining risk
+
+- If there is no actual NavMesh route around a placed obstacle, the AI now intentionally refuses to force through by code. This is correct behavior; map/NavMesh authoring must provide a valid route.
+- Runtime graybox still benefits from converting to a saved `.umap` with authored NavMeshBoundsVolume for long-term stability.

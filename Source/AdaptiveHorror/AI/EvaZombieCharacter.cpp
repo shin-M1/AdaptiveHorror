@@ -66,6 +66,10 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     TypeLabel->SetText(FText::FromString(TEXT("ZOMBIE")));
     TypeLabel->SetTextRenderColor(FColor::Green);
     TypeLabel->SetWorldSize(42.0f);
+    TypeLabel->SetVisibility(true, true);
+    TypeLabel->SetHiddenInGame(false, true);
+    TypeLabel->SetOwnerNoSee(false);
+    TypeLabel->SetOnlyOwnerSee(false);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -116,22 +120,10 @@ void AEvaZombieCharacter::BeginPlay()
     {
         HealthComponent->OnDeath.AddDynamic(this, &AEvaZombieCharacter::HandleDeath);
     }
+    EnsurePrototypeDebugLabelInitialized();
     ConfigureEvolution(EvolutionType);
-    UE_LOG(LogAdaptiveHorror, Log,
-        TEXT("[EnemyVisual] BeginPlay Actor=%s Class=%s EnemyType=%s DebugLabelComponent=%s LabelText=%s LabelVisible=%s CapsuleScale=%s BodyScale=%s HeadScale=%s ActorScale=%s AIControllerClass=%s AutoPossessAI=%d Controller=%s"),
-        *GetName(),
-        *GetClass()->GetName(),
-        *UEnum::GetValueAsString(EvolutionType),
-        TypeLabel ? TEXT("true") : TEXT("false"),
-        TypeLabel ? *TypeLabel->Text.ToString() : TEXT("None"),
-        TypeLabel && TypeLabel->IsVisible() ? TEXT("true") : TEXT("false"),
-        *GetCapsuleComponent()->GetRelativeScale3D().ToCompactString(),
-        BodyVisual ? *BodyVisual->GetRelativeScale3D().ToCompactString() : TEXT("None"),
-        HeadVisual ? *HeadVisual->GetRelativeScale3D().ToCompactString() : TEXT("None"),
-        *GetActorScale3D().ToCompactString(),
-        AIControllerClass ? *AIControllerClass->GetName() : TEXT("None"),
-        static_cast<int32>(AutoPossessAI),
-        GetController() ? *GetController()->GetClass()->GetName() : TEXT("None"));
+    EnsurePrototypeDebugLabelInitialized();
+    LogPrototypeDebugLabelState(TEXT("BeginPlay"));
 }
 
 float AEvaZombieCharacter::TakeDamage(const float DamageAmount, const FDamageEvent& DamageEvent,
@@ -261,6 +253,7 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     }
     SetActorScale3D(FVector::OneVector);
     SetPrototypeDebugLabel(DebugLabel, DebugLabelColor);
+    LogPrototypeDebugLabelState(TEXT("ConfigureEvolution"));
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
         MovementComponent->MaxWalkSpeed = MovementSpeed;
@@ -270,6 +263,7 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
 
 void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FColor& Color, const float WorldSize)
 {
+    EnsurePrototypeDebugLabelInitialized();
     if (!TypeLabel)
     {
         return;
@@ -278,6 +272,78 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
     TypeLabel->SetText(FText::FromString(Label));
     TypeLabel->SetTextRenderColor(Color);
     TypeLabel->SetWorldSize(WorldSize);
+    TypeLabel->SetVisibility(true, true);
+    TypeLabel->SetHiddenInGame(false, true);
+    TypeLabel->SetOwnerNoSee(false);
+    TypeLabel->SetOnlyOwnerSee(false);
+}
+
+void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
+{
+    if (!TypeLabel)
+    {
+        UE_LOG(LogAdaptiveHorror, Warning,
+            TEXT("[EnemyVisual] LabelInitMissing Actor=%s Class=%s EnemyType=%s"),
+            *GetName(),
+            *GetClass()->GetName(),
+            *UEnum::GetValueAsString(EvolutionType));
+        return;
+    }
+
+    if (!TypeLabel->IsRegistered() && GetWorld())
+    {
+        TypeLabel->RegisterComponent();
+    }
+    if (TypeLabel->GetAttachParent() != GetCapsuleComponent())
+    {
+        TypeLabel->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+    }
+
+    TypeLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TypeLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 165.0f));
+    TypeLabel->SetHorizontalAlignment(EHTA_Center);
+    TypeLabel->SetVerticalAlignment(EVRTA_TextCenter);
+    TypeLabel->SetVisibility(true, true);
+    TypeLabel->SetHiddenInGame(false, true);
+    TypeLabel->SetOwnerNoSee(false);
+    TypeLabel->SetOnlyOwnerSee(false);
+}
+
+void AEvaZombieCharacter::LogPrototypeDebugLabelState(const FString& Context) const
+{
+    const APlayerCameraManager* CameraManager = GetWorld() ? UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0) : nullptr;
+    const bool bCameraAcquired = CameraManager != nullptr;
+    float CameraDistance = -1.0f;
+    bool bDistanceHidden = false;
+    if (TypeLabel && CameraManager)
+    {
+        CameraDistance = FVector::Dist(TypeLabel->GetComponentLocation(), CameraManager->GetCameraLocation());
+        bDistanceHidden = CameraDistance > DebugLabelMaxVisibleDistance;
+    }
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[EnemyVisual] %s Actor=%s Class=%s EnemyType=%s DebugLabelComponent=%s LabelText=%s Visible=%s HiddenInGame=%s OwnerNoSee=%s OnlyOwnerSee=%s DistanceHideCondition=%s MaxDistance=%.1f CameraAcquired=%s CameraDistance=%.1f CapsuleScale=%s BodyScale=%s HeadScale=%s ActorScale=%s AIControllerClass=%s AutoPossessAI=%d Controller=%s"),
+        *Context,
+        *GetName(),
+        *GetClass()->GetName(),
+        *UEnum::GetValueAsString(EvolutionType),
+        TypeLabel ? TEXT("true") : TEXT("false"),
+        TypeLabel ? *TypeLabel->Text.ToString() : TEXT("None"),
+        TypeLabel && TypeLabel->IsVisible() ? TEXT("true") : TEXT("false"),
+        TypeLabel && TypeLabel->bHiddenInGame ? TEXT("true") : TEXT("false"),
+        TypeLabel && TypeLabel->bOwnerNoSee ? TEXT("true") : TEXT("false"),
+        TypeLabel && TypeLabel->bOnlyOwnerSee ? TEXT("true") : TEXT("false"),
+        bDistanceHidden ? TEXT("true") : TEXT("false"),
+        DebugLabelMaxVisibleDistance,
+        bCameraAcquired ? TEXT("true") : TEXT("false"),
+        CameraDistance,
+        *GetCapsuleComponent()->GetRelativeScale3D().ToCompactString(),
+        BodyVisual ? *BodyVisual->GetRelativeScale3D().ToCompactString() : TEXT("None"),
+        HeadVisual ? *HeadVisual->GetRelativeScale3D().ToCompactString() : TEXT("None"),
+        *GetActorScale3D().ToCompactString(),
+        AIControllerClass ? *AIControllerClass->GetName() : TEXT("None"),
+        static_cast<int32>(AutoPossessAI),
+        GetController() ? *GetController()->GetClass()->GetName() : TEXT("None"));
 }
 
 void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
@@ -296,13 +362,15 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0);
     if (!CameraManager)
     {
+        TypeLabel->SetVisibility(true, true);
+        TypeLabel->SetHiddenInGame(false, true);
         return;
     }
 
     const FVector LabelLocation = TypeLabel->GetComponentLocation();
     const FVector ToCamera = CameraManager->GetCameraLocation() - LabelLocation;
     const float DistanceSq = ToCamera.SizeSquared();
-    const bool bShouldShow = DistanceSq <= FMath::Square(4500.0f);
+    const bool bShouldShow = DistanceSq <= FMath::Square(DebugLabelMaxVisibleDistance);
     TypeLabel->SetVisibility(bShouldShow, true);
     if (!bShouldShow || ToCamera.IsNearlyZero())
     {

@@ -385,3 +385,32 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: press P and confirm NavMesh coverage near spawn locations.
 - [ ] PIE: press F2 and F4 and confirm HUNTER/ADAM spawns are safe and not embedded.
 - [ ] PIE: confirm repeated `is stuck and failed to move` logs no longer appear during ordinary pursuit.
+
+## Cycle 009 Obstacle pursuit / label consistency follow-up
+
+- [x] Add path-state diagnostics for stopped obstacle pursuit.
+- [x] Log MoveRequest result, PathFollowing state, PathValid, IsPartial, PathPoints, CurrentPathPointIndex.
+- [x] Log player/enemy NavProjection results.
+- [x] Log left/right detour candidate NavProjection results.
+- [x] Log enemy-to-player trace result.
+- [x] Log MoveCompleted ResultCode and distinguish Success / Blocked / Aborted / Invalid / OffPath.
+- [x] Keep Path Following preferred whenever a valid NavPath exists.
+- [x] Restrict Direct fallback to clear line-of-sight and clear-forward cases only.
+- [x] Prevent Direct fallback from overwriting accepted MoveTo detours.
+- [x] Accept sidestep destinations only after successful NavProjection.
+- [x] Return to MoveToActor(Player) after sidestep recovery.
+- [x] Use partial path end as an alternate detour search origin when available.
+- [x] Avoid overwriting MoveTo every tick.
+- [x] Log capsule radius versus Nav Agent radius.
+- [x] Add common enemy debug label initialization.
+- [x] Ensure HUNTER/ADAM subclass label text is logged after subclass initialization.
+- [x] Log label state for BeginPlay and ConfigureEvolution paths.
+- [x] Document F2/F3/F4/F7/F9/N/P/F8 debug key status.
+- [x] Development Editor / Win64 build without Live Coding.
+- [x] Automation RunTests AdaptiveHorror: 15 tests succeeded.
+- [x] Runtime smoke with NullRHI commandlet launch.
+- [ ] PIE: confirm a zombie routes around an obstacle when the NavMesh contains a valid detour.
+- [ ] PIE: confirm the zombie stops instead of forcing through when the NavMesh has no valid detour.
+- [ ] PIE: confirm labels are visible for InitialVisibleZombie, Wave Spawn, AdaptiveSpawn, evolved zombie, HUNTER, ADAM, ADAM minions, and HUNTER reinsertion.
+- [ ] PIE: press F2/F3/F4/F7/F9/N and confirm runtime debug behavior.
+- [ ] Consider adding an automation test that directly exercises projected sidestep recovery with a synthetic obstacle/NavPath setup.

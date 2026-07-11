@@ -51,6 +51,7 @@ void AEvaHunterCharacter::BeginPlay()
         RightArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 1.05f));
     }
     SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d"), HunterTier), FColor::Red, 54.0f);
+    LogPrototypeDebugLabelState(TEXT("HunterBeginPlayFinal"));
 
     if (UGameInstance* GameInstance = GetGameInstance())
     {

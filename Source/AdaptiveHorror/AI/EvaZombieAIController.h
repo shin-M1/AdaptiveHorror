@@ -9,6 +9,7 @@
 class UAIPerceptionComponent;
 class UAISenseConfig_Hearing;
 class UAISenseConfig_Sight;
+struct FPathFollowingResult;
 
 UCLASS(Blueprintable)
 class ADAPTIVEHORROR_API AEvaZombieAIController : public AAIController
@@ -33,6 +34,7 @@ public:
 
 protected:
     virtual void OnPossess(APawn* InPawn) override;
+    virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
     UFUNCTION()
     void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
@@ -45,6 +47,9 @@ protected:
     bool MoveToLocationOrDirect(const FVector& GoalLocation, float AcceptanceRadius);
     bool TrySidestepAroundObstacle(const FVector& GoalLocation);
     bool ApplyDirectFallbackMovement(const FVector& DesiredDirection, const FColor& DebugColor);
+    bool CanUseDirectFallback(const FVector& DesiredDirection, float TraceDistance, FString& OutReason) const;
+    bool ProjectNavigationPoint(const FVector& Point, FVector& OutProjectedLocation) const;
+    void LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation, EPathFollowingRequestResult::Type MoveResult) const;
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
@@ -79,4 +84,6 @@ private:
     FVector LastMoveRequestGoal = FVector::ZeroVector;
     int32 ConsecutiveMoveFailures = 0;
     bool bPreferRightDetour = true;
+    bool bRecoveringSidestep = false;
+    float LastSidestepMoveTime = -1000.0f;
 };

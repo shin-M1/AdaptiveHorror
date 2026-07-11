@@ -66,6 +66,7 @@ void AEvaAdamBossCharacter::BeginPlay()
         RightArmVisual->SetRelativeScale3D(FVector(0.34f, 0.30f, 1.38f));
     }
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor(255, 128, 0), 78.0f);
+    LogPrototypeDebugLabelState(TEXT("AdamBeginPlayFinal"));
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
         MovementComponent->MaxWalkSpeed = AdamMovementSpeed;
@@ -119,6 +120,7 @@ void AEvaAdamBossCharacter::EnterPhaseTwo()
         RightArmVisual->SetRelativeScale3D(FVector(0.40f, 0.34f, 1.55f));
     }
     SetPrototypeDebugLabel(TEXT("ADAM P2"), FColor::Red, 82.0f);
+    LogPrototypeDebugLabelState(TEXT("AdamPhaseTwoLabel"));
 
 #if !UE_BUILD_SHIPPING
     if (GEngine)

@@ -10,13 +10,70 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/DamageType.h"
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/CapsuleComponent.h"
 #include "NavigationPath.h"
+#include "NavigationData.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
+
+namespace
+{
+const TCHAR* EvaMoveRequestResultToString(const EPathFollowingRequestResult::Type Result)
+{
+    switch (Result)
+    {
+    case EPathFollowingRequestResult::Failed:
+        return TEXT("Failed");
+    case EPathFollowingRequestResult::AlreadyAtGoal:
+        return TEXT("AlreadyAtGoal");
+    case EPathFollowingRequestResult::RequestSuccessful:
+        return TEXT("RequestSuccessful");
+    default:
+        return TEXT("Unknown");
+    }
+}
+
+const TCHAR* EvaPathStatusToString(const EPathFollowingStatus::Type Status)
+{
+    switch (Status)
+    {
+    case EPathFollowingStatus::Idle:
+        return TEXT("Idle");
+    case EPathFollowingStatus::Waiting:
+        return TEXT("Waiting");
+    case EPathFollowingStatus::Paused:
+        return TEXT("Paused");
+    case EPathFollowingStatus::Moving:
+        return TEXT("Moving");
+    default:
+        return TEXT("Unknown");
+    }
+}
+
+const TCHAR* EvaPathResultCodeToString(const EPathFollowingResult::Type ResultCode)
+{
+    switch (ResultCode)
+    {
+    case EPathFollowingResult::Success:
+        return TEXT("Success");
+    case EPathFollowingResult::Blocked:
+        return TEXT("Blocked");
+    case EPathFollowingResult::OffPath:
+        return TEXT("OffPath");
+    case EPathFollowingResult::Aborted:
+        return TEXT("Aborted");
+    case EPathFollowingResult::Invalid:
+        return TEXT("Invalid");
+    default:
+        return TEXT("Unknown");
+    }
+}
+}
 
 AEvaZombieAIController::AEvaZombieAIController()
 {
@@ -58,6 +115,42 @@ void AEvaZombieAIController::OnPossess(APawn* InPawn)
     }
 }
 
+void AEvaZombieAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+    Super::OnMoveCompleted(RequestID, Result);
+
+    const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+    const FNavPathSharedPtr ActivePath = PathComponent ? PathComponent->GetPath() : nullptr;
+    const int32 ActivePathPoints = ActivePath.IsValid() ? ActivePath->GetPathPoints().Num() : 0;
+    const bool bPathValid = PathComponent && PathComponent->HasValidPath();
+    const bool bPartial = PathComponent && PathComponent->HasPartialPath();
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[AIPath] MoveCompleted Controller=%s Pawn=%s RequestId=%u ResultCode=%s Result=%s Flags=0x%04x PathStatus=%s PathValid=%s IsPartial=%s PathPoints=%d CurrentPathPointIndex=%d"),
+        *GetName(),
+        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+        RequestID.GetID(),
+        EvaPathResultCodeToString(Result.Code),
+        *Result.ToString(),
+        static_cast<uint32>(Result.Flags),
+        PathComponent ? EvaPathStatusToString(PathComponent->GetStatus()) : TEXT("NoPathFollowingComponent"),
+        bPathValid ? TEXT("true") : TEXT("false"),
+        bPartial ? TEXT("true") : TEXT("false"),
+        ActivePathPoints,
+        PathComponent ? PathComponent->GetCurrentPathIndex() : INDEX_NONE);
+
+    if (bRecoveringSidestep && (Result.IsSuccess() || Result.Code == EPathFollowingResult::Blocked ||
+        Result.Code == EPathFollowingResult::OffPath || Result.Code == EPathFollowingResult::Invalid))
+    {
+        bRecoveringSidestep = false;
+        LastMoveRequestTime = -1000.0f;
+        if (TargetActor && GetPawn())
+        {
+            MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
+        }
+    }
+}
+
 void AEvaZombieAIController::Tick(const float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -67,6 +160,17 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
     {
         ClearPlayerTarget();
         return;
+    }
+
+    if (bRecoveringSidestep && GetWorld())
+    {
+        const float Now = GetWorld()->GetTimeSeconds();
+        if (GetMoveStatus() == EPathFollowingStatus::Moving && Now - LastSidestepMoveTime < 1.4f)
+        {
+            SetFocus(TargetActor);
+            return;
+        }
+        bRecoveringSidestep = false;
     }
 
     const FVector CurrentPawnLocation = GetPawn()->GetActorLocation();
@@ -92,11 +196,22 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
                 TargetActor ? *TargetActor->GetName() : TEXT("None"),
                 TargetActor ? FVector::Dist(CurrentPawnLocation, TargetActor->GetActorLocation()) : -1.0f,
                 ConsecutiveMoveFailures);
-            StopMovement();
-            LastMoveRequestTime = -1000.0f;
+            LogPathDiagnostics(TEXT("StuckRecovery"), TargetActor ? TargetActor->GetActorLocation() : CurrentPawnLocation,
+                EPathFollowingRequestResult::Failed);
             if (TargetActor)
             {
-                bPerformedStuckRecovery = TrySidestepAroundObstacle(TargetActor->GetActorLocation());
+                const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+                const bool bHasUsableFullPath = PathComponent && PathComponent->HasValidPath() && !PathComponent->HasPartialPath();
+                LastMoveRequestTime = -1000.0f;
+                if (bHasUsableFullPath)
+                {
+                    bPerformedStuckRecovery = MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
+                }
+                else
+                {
+                    StopMovement();
+                    bPerformedStuckRecovery = TrySidestepAroundObstacle(TargetActor->GetActorLocation());
+                }
             }
             TimeSinceMeaningfulMovement = 0.0f;
             LastObservedPawnLocation = CurrentPawnLocation;
@@ -331,50 +446,67 @@ void AEvaZombieAIController::ApplyAdaptivePerception()
 
 bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float AcceptanceRadius)
 {
-    if (!GoalActor || !GetPawn())
+    APawn* ControlledPawn = GetPawn();
+    if (!GoalActor || !ControlledPawn || !GetWorld())
     {
         return false;
     }
 
-    UNavigationPath* DiagnosticPath = GetWorld() ?
-        UNavigationSystemV1::FindPathToActorSynchronously(GetWorld(), GetPawn()->GetActorLocation(),
-            GoalActor, 50.0f, GetPawn()) :
-        nullptr;
+    const FVector GoalLocation = GoalActor->GetActorLocation();
+    const float Now = GetWorld()->GetTimeSeconds();
+    const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+    if (!bRecoveringSidestep && GetMoveStatus() == EPathFollowingStatus::Moving &&
+        PathComponent && PathComponent->HasValidPath() &&
+        PathComponent->GetMoveGoal() == GoalActor &&
+        Now - LastMoveRequestTime < 1.25f)
+    {
+        return true;
+    }
+
+    UNavigationPath* DiagnosticPath =
+        UNavigationSystemV1::FindPathToActorSynchronously(GetWorld(), ControlledPawn->GetActorLocation(),
+            GoalActor, 50.0f, ControlledPawn);
     const bool bHasValidDiagnosticPath = DiagnosticPath && DiagnosticPath->IsValid();
     const int32 PathPointCount = DiagnosticPath ? DiagnosticPath->PathPoints.Num() : 0;
 
     const EPathFollowingRequestResult::Type MoveResult =
         MoveToActor(GoalActor, AcceptanceRadius, true, true, true, nullptr, true);
+    LastMoveRequestGoal = GoalLocation;
+    LastMoveRequestTime = Now;
+
     if (MoveResult != EPathFollowingRequestResult::Failed)
     {
         ConsecutiveMoveFailures = 0;
-        const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
         if (Now - LastMoveDiagnosticLogTime > 1.25f)
         {
             LastMoveDiagnosticLogTime = Now;
             UE_LOG(LogAdaptiveHorror, Log,
-                TEXT("[AI] MoveToActor accepted Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f PathValid=%s PathPoints=%d Result=%d"),
+                TEXT("[AI] MoveToActor accepted Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f PathValid=%s IsPartial=%s PathPoints=%d Result=%s"),
                 *GetName(),
-                GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+                *ControlledPawn->GetName(),
                 *GoalActor->GetName(),
                 AcceptanceRadius,
                 bHasValidDiagnosticPath ? TEXT("true") : TEXT("false"),
+                DiagnosticPath && DiagnosticPath->IsPartial() ? TEXT("true") : TEXT("false"),
                 PathPointCount,
-                static_cast<int32>(MoveResult));
+                EvaMoveRequestResultToString(MoveResult));
+            LogPathDiagnostics(TEXT("MoveToActorAccepted"), GoalLocation, MoveResult);
         }
         return true;
     }
 
     ++ConsecutiveMoveFailures;
     UE_LOG(LogAdaptiveHorror, Warning,
-        TEXT("[AI] MoveToActor failed Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f PathValid=%s PathPoints=%d Failures=%d"),
+        TEXT("[AI] MoveToActor failed Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f PathValid=%s IsPartial=%s PathPoints=%d Failures=%d"),
         *GetName(),
-        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+        *ControlledPawn->GetName(),
         *GoalActor->GetName(),
         AcceptanceRadius,
         bHasValidDiagnosticPath ? TEXT("true") : TEXT("false"),
+        DiagnosticPath && DiagnosticPath->IsPartial() ? TEXT("true") : TEXT("false"),
         PathPointCount,
         ConsecutiveMoveFailures);
+    LogPathDiagnostics(TEXT("MoveToActorFailed"), GoalLocation, MoveResult);
     return MoveToLocationOrDirect(GoalActor->GetActorLocation(), AcceptanceRadius);
 }
 
@@ -387,9 +519,11 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
     }
 
     const float Now = GetWorld()->GetTimeSeconds();
-    if (GetMoveStatus() == EPathFollowingStatus::Moving &&
+    const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+    if (!bRecoveringSidestep && GetMoveStatus() == EPathFollowingStatus::Moving &&
+        PathComponent && PathComponent->HasValidPath() &&
         FVector::DistSquared2D(LastMoveRequestGoal, GoalLocation) < FMath::Square(90.0f) &&
-        Now - LastMoveRequestTime < 0.55f)
+        Now - LastMoveRequestTime < 0.75f)
     {
         return true;
     }
@@ -397,10 +531,9 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
     LastMoveRequestGoal = GoalLocation;
     LastMoveRequestTime = Now;
 
-    UNavigationPath* DiagnosticPath = GetWorld() ?
+    UNavigationPath* DiagnosticPath =
         UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), ControlledPawn->GetActorLocation(),
-            GoalLocation, ControlledPawn) :
-        nullptr;
+            GoalLocation, ControlledPawn);
     const bool bHasValidDiagnosticPath = DiagnosticPath && DiagnosticPath->IsValid();
     const int32 PathPointCount = DiagnosticPath ? DiagnosticPath->PathPoints.Num() : 0;
 
@@ -413,28 +546,38 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
         {
             LastMoveDiagnosticLogTime = Now;
             UE_LOG(LogAdaptiveHorror, Log,
-                TEXT("[AI] MoveToLocation accepted Controller=%s Pawn=%s Goal=%s Acceptance=%.1f PathValid=%s PathPoints=%d Result=%d"),
+                TEXT("[AI] MoveToLocation accepted Controller=%s Pawn=%s Goal=%s Acceptance=%.1f PathValid=%s IsPartial=%s PathPoints=%d Result=%s"),
                 *GetName(),
                 *ControlledPawn->GetName(),
                 *GoalLocation.ToCompactString(),
                 AcceptanceRadius,
                 bHasValidDiagnosticPath ? TEXT("true") : TEXT("false"),
+                DiagnosticPath && DiagnosticPath->IsPartial() ? TEXT("true") : TEXT("false"),
                 PathPointCount,
-                static_cast<int32>(MoveResult));
+                EvaMoveRequestResultToString(MoveResult));
+            LogPathDiagnostics(TEXT("MoveToLocationAccepted"), GoalLocation, MoveResult);
         }
         return true;
     }
 
     ++ConsecutiveMoveFailures;
     UE_LOG(LogAdaptiveHorror, Warning,
-        TEXT("[AI] MoveToLocation failed Controller=%s Pawn=%s Goal=%s Acceptance=%.1f PathValid=%s PathPoints=%d Failures=%d"),
+        TEXT("[AI] MoveToLocation failed Controller=%s Pawn=%s Goal=%s Acceptance=%.1f PathValid=%s IsPartial=%s PathPoints=%d Failures=%d"),
         *GetName(),
         *ControlledPawn->GetName(),
         *GoalLocation.ToCompactString(),
         AcceptanceRadius,
         bHasValidDiagnosticPath ? TEXT("true") : TEXT("false"),
+        DiagnosticPath && DiagnosticPath->IsPartial() ? TEXT("true") : TEXT("false"),
         PathPointCount,
         ConsecutiveMoveFailures);
+    LogPathDiagnostics(TEXT("MoveToLocationFailed"), GoalLocation, MoveResult);
+
+    if (bHasValidDiagnosticPath)
+    {
+        // If navigation can still produce a route, do not override Path Following with direct movement.
+        return false;
+    }
 
     const FVector DirectionToGoal = (GoalLocation - ControlledPawn->GetActorLocation()).GetSafeNormal2D();
     if (DirectionToGoal.IsNearlyZero())
@@ -467,17 +610,15 @@ bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation,
         return false;
     }
 
-    FHitResult WallHit;
-    const FVector TraceStart = ControlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
-    const FVector TraceEnd = TraceStart + MoveDirection * 95.0f;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaDirectMoveObstacle), false, ControlledPawn);
-    const bool bBlockedAhead = GetWorld()->LineTraceSingleByChannel(WallHit, TraceStart, TraceEnd,
-        ECC_WorldStatic, QueryParams);
-    if (bBlockedAhead)
+    FString DirectFallbackReason;
+    if (!CanUseDirectFallback(MoveDirection, 115.0f, DirectFallbackReason))
     {
-#if !UE_BUILD_SHIPPING
-        DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 0.35f, 0, 2.0f);
-#endif
+        UE_LOG(LogAdaptiveHorror, Warning,
+            TEXT("[AIPath] DirectFallback rejected Controller=%s Pawn=%s Goal=%s Reason=%s"),
+            *GetName(),
+            *ControlledPawn->GetName(),
+            *GoalLocation.ToCompactString(),
+            *DirectFallbackReason);
         return TrySidestepAroundObstacle(GoalLocation);
     }
 
@@ -494,7 +635,21 @@ bool AEvaZombieAIController::TrySidestepAroundObstacle(const FVector& GoalLocati
         return false;
     }
 
-    const FVector DirectionToGoal = (GoalLocation - ControlledPawn->GetActorLocation()).GetSafeNormal2D();
+    FVector SearchOrigin = ControlledPawn->GetActorLocation();
+    bool bUsingPartialPathEnd = false;
+    const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+    const FNavPathSharedPtr ActivePath = PathComponent ? PathComponent->GetPath() : nullptr;
+    if (ActivePath.IsValid() && ActivePath->IsPartial() && ActivePath->GetPathPoints().Num() > 0)
+    {
+        SearchOrigin = ActivePath->GetPathPoints().Last().Location;
+        bUsingPartialPathEnd = true;
+    }
+
+    FVector DirectionToGoal = (GoalLocation - SearchOrigin).GetSafeNormal2D();
+    if (DirectionToGoal.IsNearlyZero())
+    {
+        DirectionToGoal = (GoalLocation - ControlledPawn->GetActorLocation()).GetSafeNormal2D();
+    }
     if (DirectionToGoal.IsNearlyZero())
     {
         return false;
@@ -517,18 +672,50 @@ bool AEvaZombieAIController::TrySidestepAroundObstacle(const FVector& GoalLocati
 
     for (const FVector& CandidateDirection : CandidateDirections)
     {
-        if (ApplyDirectFallbackMovement(CandidateDirection, FColor::Cyan))
+        const FVector RawCandidateLocation = SearchOrigin + CandidateDirection * 420.0f;
+        FVector ProjectedCandidateLocation = FVector::ZeroVector;
+        const bool bProjected = ProjectNavigationPoint(RawCandidateLocation, ProjectedCandidateLocation);
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[AIPath] SidestepCandidate Controller=%s Pawn=%s Goal=%s Raw=%s Projected=%s ProjectedLocation=%s FromPartialPathEnd=%s"),
+            *GetName(),
+            *ControlledPawn->GetName(),
+            *GoalLocation.ToCompactString(),
+            *RawCandidateLocation.ToCompactString(),
+            bProjected ? TEXT("true") : TEXT("false"),
+            *ProjectedCandidateLocation.ToCompactString(),
+            bUsingPartialPathEnd ? TEXT("true") : TEXT("false"));
+
+        if (!bProjected)
         {
+            continue;
+        }
+
+        const EPathFollowingRequestResult::Type MoveResult =
+            MoveToLocation(ProjectedCandidateLocation, 70.0f, true, true, true, true, nullptr, true);
+        LogPathDiagnostics(TEXT("SidestepMoveToProjectedCandidate"), ProjectedCandidateLocation, MoveResult);
+        if (MoveResult != EPathFollowingRequestResult::Failed)
+        {
+            LastMoveRequestGoal = ProjectedCandidateLocation;
+            LastMoveRequestTime = GetWorld()->GetTimeSeconds();
+            LastSidestepMoveTime = LastMoveRequestTime;
+            bRecoveringSidestep = true;
+            ConsecutiveMoveFailures = 0;
             UE_LOG(LogAdaptiveHorror, Log,
-                TEXT("[AI] Sidestep detour Controller=%s Pawn=%s Goal=%s Direction=%s"),
+                TEXT("[AI] Sidestep detour accepted Controller=%s Pawn=%s Goal=%s ProjectedLocation=%s MoveRequest=%s"),
                 *GetName(),
                 *ControlledPawn->GetName(),
                 *GoalLocation.ToCompactString(),
-                *CandidateDirection.ToCompactString());
+                *ProjectedCandidateLocation.ToCompactString(),
+                EvaMoveRequestResultToString(MoveResult));
             return true;
         }
     }
 
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[AIPath] Sidestep detour failed Controller=%s Pawn=%s Goal=%s Note=No projected candidate accepted by MoveToLocation"),
+        *GetName(),
+        *ControlledPawn->GetName(),
+        *GoalLocation.ToCompactString());
     return false;
 }
 
@@ -546,17 +733,14 @@ bool AEvaZombieAIController::ApplyDirectFallbackMovement(const FVector& DesiredD
         return false;
     }
 
-    FHitResult WallHit;
-    const FVector TraceStart = ControlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
-    const FVector TraceEnd = TraceStart + MoveDirection * 115.0f;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaDirectMoveFallback), false, ControlledPawn);
-    const bool bBlockedAhead = GetWorld()->LineTraceSingleByChannel(WallHit, TraceStart, TraceEnd,
-        ECC_WorldStatic, QueryParams);
-    if (bBlockedAhead)
+    FString DirectFallbackReason;
+    if (!CanUseDirectFallback(MoveDirection, 115.0f, DirectFallbackReason))
     {
-#if !UE_BUILD_SHIPPING
-        DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 0.35f, 0, 2.0f);
-#endif
+        UE_LOG(LogAdaptiveHorror, Verbose,
+            TEXT("[AIPath] DirectFallback movement skipped Controller=%s Pawn=%s Reason=%s"),
+            *GetName(),
+            *ControlledPawn->GetName(),
+            *DirectFallbackReason);
         return false;
     }
 
@@ -570,6 +754,186 @@ bool AEvaZombieAIController::ApplyDirectFallbackMovement(const FVector& DesiredD
         ControlledPawn->GetActorLocation() + MoveDirection * 160.0f, DebugColor, false, 0.35f, 0, 2.0f);
 #endif
     return true;
+}
+
+bool AEvaZombieAIController::CanUseDirectFallback(const FVector& DesiredDirection, const float TraceDistance,
+    FString& OutReason) const
+{
+    const APawn* ControlledPawn = GetPawn();
+    if (!ControlledPawn || !GetWorld())
+    {
+        OutReason = TEXT("NoPawnOrWorld");
+        return false;
+    }
+
+    const FVector MoveDirection = DesiredDirection.GetSafeNormal2D();
+    if (MoveDirection.IsNearlyZero())
+    {
+        OutReason = TEXT("ZeroDirection");
+        return false;
+    }
+
+    const FVector TraceStart = ControlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaDirectFallbackTrace), false, ControlledPawn);
+    if (TargetActor)
+    {
+        QueryParams.AddIgnoredActor(TargetActor);
+    }
+
+    if (TargetActor)
+    {
+        FHitResult LineOfSightHit;
+        const FVector LineOfSightEnd = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+        const bool bLineBlocked = GetWorld()->LineTraceSingleByChannel(LineOfSightHit, TraceStart, LineOfSightEnd,
+            ECC_WorldStatic, QueryParams);
+        if (bLineBlocked)
+        {
+            OutReason = FString::Printf(TEXT("LineOfSightBlocked Hit=%s Impact=%s"),
+                LineOfSightHit.GetActor() ? *LineOfSightHit.GetActor()->GetName() : TEXT("WorldStatic"),
+                *LineOfSightHit.ImpactPoint.ToCompactString());
+#if !UE_BUILD_SHIPPING
+            DrawDebugLine(GetWorld(), TraceStart, LineOfSightEnd, FColor::Red, false, 0.35f, 0, 2.0f);
+#endif
+            return false;
+        }
+    }
+
+    FHitResult ForwardHit;
+    const FVector ForwardTraceEnd = TraceStart + MoveDirection * TraceDistance;
+    const bool bForwardBlocked = GetWorld()->LineTraceSingleByChannel(ForwardHit, TraceStart, ForwardTraceEnd,
+        ECC_WorldStatic, QueryParams);
+    if (bForwardBlocked)
+    {
+        OutReason = FString::Printf(TEXT("ForwardBlocked Hit=%s Impact=%s"),
+            ForwardHit.GetActor() ? *ForwardHit.GetActor()->GetName() : TEXT("WorldStatic"),
+            *ForwardHit.ImpactPoint.ToCompactString());
+#if !UE_BUILD_SHIPPING
+        DrawDebugLine(GetWorld(), TraceStart, ForwardTraceEnd, FColor::Red, false, 0.35f, 0, 2.0f);
+#endif
+        return false;
+    }
+
+    OutReason = TEXT("LineOfSightAndForwardClear");
+    return true;
+}
+
+bool AEvaZombieAIController::ProjectNavigationPoint(const FVector& Point, FVector& OutProjectedLocation) const
+{
+    OutProjectedLocation = FVector::ZeroVector;
+    if (!GetWorld())
+    {
+        return false;
+    }
+
+    UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    if (!NavSystem)
+    {
+        return false;
+    }
+
+    const ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn());
+    const FNavAgentProperties* AgentProperties = ControlledCharacter ?
+        &ControlledCharacter->GetNavAgentPropertiesRef() :
+        nullptr;
+
+    FNavLocation ProjectedNavLocation;
+    const bool bProjected = NavSystem->ProjectPointToNavigation(Point, ProjectedNavLocation,
+        FVector(260.0f, 260.0f, 420.0f), AgentProperties);
+    if (bProjected)
+    {
+        OutProjectedLocation = ProjectedNavLocation.Location;
+    }
+    return bProjected;
+}
+
+void AEvaZombieAIController::LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation,
+    const EPathFollowingRequestResult::Type MoveResult) const
+{
+    APawn* ControlledPawn = GetPawn();
+    if (!ControlledPawn || !GetWorld())
+    {
+        return;
+    }
+
+    const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
+    const FNavPathSharedPtr ActivePath = PathComponent ? PathComponent->GetPath() : nullptr;
+    const bool bActivePathValid = PathComponent && PathComponent->HasValidPath();
+    const bool bActivePathPartial = PathComponent && PathComponent->HasPartialPath();
+    const int32 ActivePathPoints = ActivePath.IsValid() ? ActivePath->GetPathPoints().Num() : 0;
+    const int32 CurrentPathPointIndex = PathComponent ? PathComponent->GetCurrentPathIndex() : INDEX_NONE;
+
+    UNavigationPath* DiagnosticPath = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),
+        ControlledPawn->GetActorLocation(), GoalLocation, ControlledPawn);
+    const bool bDiagnosticPathValid = DiagnosticPath && DiagnosticPath->IsValid();
+    const bool bDiagnosticPathPartial = DiagnosticPath && DiagnosticPath->IsPartial();
+    const int32 DiagnosticPathPoints = DiagnosticPath ? DiagnosticPath->PathPoints.Num() : 0;
+
+    FVector PlayerProjectedLocation = FVector::ZeroVector;
+    const bool bPlayerProjected = ProjectNavigationPoint(GoalLocation, PlayerProjectedLocation);
+    FVector EnemyProjectedLocation = FVector::ZeroVector;
+    const bool bEnemyProjected = ProjectNavigationPoint(ControlledPawn->GetActorLocation(), EnemyProjectedLocation);
+
+    FVector DirectionToGoal = (GoalLocation - ControlledPawn->GetActorLocation()).GetSafeNormal2D();
+    if (DirectionToGoal.IsNearlyZero())
+    {
+        DirectionToGoal = ControlledPawn->GetActorForwardVector().GetSafeNormal2D();
+    }
+    const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, DirectionToGoal).GetSafeNormal2D();
+    const FVector RightCandidate = ControlledPawn->GetActorLocation() + RightDirection * 420.0f;
+    const FVector LeftCandidate = ControlledPawn->GetActorLocation() - RightDirection * 420.0f;
+    FVector RightProjectedLocation = FVector::ZeroVector;
+    FVector LeftProjectedLocation = FVector::ZeroVector;
+    const bool bRightProjected = ProjectNavigationPoint(RightCandidate, RightProjectedLocation);
+    const bool bLeftProjected = ProjectNavigationPoint(LeftCandidate, LeftProjectedLocation);
+
+    FHitResult DirectTraceHit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaEnemyToPlayerTrace), false, ControlledPawn);
+    if (TargetActor)
+    {
+        QueryParams.AddIgnoredActor(TargetActor);
+    }
+    const FVector TraceStart = ControlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+    const FVector TraceEnd = GoalLocation + FVector(0.0f, 0.0f, 55.0f);
+    const bool bDirectTraceBlocked = GetWorld()->LineTraceSingleByChannel(DirectTraceHit, TraceStart, TraceEnd,
+        ECC_WorldStatic, QueryParams);
+
+    float CapsuleRadius = -1.0f;
+    float NavAgentRadius = -1.0f;
+    if (const ACharacter* ControlledCharacter = Cast<ACharacter>(ControlledPawn))
+    {
+        CapsuleRadius = ControlledCharacter->GetCapsuleComponent() ?
+            ControlledCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() :
+            -1.0f;
+        NavAgentRadius = ControlledCharacter->GetNavAgentPropertiesRef().AgentRadius;
+    }
+
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[AIPath] Context=%s Controller=%s Pawn=%s Goal=%s MoveRequest=%s PathFollowingState=%s PathValid=%s IsPartial=%s PathPoints=%d CurrentPathPointIndex=%d DiagnosticPathValid=%s DiagnosticIsPartial=%s DiagnosticPathPoints=%d PlayerNavProjection=%s PlayerProjected=%s EnemyNavProjection=%s EnemyProjected=%s LeftDetourNavProjection=%s LeftProjected=%s RightDetourNavProjection=%s RightProjected=%s EnemyToPlayerTraceBlocked=%s TraceHit=%s CapsuleRadius=%.1f NavAgentRadius=%.1f"),
+        Context ? Context : TEXT("None"),
+        *GetName(),
+        *ControlledPawn->GetName(),
+        *GoalLocation.ToCompactString(),
+        EvaMoveRequestResultToString(MoveResult),
+        PathComponent ? EvaPathStatusToString(PathComponent->GetStatus()) : TEXT("NoPathFollowingComponent"),
+        bActivePathValid ? TEXT("true") : TEXT("false"),
+        bActivePathPartial ? TEXT("true") : TEXT("false"),
+        ActivePathPoints,
+        CurrentPathPointIndex,
+        bDiagnosticPathValid ? TEXT("true") : TEXT("false"),
+        bDiagnosticPathPartial ? TEXT("true") : TEXT("false"),
+        DiagnosticPathPoints,
+        bPlayerProjected ? TEXT("true") : TEXT("false"),
+        *PlayerProjectedLocation.ToCompactString(),
+        bEnemyProjected ? TEXT("true") : TEXT("false"),
+        *EnemyProjectedLocation.ToCompactString(),
+        bLeftProjected ? TEXT("true") : TEXT("false"),
+        *LeftProjectedLocation.ToCompactString(),
+        bRightProjected ? TEXT("true") : TEXT("false"),
+        *RightProjectedLocation.ToCompactString(),
+        bDirectTraceBlocked ? TEXT("true") : TEXT("false"),
+        DirectTraceHit.GetActor() ? *DirectTraceHit.GetActor()->GetName() : TEXT("None"),
+        CapsuleRadius,
+        NavAgentRadius);
 }
 
 AActor* AEvaZombieAIController::FindNearestTaggedActor(const FName Tag, const FVector& FromLocation) const
