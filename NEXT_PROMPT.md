@@ -802,3 +802,74 @@ If issues remain:
 Recommended next task:
 
 - PIE visual verification and targeted fixes only. Avoid new content until obstacle pursuit and all-enemy labels are confirmed in the viewport.
+
+## Latest Handoff - 2026-07-12 Cycle 010
+
+Continue from the stationary-target repath and F4 ADAM debug-start fix.
+
+Current important state:
+
+- Live Codingなし Development Editor / Win64 build succeeds.
+- `Automation RunTests AdaptiveHorror` succeeds; latest log shows 15 successful tests.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -ExecCmds="Quit"` exits with code 0.
+- Zombies now monitor movement progress even when the player is completely stationary.
+- `[AIRepath]` logs include:
+  - Repath reason: TargetMoved / NoProgress / MoveCompleted / PathInvalid / SidestepFinished / PeriodicRefresh.
+  - Time since last MoveTo.
+  - Time since last meaningful progress.
+  - Recent movement distance.
+  - DirectFallback active.
+  - Sidestep active.
+  - PathFollowing status.
+  - CurrentMoveRequestID.
+  - MoveTo reissue result.
+- NoProgress now aborts the current move and reissues `MoveToActor(Player)` at low frequency.
+- Direct fallback is cleared whenever Path Following is accepted.
+- Sidestep completion/timeout returns to normal player pursuit.
+- F4 now:
+  - Logs `[AdamDebug] F4 pressed`.
+  - Teleports player to ADAM arena.
+  - Removes non-boss/non-HUNTER enemies near ADAM arena.
+  - Explicitly starts the ADAM encounter through the Director.
+  - Avoids ADAM duplicate spawn.
+  - Re-primes ADAM target when available.
+- Director ADAM start now:
+  - Does not leave `bAdamEncounterActive=true` after failed spawn.
+  - Reuses existing living ADAM if present.
+  - Logs AdamClass, existing count, spawn result, final location, NavProjection, AIController, possession, PlayerTarget, Health, Phase, and failure reason.
+- Generic safe spawn no longer calls `ConfigureEvolution()` on actors tagged `Adam` or `Boss`, preventing ADAM from being reset into normal zombie visuals/label.
+- Ordinary AdaptiveSpawn is skipped while ADAM encounter is active.
+- README notes that COMPOSITE is the 80% EVA analysis evolved variant.
+
+Immediate next PIE checks:
+
+1. Start PIE and place/stand behind the same obstacle as the previous repro.
+2. Keep the player completely still. Do not jump.
+3. Confirm a zombie reroutes around the obstacle via `[AIRepath] Reason=NoProgress` or `PeriodicRefresh`.
+4. Confirm it does not keep pressing into the wall for several seconds.
+5. Confirm it reaches melee range and attacks.
+6. Repeat with multiple zombies.
+7. Press F4:
+   - Confirm ADAM is visible in Adam Arena.
+   - Confirm normal/COMPOSITE debug enemies were cleared if they were blocking verification.
+   - Confirm repeated F4 does not duplicate ADAM.
+   - Confirm ADAM AIController is possessed and targeting the player.
+8. Confirm labels still visible:
+   - ADAM.
+   - ADAM summoned enemies.
+   - FAST.
+   - ARMORED.
+   - LONG ARM.
+
+If obstacle pursuit still fails:
+
+- Inspect `[AIRepath]` and `[AIPath]` together.
+- If `NoProgress` fires and MoveTo result is successful but the pawn still presses into the wall, inspect path corridor/collision mismatch around that obstacle.
+- If `PathValid=true` and NavMesh is green/connected, verify the obstacle collision is represented consistently for both navigation and character movement.
+- Do not add another direct sidestep loop until the path/movement mismatch is identified.
+
+If F4 still does not show ADAM:
+
+- Search logs for `[AdamDebug]`.
+- Check `ExistingAdamCount`, `SpawnAttempted`, `SpawnResult`, `AdamClass`, `NavProjected`, `AIController`, `Possessed`, `PlayerTarget`, and `DestroyReason`.
+- If `SpawnResult` is valid but the visual looks like a zombie, check for any remaining non-ADAM `ConfigureEvolution()` call path.

@@ -1180,7 +1180,10 @@ AEvaZombieCharacter* AEvaPrototypeGameMode::SpawnEnemyNearLocation(TSubclassOf<A
         return nullptr;
     }
 
-    Enemy->ConfigureEvolution(EvolutionType);
+    if (!Enemy->ActorHasTag(TEXT("Adam")) && !Enemy->ActorHasTag(TEXT("Boss")))
+    {
+        Enemy->ConfigureEvolution(EvolutionType);
+    }
     if (!Enemy->GetController())
     {
         Enemy->SpawnDefaultController();
@@ -1447,6 +1450,12 @@ void AEvaPrototypeGameMode::SpawnAdaptiveEnemy()
     {
         return;
     }
+    if (CurrentDirector && CurrentDirector->IsAdamEncounterActive())
+    {
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[Spawn] Type=Zombie Reason=AdaptiveSpawn Skipped=AdamEncounterActive"));
+        return;
+    }
 
     EEvaEvolutionType EvolutionType = EEvaEvolutionType::None;
     if (const UGameInstance* GameInstance = GetWorld()->GetGameInstance())
@@ -1575,6 +1584,39 @@ void AEvaPrototypeGameMode::ResetEnemyTargets()
     }
 }
 
+int32 AEvaPrototypeGameMode::CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, const float Radius)
+{
+    if (!GetWorld())
+    {
+        return 0;
+    }
+
+    int32 RemovedCount = 0;
+    for (TActorIterator<AEvaZombieCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaZombieCharacter* Enemy = *It;
+        if (!IsLivingEvaEnemy(Enemy) || Enemy->ActorHasTag(TEXT("Adam")) || Enemy->ActorHasTag(TEXT("Boss")) ||
+            Enemy->ActorHasTag(TEXT("Hunter")))
+        {
+            continue;
+        }
+
+        if (FVector::DistSquared2D(Enemy->GetActorLocation(), ArenaLocation) <= FMath::Square(Radius))
+        {
+            UE_LOG(LogAdaptiveHorror, Warning,
+                TEXT("[AdamDebug] CleanupRemovedEnemy Actor=%s Class=%s Location=%s ArenaLocation=%s Radius=%.1f"),
+                *Enemy->GetName(),
+                *Enemy->GetClass()->GetName(),
+                *Enemy->GetActorLocation().ToCompactString(),
+                *ArenaLocation.ToCompactString(),
+                Radius);
+            Enemy->Destroy();
+            ++RemovedCount;
+        }
+    }
+    return RemovedCount;
+}
+
 bool AEvaPrototypeGameMode::ShouldDisplayDebugStatusMessage() const
 {
     return GetWorld() && !LastDebugStatusMessage.IsEmpty() &&
@@ -1656,11 +1698,6 @@ void AEvaPrototypeGameMode::DebugWarpPlayerToAdamArena()
         return;
     }
 
-    if (CurrentDirector)
-    {
-        CurrentDirector->NotifyZoneEntered(EEvaFacilityZone::AdamArena);
-    }
-
     APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
     AEvaPlayerCharacter* Player = PlayerController ? Cast<AEvaPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
     if (!Player)
@@ -1672,13 +1709,50 @@ void AEvaPrototypeGameMode::DebugWarpPlayerToAdamArena()
     const FTransform AdamTransform = CurrentDirector ?
         CurrentDirector->GetAdamSpawnTransform() :
         FTransform(FRotator(0.0f, 180.0f, 0.0f), FVector(5100.0f, 0.0f, 170.0f));
+    const int32 ExistingAdamCountBefore = GetActiveAdamCount();
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[AdamDebug] F4 pressed ArenaLocation=%s ArenaState=Director:%s Zone:%s EncounterActive:%s StageClear:%s AdamClass=%s ExistingAdamCount=%d"),
+        *AdamTransform.GetLocation().ToCompactString(),
+        CurrentDirector ? TEXT("true") : TEXT("false"),
+        CurrentDirector ? *CurrentDirector->GetCurrentZoneName() : TEXT("NoDirector"),
+        CurrentDirector && CurrentDirector->IsAdamEncounterActive() ? TEXT("true") : TEXT("false"),
+        bStageClear ? TEXT("true") : TEXT("false"),
+        *AEvaAdamBossCharacter::StaticClass()->GetName(),
+        ExistingAdamCountBefore);
+
     const FVector PlayerLocation = AdamTransform.GetLocation() + FVector(-900.0f, 0.0f, 0.0f);
     Player->SetActorLocationAndRotation(PlayerLocation, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
     if (PlayerController)
     {
         PlayerController->SetControlRotation(FRotator::ZeroRotator);
     }
-    ShowDebugStatusMessage(TEXT("DEBUG F4: Warped to ADAM arena."), 4.0f);
+
+    const int32 RemovedEnemies = CleanupAdamArenaDebugEnemies(AdamTransform.GetLocation(), 2200.0f);
+    if (CurrentDirector)
+    {
+        CurrentDirector->NotifyZoneEntered(EEvaFacilityZone::AdamArena);
+        CurrentDirector->StartAdamEncounter();
+    }
+    else
+    {
+        UE_LOG(LogAdaptiveHorror, Warning, TEXT("[AdamDebug] F4 failed: no ResearchFacilityDirector."));
+    }
+
+    const int32 ExistingAdamCountAfter = GetActiveAdamCount();
+    if (CurrentDirector && CurrentDirector->GetActiveAdam())
+    {
+        PrimeEnemyForPlayer(CurrentDirector->GetActiveAdam());
+    }
+
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[AdamDebug] F4 result ArenaLocation=%s RemovedNonBossEnemies=%d ExistingAdamBefore=%d ExistingAdamAfter=%d ActiveAdam=%s"),
+        *AdamTransform.GetLocation().ToCompactString(),
+        RemovedEnemies,
+        ExistingAdamCountBefore,
+        ExistingAdamCountAfter,
+        CurrentDirector && CurrentDirector->GetActiveAdam() ? *CurrentDirector->GetActiveAdam()->GetName() : TEXT("None"));
+    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F4: ADAM arena start. Adam=%d Removed=%d"),
+        ExistingAdamCountAfter, RemovedEnemies), 4.0f);
 #endif
 }
 

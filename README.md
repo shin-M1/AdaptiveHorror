@@ -125,7 +125,8 @@ F3:
 
 F4:
 
-- Warp to the ADAM arena via `DebugWarpPlayerToAdamArena()`.
+- Move to the ADAM arena and explicitly start/confirm the ADAM encounter via `DebugWarpPlayerToAdamArena()`.
+- F4 also removes nearby non-boss debug enemies so ordinary Adaptive Spawn does not obscure ADAM verification.
 
 F7/F9/N:
 
@@ -143,3 +144,8 @@ P:
 - F5: full player heal/ammo restore.
 - F6: force Stage Clear.
 - F8: not assigned by game code because it conflicts with PIE Eject.
+
+Evolution label note:
+
+- `COMPOSITE` is the 80% EVA analysis evolved variant.
+- FAST / ARMORED / LONG ARM labels still need PIE visual confirmation after the latest ADAM/repath pass.

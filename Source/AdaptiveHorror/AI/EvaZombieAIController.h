@@ -26,6 +26,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|AI")
     void ClearPlayerTarget();
 
+    UFUNCTION(BlueprintPure, Category = "EVA|AI")
+    AActor* GetPlayerTarget() const { return TargetActor; }
+
     UFUNCTION(BlueprintCallable, Category = "EVA|AI")
     void ConfigureCombat(float NewAttackRange, float NewAttackDamage, float NewAttackInterval);
 
@@ -49,7 +52,10 @@ protected:
     bool ApplyDirectFallbackMovement(const FVector& DesiredDirection, const FColor& DebugColor);
     bool CanUseDirectFallback(const FVector& DesiredDirection, float TraceDistance, FString& OutReason) const;
     bool ProjectNavigationPoint(const FVector& Point, FVector& OutProjectedLocation) const;
+    bool EvaluateRepathForStationaryTarget(float DeltaSeconds);
+    bool ReissueMoveToTarget(const TCHAR* RepathReason, bool bAbortCurrentMove);
     void LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation, EPathFollowingRequestResult::Type MoveResult) const;
+    void LogRepathState(const TCHAR* RepathReason, EPathFollowingRequestResult::Type MoveResult, float RecentMoveDistance) const;
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
@@ -86,4 +92,13 @@ private:
     bool bPreferRightDetour = true;
     bool bRecoveringSidestep = false;
     float LastSidestepMoveTime = -1000.0f;
+    bool bDirectFallbackActive = false;
+    float LastDirectFallbackTime = -1000.0f;
+    float LastRepathMonitorTime = -1000.0f;
+    float LastMeaningfulProgressTime = -1000.0f;
+    float LastProgressSampleTime = -1000.0f;
+    float LastProgressDistance = 0.0f;
+    FVector LastProgressSampleLocation = FVector::ZeroVector;
+    FVector LastRepathTargetLocation = FVector::ZeroVector;
+    bool bInternalRepathAbort = false;
 };

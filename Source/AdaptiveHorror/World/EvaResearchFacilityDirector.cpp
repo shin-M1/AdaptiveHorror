@@ -1,11 +1,16 @@
 #include "World/EvaResearchFacilityDirector.h"
+#include "AdaptiveHorror.h"
 #include "AI/EvaAdamBossCharacter.h"
+#include "AI/EvaZombieAIController.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "AI/EvaZombieCharacter.h"
+#include "Components/EvaHealthComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Pickups/EvaAmmoPickup.h"
 #include "Pickups/EvaHealthPickup.h"
@@ -89,12 +94,47 @@ void AEvaResearchFacilityDirector::NotifyAdamDefeated(AEvaAdamBossCharacter* Ada
 
 void AEvaResearchFacilityDirector::StartAdamEncounter()
 {
-    if (!GetWorld() || !AdamBossClass || bAdamEncounterActive || bStageClear)
+    if (!GetWorld() || bStageClear)
     {
+        LogAdamEncounterState(TEXT("StartAdamEncounterSkipped"), false, ActiveAdam,
+            bStageClear ? TEXT("StageClear") : TEXT("NoWorld"));
         return;
     }
 
-    bAdamEncounterActive = true;
+    if (!AdamBossClass)
+    {
+        bAdamEncounterActive = false;
+        LogAdamEncounterState(TEXT("StartAdamEncounterFailed"), false, nullptr, TEXT("AdamClassInvalid"));
+        if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
+        {
+            GameMode->ShowDebugStatusMessage(TEXT("WARNING: ADAM spawn failed - class invalid."), 5.0f);
+        }
+        return;
+    }
+
+    if (!IsValid(ActiveAdam) || (ActiveAdam->GetHealthComponent() && ActiveAdam->GetHealthComponent()->IsDead()))
+    {
+        ActiveAdam = FindExistingLivingAdam();
+    }
+    if (IsValid(ActiveAdam))
+    {
+        bAdamEncounterActive = true;
+        CurrentZone = EEvaFacilityZone::AdamArena;
+        CurrentObjective = TEXT("Defeat ADAM.");
+        if (!ActiveAdam->GetController())
+        {
+            ActiveAdam->SpawnDefaultController();
+        }
+        if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+        {
+            ActiveAdam->AlertToPlayer(PlayerController->GetPawn());
+        }
+        LogAdamEncounterState(TEXT("StartAdamEncounterExistingAdam"), false, ActiveAdam);
+        return;
+    }
+
+    bAdamEncounterActive = false;
+    CurrentZone = EEvaFacilityZone::AdamArena;
     CurrentObjective = TEXT("Defeat ADAM.");
     if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
     {
@@ -102,9 +142,11 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
     }
 
     ActiveAdam = nullptr;
+    bool bSpawnAttempted = false;
     if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
     {
         TSubclassOf<AEvaZombieCharacter> AdamAsEnemy = AdamBossClass;
+        bSpawnAttempted = true;
         ActiveAdam = Cast<AEvaAdamBossCharacter>(GameMode->SpawnEnemyNearLocation(AdamAsEnemy,
             AdamSpawnTransform.GetLocation(), 220.0f, 760.0f, TEXT("ADAM"), TEXT("AdamEncounter")));
     }
@@ -113,16 +155,120 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
         FActorSpawnParameters SpawnParameters;
         SpawnParameters.SpawnCollisionHandlingOverride =
             ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+        bSpawnAttempted = true;
         ActiveAdam = GetWorld()->SpawnActor<AEvaAdamBossCharacter>(AdamBossClass, AdamSpawnTransform.GetLocation(),
             AdamSpawnTransform.Rotator(), SpawnParameters);
     }
     if (!ActiveAdam)
     {
+        bAdamEncounterActive = false;
+        LogAdamEncounterState(TEXT("StartAdamEncounterFailed"), bSpawnAttempted, nullptr, TEXT("SpawnReturnedNull"));
         if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
         {
             GameMode->ShowDebugStatusMessage(TEXT("WARNING: ADAM spawn failed."), 5.0f);
         }
+        return;
     }
+
+    bAdamEncounterActive = true;
+    if (!ActiveAdam->GetController())
+    {
+        ActiveAdam->SpawnDefaultController();
+    }
+    if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+    {
+        ActiveAdam->AlertToPlayer(PlayerController->GetPawn());
+    }
+    LogAdamEncounterState(TEXT("StartAdamEncounterSpawned"), bSpawnAttempted, ActiveAdam);
+}
+
+AEvaAdamBossCharacter* AEvaResearchFacilityDirector::FindExistingLivingAdam() const
+{
+    if (!GetWorld())
+    {
+        return nullptr;
+    }
+
+    for (TActorIterator<AEvaAdamBossCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaAdamBossCharacter* Adam = *It;
+        if (Adam && Adam->GetHealthComponent() && !Adam->GetHealthComponent()->IsDead())
+        {
+            return Adam;
+        }
+    }
+    return nullptr;
+}
+
+int32 AEvaResearchFacilityDirector::CountExistingLivingAdam() const
+{
+    if (!GetWorld())
+    {
+        return 0;
+    }
+
+    int32 Count = 0;
+    for (TActorIterator<AEvaAdamBossCharacter> It(GetWorld()); It; ++It)
+    {
+        const AEvaAdamBossCharacter* Adam = *It;
+        if (Adam && Adam->GetHealthComponent() && !Adam->GetHealthComponent()->IsDead())
+        {
+            ++Count;
+        }
+    }
+    return Count;
+}
+
+void AEvaResearchFacilityDirector::LogAdamEncounterState(const FString& Context, const bool bSpawnAttempted,
+    AEvaAdamBossCharacter* SpawnResult, const FString& DestroyReason) const
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    FVector ProjectedLocation = FVector::ZeroVector;
+    bool bNavProjected = false;
+    if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
+    {
+        FNavLocation NavLocation;
+        bNavProjected = NavigationSystem->ProjectPointToNavigation(AdamSpawnTransform.GetLocation(), NavLocation,
+            FVector(360.0f, 360.0f, 520.0f));
+        if (bNavProjected)
+        {
+            ProjectedLocation = NavLocation.Location;
+        }
+    }
+
+    const AEvaAdamBossCharacter* Adam = SpawnResult ? SpawnResult : ActiveAdam.Get();
+    const AController* AdamController = Adam ? Adam->GetController() : nullptr;
+    const AEvaZombieAIController* EvaAI = Cast<AEvaZombieAIController>(AdamController);
+    const APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+    const APawn* PlayerPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+    const bool bPlayerTarget = EvaAI && PlayerPawn && EvaAI->GetPlayerTarget() == PlayerPawn;
+    const UEvaHealthComponent* Health = Adam ? Adam->GetHealthComponent() : nullptr;
+
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[AdamDebug] Context=%s ArenaLocation=%s ArenaState=Zone:%s Active:%s StageClear:%s AdamClass=%s ExistingAdamCount=%d SpawnAttempted=%s SpawnResult=%s FinalLocation=%s NavProjected=%s ProjectedLocation=%s AIController=%s Possessed=%s PlayerTarget=%s Health=%.1f/%.1f Phase=%s DestroyReason=%s"),
+        *Context,
+        *AdamSpawnTransform.GetLocation().ToCompactString(),
+        *GetCurrentZoneName(),
+        bAdamEncounterActive ? TEXT("true") : TEXT("false"),
+        bStageClear ? TEXT("true") : TEXT("false"),
+        AdamBossClass ? *AdamBossClass->GetName() : TEXT("None"),
+        CountExistingLivingAdam(),
+        bSpawnAttempted ? TEXT("true") : TEXT("false"),
+        Adam ? *Adam->GetName() : TEXT("None"),
+        Adam ? *Adam->GetActorLocation().ToCompactString() : TEXT("None"),
+        bNavProjected ? TEXT("true") : TEXT("false"),
+        *ProjectedLocation.ToCompactString(),
+        AdamController ? *AdamController->GetClass()->GetName() : TEXT("None"),
+        AdamController && AdamController->GetPawn() == Adam ? TEXT("true") : TEXT("false"),
+        bPlayerTarget ? TEXT("true") : TEXT("false"),
+        Health ? Health->GetCurrentHealth() : -1.0f,
+        Health ? Health->GetMaxHealth() : -1.0f,
+        Adam && Adam->IsPhaseTwo() ? TEXT("Phase2") : TEXT("Phase1"),
+        DestroyReason.IsEmpty() ? TEXT("None") : *DestroyReason);
 }
 
 void AEvaResearchFacilityDirector::CompleteStage()

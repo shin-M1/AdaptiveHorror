@@ -174,6 +174,7 @@ private:
         const FString& Body, const FVector& Location);
     void ResetEnemyTargets();
     void PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) const;
+    int32 CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, float Radius);
 
     UPROPERTY()
     TObjectPtr<UStaticMesh> RuntimeCubeMesh;

@@ -414,3 +414,33 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: confirm labels are visible for InitialVisibleZombie, Wave Spawn, AdaptiveSpawn, evolved zombie, HUNTER, ADAM, ADAM minions, and HUNTER reinsertion.
 - [ ] PIE: press F2/F3/F4/F7/F9/N and confirm runtime debug behavior.
 - [ ] Consider adding an automation test that directly exercises projected sidestep recovery with a synthetic obstacle/NavPath setup.
+
+## Cycle 010 Stationary target repath / ADAM debug start follow-up
+
+- [x] Add stationary-target NoProgress monitoring independent of target movement.
+- [x] Reissue `MoveToActor(Player)` when a valid path is accepted but the pawn has no meaningful progress.
+- [x] Log Repath reasons: TargetMoved / NoProgress / MoveCompleted / PathInvalid / SidestepFinished / PeriodicRefresh.
+- [x] Log elapsed time since last MoveTo, elapsed time since last progress, recent movement distance, DirectFallback active, Sidestep active, PathFollowing status, CurrentMoveRequestID, and reissue result.
+- [x] Ensure Direct fallback is deactivated when Path Following MoveTo is accepted.
+- [x] Ensure sidestep completion/timeout returns to normal player pursuit.
+- [x] Make F4 explicitly start the ADAM encounter, not only teleport.
+- [x] Prevent ADAM spawn failure from leaving Director in a false active state.
+- [x] Prevent generic evolution setup from resetting ADAM into normal zombie visuals.
+- [x] Clean non-boss arena enemies during F4 ADAM debug start.
+- [x] Suppress ordinary AdaptiveSpawn while ADAM encounter is active.
+- [x] Add ADAM debug logs for spawn state, class, count, nav projection, controller, possession, target, health, phase, and failure reason.
+- [x] Development Editor / Win64 build without Live Coding.
+- [x] Automation RunTests AdaptiveHorror: 15 tests succeeded.
+- [x] Runtime smoke with NullRHI commandlet launch.
+- [ ] PIE: with player fully stationary and not jumping, confirm zombie routes around an obstacle using NoProgress repath.
+- [ ] PIE: confirm zombie does not press into the wall for several seconds.
+- [ ] PIE: confirm zombie reaches melee range after obstacle reroute.
+- [ ] PIE: confirm multiple zombies do not break pursuit around the obstacle.
+- [ ] PIE: press F4 and confirm visible ADAM exists in Adam Arena.
+- [ ] PIE: confirm F4 does not duplicate ADAM when pressed repeatedly.
+- [ ] PIE: confirm ADAM AIController is possessed and targets player.
+- [ ] PIE: confirm ADAM label is visible.
+- [ ] PIE: confirm ADAM summoned enemy labels are visible.
+- [ ] PIE: confirm FAST label.
+- [ ] PIE: confirm ARMORED label.
+- [ ] PIE: confirm LONG ARM label.

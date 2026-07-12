@@ -76,6 +76,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     FTransform GetAdamSpawnTransform() const { return AdamSpawnTransform; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    AEvaAdamBossCharacter* GetActiveAdam() const { return ActiveAdam; }
+
 protected:
     virtual void BeginPlay() override;
 
@@ -100,6 +103,10 @@ private:
         const FString& SpawnReason = TEXT("ZoneEncounter"));
     void SpawnSupportPickupsForZone(EEvaFacilityZone Zone);
     void SetObjectiveForZone(EEvaFacilityZone Zone);
+    AEvaAdamBossCharacter* FindExistingLivingAdam() const;
+    int32 CountExistingLivingAdam() const;
+    void LogAdamEncounterState(const FString& Context, bool bSpawnAttempted, AEvaAdamBossCharacter* SpawnResult,
+        const FString& DestroyReason = TEXT("")) const;
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
     EEvaFacilityZone CurrentZone = EEvaFacilityZone::EntryLobby;

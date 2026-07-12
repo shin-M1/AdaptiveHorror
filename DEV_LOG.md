@@ -857,3 +857,113 @@ P:
 
 - If there is no actual NavMesh route around a placed obstacle, the AI now intentionally refuses to force through by code. This is correct behavior; map/NavMesh authoring must provide a valid route.
 - Runtime graybox still benefits from converting to a saved `.umap` with authored NavMeshBoundsVolume for long-term stability.
+
+## 2026-07-12 - Cycle 010: Stationary target repathing and F4 ADAM debug start
+
+### PIE feedback addressed
+
+- Player stationary behind an obstacle:
+  - Zombies could stop completely or keep pressing into a wall.
+  - If the player jumped, zombies immediately resumed pathing around the obstacle.
+  - NavMesh was visually connected and previous `[AIPath]` logs did not show PathValid/Partial/Blocked errors.
+- F4:
+  - Player teleported to Adam Arena.
+  - ADAM was not visible/confirmed.
+  - Arena contained normal or COMPOSITE infected instead.
+
+### Changes
+
+- `AEvaZombieAIController`
+  - Added low-frequency stationary-target repath monitoring.
+  - Repath reasons now include:
+    - `TargetMoved`
+    - `NoProgress`
+    - `MoveCompleted`
+    - `PathInvalid`
+    - `SidestepFinished`
+    - `PeriodicRefresh`
+  - Added `[AIRepath]` log fields:
+    - last MoveTo age.
+    - last meaningful movement age.
+    - recent movement distance.
+    - DirectFallback active.
+    - Sidestep active.
+    - PathFollowing status.
+    - PathValid / IsPartial.
+    - CurrentMoveRequestID.
+    - MoveTo reissue result.
+  - If Path Following is accepted but the pawn makes no progress for roughly 1.25 seconds, the current move is aborted and `MoveToActor(Player)` is reissued.
+  - Repath monitoring runs around every 0.65 seconds, not every Tick.
+  - Direct fallback is explicitly marked inactive when any MoveTo path request is accepted.
+  - Sidestep timeout/completion now forces a normal `MoveToActor(Player)` return.
+
+- `AEvaPrototypeGameMode`
+  - F4 now acts as a reliable ADAM debug start:
+    - Logs `[AdamDebug] F4 pressed`.
+    - Moves the player to the ADAM arena safe offset.
+    - Removes non-boss/non-HUNTER enemies near the arena to avoid debug-spawn interference.
+    - Calls the Director Adam encounter start explicitly.
+    - Re-primes the active ADAM target when available.
+    - Logs final ADAM count and active ADAM name.
+  - Adaptive spawn now skips while ADAM encounter is active, so ordinary adaptive enemies do not obscure ADAM verification.
+  - Generic enemy safe spawn no longer applies `ConfigureEvolution()` to actors tagged `Adam` or `Boss`; this prevents ADAM from being visually/label-wise reset into a normal zombie after spawn.
+
+- `AEvaResearchFacilityDirector`
+  - `StartAdamEncounter()` now:
+    - Searches for an existing living ADAM and avoids duplicate spawn.
+    - Does not leave `bAdamEncounterActive=true` if spawning fails.
+    - Spawns ADAM only when no living ADAM exists.
+    - Ensures controller possession and player target assignment.
+    - Emits `[AdamDebug]` logs with:
+      - Arena location.
+      - Arena state.
+      - AdamClass.
+      - Existing Adam count.
+      - Spawn attempted/result.
+      - Final location.
+      - NavProjection result.
+      - AIController.
+      - Possessed.
+      - PlayerTarget.
+      - Health.
+      - Phase.
+      - Destroy/failure reason.
+
+### Build / test verification
+
+- First build attempt:
+  - Failed due missing `AdaptiveHorror.h` include in `EvaResearchFacilityDirector.cpp` for `LogAdaptiveHorror`.
+  - Fixed by adding the include.
+- Final build:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`
+  - Static source sanity: PASS.
+  - GenerateProjectFiles: Success.
+  - Development Editor / Win64 build without Live Coding: Success.
+  - Automation RunTests AdaptiveHorror: exit code 0.
+  - Automation log confirms 15 successful tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -NullRHI -unattended -nop4 -nosplash -ExecCmds="Quit"`
+  - Result: exit code 0.
+
+### Automation/runtime observations
+
+- `[AdamDebug] Context=StartAdamEncounterSpawned` appeared during automation, confirming that Director Adam encounter start calls the ADAM spawn path.
+- Automation world has no real player/NavMesh, so `PlayerTarget=false` and `NavProjected=false` in that specific automation log are expected and not a PIE result.
+
+### PIE/manual verification status
+
+- Not visually confirmed in this environment:
+  - Player remains completely still and does not jump while zombie routes around an obstacle.
+  - Zombie stops pressing into the wall and reaches melee range after the repath.
+  - Multiple zombies preserve pursuit around the obstacle.
+  - F4 spawns/keeps a visible ADAM in the arena in PIE.
+  - ADAM label visibility.
+  - ADAM summoned enemy label visibility.
+  - FAST label visibility.
+  - ARMORED label visibility.
+  - LONG ARM label visibility.
+
+### Notes
+
+- COMPOSITE is the 80% EVA analysis evolved variant.
+- If `[AIRepath] Reason=NoProgress` repeatedly fires while NavMesh is visibly connected, inspect whether the obstacle collision is affecting movement but not cutting path data. If no real NavPath detour exists, fix map/NavMesh authoring rather than forcing AI through code.
