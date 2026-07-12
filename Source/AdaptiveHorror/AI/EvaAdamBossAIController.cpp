@@ -20,11 +20,13 @@ void AEvaAdamBossAIController::Tick(const float DeltaSeconds)
 
     if (!GetPawn() || !GetWorld())
     {
+        SetAdamDebugState(TEXT("No Pawn"));
         return;
     }
 
     if (!TargetActor)
     {
+        SetAdamDebugState(TEXT("Acquiring Target"));
         if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
         {
             SetPlayerTarget(PlayerController->GetPawn());
@@ -35,11 +37,14 @@ void AEvaAdamBossAIController::Tick(const float DeltaSeconds)
     if (!Player || Player->IsDead())
     {
         TargetActor = nullptr;
+        CurrentTargetDistance = -1.0f;
+        SetAdamDebugState(TEXT("No Valid Target"));
         ClearFocus(EAIFocusPriority::Gameplay);
         StopMovement();
         return;
     }
 
+    CurrentTargetDistance = FVector::Distance(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation());
     SetFocus(TargetActor);
 
     if (CanAttackTarget())
@@ -55,8 +60,18 @@ void AEvaAdamBossAIController::Tick(const float DeltaSeconds)
         return;
     }
 
-    TryRoarSummon();
+    const bool bRoared = TryRoarSummon();
+    if (!bRoared)
+    {
+        SetAdamDebugState(TEXT("Chasing"));
+    }
     MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
+}
+
+void AEvaAdamBossAIController::TryAttackTarget()
+{
+    SetAdamDebugState(TEXT("Attack"), TEXT("Attack started"));
+    Super::TryAttackTarget();
 }
 
 bool AEvaAdamBossAIController::TryChargeAttack()
@@ -80,6 +95,7 @@ bool AEvaAdamBossAIController::TryChargeAttack()
     }
 
     LastChargeTime = Now;
+    SetAdamDebugState(TEXT("Charge"), TEXT("Charge started"));
     MoveToLocationOrDirect(TargetActor->GetActorLocation(), 60.0f);
     UGameplayStatics::ApplyDamage(TargetActor, Adam->GetChargeDamage(), this, Adam, UDamageType::StaticClass());
     return true;
@@ -109,6 +125,25 @@ bool AEvaAdamBossAIController::TryRoarSummon()
     }
 
     LastRoarTime = Now;
-    Adam->SpawnRoarMinions(Adam->IsPhaseTwo() ? 3 : 2, bSummonEvolved);
+    const int32 SummonCount = Adam->IsPhaseTwo() ? 3 : 2;
+    SetAdamDebugState(TEXT("Roar / Summon"), TEXT("Roar started / Summon started"), SummonCount);
+    Adam->SpawnRoarMinions(SummonCount, bSummonEvolved);
     return true;
+}
+
+void AEvaAdamBossAIController::SetAdamDebugState(const FString& NewState, const FString& NewEvent,
+    const int32 NewSummonCount)
+{
+    if (!NewState.IsEmpty())
+    {
+        CurrentAdamState = NewState;
+    }
+    if (!NewEvent.IsEmpty())
+    {
+        LastAdamEvent = NewEvent;
+    }
+    if (NewSummonCount != INDEX_NONE)
+    {
+        LastSummonCount = FMath::Max(0, NewSummonCount);
+    }
 }

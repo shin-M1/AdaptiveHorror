@@ -44,6 +44,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void EnsurePrototypeDebugLabelInitialized();
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void SetOverheadHealthBarEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void SetDebugHealthNumbersVisible(bool bVisible);
+
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UStaticMeshComponent* GetBodyVisualComponent() const { return BodyVisual; }
 
@@ -62,7 +68,9 @@ protected:
     virtual void OnDefeated();
     void SetPrototypeDebugLabel(const FString& Label, const FColor& Color, float WorldSize = 42.0f);
     void UpdatePrototypeDebugLabelFacing();
+    void UpdatePrototypeHealthBar();
     void LogPrototypeDebugLabelState(const FString& Context) const;
+    bool ShouldShowDebugHealthNumbers() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -82,8 +90,20 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> TypeLabel;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UTextRenderComponent> HealthBarLabel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UTextRenderComponent> HealthValueLabel;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     float DebugLabelMaxVisibleDistance = 12000.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
+    bool bDisplayOverheadHealthBar = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
+    bool bDebugHealthNumbersVisible = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Combat")
     TObjectPtr<UBoxComponent> TorsoHitbox;

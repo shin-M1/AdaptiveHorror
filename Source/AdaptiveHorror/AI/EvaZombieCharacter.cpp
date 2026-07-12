@@ -17,8 +17,16 @@
 #include "GameFramework/PlayerController.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Engine/Engine.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
+
+#if !UE_BUILD_SHIPPING
+static TAutoConsoleVariable<int32> CVarEvaDebugEnemyHealthNumbers(
+    TEXT("Eva.DebugEnemyHealthNumbers"),
+    0,
+    TEXT("Shows CurrentHP / MaxHP under normal enemy overhead HP bars when set to 1."));
+#endif
 
 AEvaZombieCharacter::AEvaZombieCharacter()
 {
@@ -70,6 +78,36 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     TypeLabel->SetHiddenInGame(false, true);
     TypeLabel->SetOwnerNoSee(false);
     TypeLabel->SetOnlyOwnerSee(false);
+
+    HealthBarLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("HealthBarLabel"));
+    HealthBarLabel->SetupAttachment(GetCapsuleComponent());
+    HealthBarLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    HealthBarLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 139.0f));
+    HealthBarLabel->SetRelativeRotation(FRotator::ZeroRotator);
+    HealthBarLabel->SetHorizontalAlignment(EHTA_Center);
+    HealthBarLabel->SetVerticalAlignment(EVRTA_TextCenter);
+    HealthBarLabel->SetText(FText::FromString(TEXT("[##########]")));
+    HealthBarLabel->SetTextRenderColor(FColor::Green);
+    HealthBarLabel->SetWorldSize(24.0f);
+    HealthBarLabel->SetVisibility(true, true);
+    HealthBarLabel->SetHiddenInGame(false, true);
+    HealthBarLabel->SetOwnerNoSee(false);
+    HealthBarLabel->SetOnlyOwnerSee(false);
+
+    HealthValueLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("HealthValueLabel"));
+    HealthValueLabel->SetupAttachment(GetCapsuleComponent());
+    HealthValueLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    HealthValueLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 119.0f));
+    HealthValueLabel->SetRelativeRotation(FRotator::ZeroRotator);
+    HealthValueLabel->SetHorizontalAlignment(EHTA_Center);
+    HealthValueLabel->SetVerticalAlignment(EVRTA_TextCenter);
+    HealthValueLabel->SetText(FText::FromString(TEXT("100 / 100")));
+    HealthValueLabel->SetTextRenderColor(FColor::White);
+    HealthValueLabel->SetWorldSize(18.0f);
+    HealthValueLabel->SetVisibility(false, true);
+    HealthValueLabel->SetHiddenInGame(true, true);
+    HealthValueLabel->SetOwnerNoSee(false);
+    HealthValueLabel->SetOnlyOwnerSee(false);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -278,6 +316,18 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
     TypeLabel->SetOnlyOwnerSee(false);
 }
 
+void AEvaZombieCharacter::SetOverheadHealthBarEnabled(const bool bEnabled)
+{
+    bDisplayOverheadHealthBar = bEnabled;
+    UpdatePrototypeHealthBar();
+}
+
+void AEvaZombieCharacter::SetDebugHealthNumbersVisible(const bool bVisible)
+{
+    bDebugHealthNumbersVisible = bVisible;
+    UpdatePrototypeHealthBar();
+}
+
 void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
 {
     if (!TypeLabel)
@@ -307,6 +357,44 @@ void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
     TypeLabel->SetHiddenInGame(false, true);
     TypeLabel->SetOwnerNoSee(false);
     TypeLabel->SetOnlyOwnerSee(false);
+
+    if (HealthBarLabel)
+    {
+        if (!HealthBarLabel->IsRegistered() && GetWorld())
+        {
+            HealthBarLabel->RegisterComponent();
+        }
+        if (HealthBarLabel->GetAttachParent() != GetCapsuleComponent())
+        {
+            HealthBarLabel->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+        }
+        HealthBarLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        HealthBarLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 139.0f));
+        HealthBarLabel->SetHorizontalAlignment(EHTA_Center);
+        HealthBarLabel->SetVerticalAlignment(EVRTA_TextCenter);
+        HealthBarLabel->SetOwnerNoSee(false);
+        HealthBarLabel->SetOnlyOwnerSee(false);
+    }
+
+    if (HealthValueLabel)
+    {
+        if (!HealthValueLabel->IsRegistered() && GetWorld())
+        {
+            HealthValueLabel->RegisterComponent();
+        }
+        if (HealthValueLabel->GetAttachParent() != GetCapsuleComponent())
+        {
+            HealthValueLabel->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+        }
+        HealthValueLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        HealthValueLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 119.0f));
+        HealthValueLabel->SetHorizontalAlignment(EHTA_Center);
+        HealthValueLabel->SetVerticalAlignment(EVRTA_TextCenter);
+        HealthValueLabel->SetOwnerNoSee(false);
+        HealthValueLabel->SetOnlyOwnerSee(false);
+    }
+
+    UpdatePrototypeHealthBar();
 }
 
 void AEvaZombieCharacter::LogPrototypeDebugLabelState(const FString& Context) const
@@ -356,8 +444,18 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     if (HealthComponent && HealthComponent->IsDead())
     {
         TypeLabel->SetVisibility(false, true);
+        if (HealthBarLabel)
+        {
+            HealthBarLabel->SetVisibility(false, true);
+        }
+        if (HealthValueLabel)
+        {
+            HealthValueLabel->SetVisibility(false, true);
+        }
         return;
     }
+
+    UpdatePrototypeHealthBar();
 
     APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0);
     if (!CameraManager)
@@ -372,6 +470,17 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     const float DistanceSq = ToCamera.SizeSquared();
     const bool bShouldShow = DistanceSq <= FMath::Square(DebugLabelMaxVisibleDistance);
     TypeLabel->SetVisibility(bShouldShow, true);
+    if (HealthBarLabel)
+    {
+        HealthBarLabel->SetVisibility(bShouldShow && bDisplayOverheadHealthBar, true);
+        HealthBarLabel->SetHiddenInGame(!(bShouldShow && bDisplayOverheadHealthBar), true);
+    }
+    if (HealthValueLabel)
+    {
+        const bool bShowHealthValue = bShouldShow && bDisplayOverheadHealthBar && ShouldShowDebugHealthNumbers();
+        HealthValueLabel->SetVisibility(bShowHealthValue, true);
+        HealthValueLabel->SetHiddenInGame(!bShowHealthValue, true);
+    }
     if (!bShouldShow || ToCamera.IsNearlyZero())
     {
         return;
@@ -381,6 +490,56 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     // from normal FPS angles and never inherits the enemy's left/right rotation.
     const FRotator FacingRotation(0.0f, ToCamera.Rotation().Yaw, 0.0f);
     TypeLabel->SetWorldRotation(FacingRotation);
+    if (HealthBarLabel)
+    {
+        HealthBarLabel->SetWorldRotation(FacingRotation);
+    }
+    if (HealthValueLabel)
+    {
+        HealthValueLabel->SetWorldRotation(FacingRotation);
+    }
+}
+
+void AEvaZombieCharacter::UpdatePrototypeHealthBar()
+{
+    const bool bAlive = HealthComponent && !HealthComponent->IsDead();
+    const bool bShowBar = bDisplayOverheadHealthBar && bAlive;
+    if (HealthBarLabel)
+    {
+        const float HealthPercent = HealthComponent ? FMath::Clamp(HealthComponent->GetHealthPercent(), 0.0f, 1.0f) : 0.0f;
+        const int32 FilledSegments = FMath::Clamp(FMath::RoundToInt(HealthPercent * 10.0f), 0, 10);
+        FString BarText(TEXT("["));
+        for (int32 Index = 0; Index < 10; ++Index)
+        {
+            BarText += Index < FilledSegments ? TEXT("#") : TEXT("-");
+        }
+        BarText += TEXT("]");
+
+        HealthBarLabel->SetText(FText::FromString(BarText));
+        HealthBarLabel->SetTextRenderColor(HealthPercent > 0.5f ? FColor::Green :
+            (HealthPercent > 0.25f ? FColor::Yellow : FColor::Red));
+        HealthBarLabel->SetVisibility(bShowBar, true);
+        HealthBarLabel->SetHiddenInGame(!bShowBar, true);
+    }
+
+    if (HealthValueLabel)
+    {
+        const bool bShowValue = bShowBar && ShouldShowDebugHealthNumbers();
+        HealthValueLabel->SetText(FText::FromString(HealthComponent ?
+            FString::Printf(TEXT("%.0f / %.0f"), HealthComponent->GetCurrentHealth(), HealthComponent->GetMaxHealth()) :
+            FString(TEXT("0 / 0"))));
+        HealthValueLabel->SetVisibility(bShowValue, true);
+        HealthValueLabel->SetHiddenInGame(!bShowValue, true);
+    }
+}
+
+bool AEvaZombieCharacter::ShouldShowDebugHealthNumbers() const
+{
+#if !UE_BUILD_SHIPPING
+    return bDebugHealthNumbersVisible || CVarEvaDebugEnemyHealthNumbers.GetValueOnGameThread() != 0;
+#else
+    return false;
+#endif
 }
 
 void AEvaZombieCharacter::ApplyEvolutionToController()
@@ -459,6 +618,14 @@ void AEvaZombieCharacter::OnDefeated()
     if (TypeLabel)
     {
         TypeLabel->SetVisibility(false, true);
+    }
+    if (HealthBarLabel)
+    {
+        HealthBarLabel->SetVisibility(false, true);
+    }
+    if (HealthValueLabel)
+    {
+        HealthValueLabel->SetVisibility(false, true);
     }
 #if !UE_BUILD_SHIPPING
     if (GEngine)

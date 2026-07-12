@@ -31,16 +31,18 @@ AEvaAdamBossCharacter::AEvaAdamBossCharacter()
 
 void AEvaAdamBossCharacter::BeginPlay()
 {
-    BaseHealth = AdamHP;
+    const float EffectiveMaxHealth = GetEffectiveAdamMaxHealth();
+    BaseHealth = EffectiveMaxHealth;
     BaseMovementSpeed = AdamMovementSpeed;
     MovementSpeed = AdamMovementSpeed;
     BaseAttackDamage = AdamMeleeDamage;
     CurrentAttackDamage = AdamMeleeDamage;
+    bDisplayOverheadHealthBar = false;
     Super::BeginPlay();
 
     if (HealthComponent)
     {
-        HealthComponent->SetMaxHealth(AdamHP, true);
+        HealthComponent->SetMaxHealth(EffectiveMaxHealth, true);
         HealthComponent->OnHealthChanged.AddDynamic(this, &AEvaAdamBossCharacter::HandleAdamHealthChanged);
     }
     if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -66,6 +68,7 @@ void AEvaAdamBossCharacter::BeginPlay()
         RightArmVisual->SetRelativeScale3D(FVector(0.34f, 0.30f, 1.38f));
     }
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor(255, 128, 0), 78.0f);
+    SetOverheadHealthBarEnabled(false);
     LogPrototypeDebugLabelState(TEXT("AdamBeginPlayFinal"));
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
@@ -119,7 +122,8 @@ void AEvaAdamBossCharacter::EnterPhaseTwo()
         RightArmVisual->SetRelativeLocation(FVector(0.0f, 96.0f, 44.0f));
         RightArmVisual->SetRelativeScale3D(FVector(0.40f, 0.34f, 1.55f));
     }
-    SetPrototypeDebugLabel(TEXT("ADAM P2"), FColor::Red, 82.0f);
+    SetPrototypeDebugLabel(TEXT("ADAM"), FColor::Red, 82.0f);
+    SetOverheadHealthBarEnabled(false);
     LogPrototypeDebugLabelState(TEXT("AdamPhaseTwoLabel"));
 
 #if !UE_BUILD_SHIPPING
@@ -151,6 +155,9 @@ void AEvaAdamBossCharacter::SpawnRoarMinions(const int32 Count, const bool bForc
     {
         return;
     }
+
+    LastSummonCount = Count;
+    TotalSummonCount += Count;
 
     EEvaEvolutionType MinionEvolutionType = bForceEvolved ? EEvaEvolutionType::Composite : EEvaEvolutionType::None;
     if (!bForceEvolved)

@@ -1,4 +1,6 @@
 #include "UI/EvaHUD.h"
+#include "AI/EvaAdamBossAIController.h"
+#include "AI/EvaAdamBossCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "AI/EvaTelemetryTypes.h"
 #include "Characters/EvaPlayerCharacter.h"
@@ -9,8 +11,15 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "UI/EvaBossHUDWidget.h"
 #include "Weapons/EvaWeaponBase.h"
 #include "World/EvaResearchFacilityDirector.h"
+
+void AEvaHUD::BeginPlay()
+{
+    Super::BeginPlay();
+    EnsureBossHUDWidget();
+}
 
 void AEvaHUD::DrawHUD()
 {
@@ -19,6 +28,8 @@ void AEvaHUD::DrawHUD()
     {
         return;
     }
+
+    UpdateBossHUD();
 
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(PlayerOwner->GetPawn());
     if (!Player)
@@ -196,4 +207,75 @@ void AEvaHUD::DrawHUD()
         DrawText(FString::Printf(TEXT("Combat Style: %s"), *StyleText), FLinearColor::White, ResultX, ResultY + 180.0f);
         DrawText(TEXT("TODO: Return to title / demo menu."), FLinearColor::Yellow, ResultX, ResultY + 215.0f);
     }
+}
+
+void AEvaHUD::EnsureBossHUDWidget()
+{
+    if (BossHUDWidget || !PlayerOwner)
+    {
+        return;
+    }
+
+    TSubclassOf<UEvaBossHUDWidget> WidgetClass = BossHUDWidgetClass;
+    if (!WidgetClass)
+    {
+        WidgetClass = UEvaBossHUDWidget::StaticClass();
+    }
+
+    BossHUDWidget = CreateWidget<UEvaBossHUDWidget>(PlayerOwner, WidgetClass);
+    if (BossHUDWidget)
+    {
+        BossHUDWidget->AddToViewport(30);
+        BossHUDWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+}
+
+void AEvaHUD::UpdateBossHUD()
+{
+    UWorld* World = GetWorld();
+    const AEvaPrototypeGameMode* GameMode = World ? World->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    const AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
+    AEvaAdamBossCharacter* Adam = Director && Director->IsAdamEncounterActive() ? Director->GetActiveAdam() : nullptr;
+    const UEvaHealthComponent* AdamHealth = Adam ? Adam->GetHealthComponent() : nullptr;
+    const bool bShowBossHUD = Director && Director->IsAdamEncounterActive() && Adam && AdamHealth &&
+        !AdamHealth->IsDead() && GameMode && !GameMode->IsStageClear();
+
+    if (!bShowBossHUD)
+    {
+        if (BossHUDWidget)
+        {
+            BossHUDWidget->ClearBossSnapshot();
+            BossHUDWidget->SetVisibility(ESlateVisibility::Collapsed);
+        }
+        return;
+    }
+
+    EnsureBossHUDWidget();
+    if (!BossHUDWidget)
+    {
+        return;
+    }
+
+    if (Canvas)
+    {
+        BossHUDWidget->SetDesiredSizeInViewport(FVector2D(Canvas->ClipX, Canvas->ClipY));
+        BossHUDWidget->SetPositionInViewport(FVector2D::ZeroVector, false);
+    }
+
+    const AEvaPlayerCharacter* Player = PlayerOwner ? Cast<AEvaPlayerCharacter>(PlayerOwner->GetPawn()) : nullptr;
+    const AEvaAdamBossAIController* AdamController = Cast<AEvaAdamBossAIController>(Adam->GetController());
+    const float TargetDistance = AdamController ? AdamController->GetCurrentTargetDistance() :
+        (Player ? FVector::Distance(Adam->GetActorLocation(), Player->GetActorLocation()) : -1.0f);
+    const int32 SummonCount = FMath::Max(Adam->GetLastSummonCount(),
+        AdamController ? AdamController->GetLastSummonCount() : 0);
+
+    BossHUDWidget->SetBossSnapshot(true, TEXT("ADAM"), AdamHealth->GetHealthPercent(),
+        AdamHealth->GetCurrentHealth(), AdamHealth->GetMaxHealth(),
+        Adam->IsPhaseTwo() ? TEXT("Phase 2") : TEXT("Phase 1"),
+        AdamController ? AdamController->GetCurrentAdamState() : TEXT("No Controller"),
+        TargetDistance,
+        SummonCount,
+        AdamController ? AdamController->GetLastAdamEvent() : TEXT("None"),
+        Adam->IsDebugBossEnabled());
+    BossHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }

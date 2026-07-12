@@ -1058,3 +1058,112 @@ P:
   - Adam charge/roar/phase behavior after the stack-overflow fix.
   - Repeated F4 Adam debug start after this fix.
 - Next PIE pass should reproduce the previous Adam chase scenario and confirm no rapid `MoveCompleted -> ReissueMoveToTarget` recursion appears in logs.
+
+## 2026-07-12 - Cycle 012: Adam debug readability and HP display split
+
+### Goal
+
+- No new gameplay feature work.
+- Improve Adam encounter debugging so the current boss state is visible at a glance.
+- Split ordinary enemy overhead HP display from ADAM boss HP display.
+
+### Changes
+
+- Added `UEvaBossHUDWidget`
+  - Independent C++ UMG widget intended as a future replacement point for formal UI.
+  - Draws a top-center Boss HUD only while the ADAM encounter is active.
+  - Normal display:
+    - `ADAM`
+    - Boss HP Bar
+    - Phase
+  - Debug display, enabled by `DebugBoss=true` on ADAM:
+    - CurrentHP / MaxHP
+    - Remaining HP
+    - Current State
+    - Target Distance
+    - Last Event
+    - Summon Count
+
+- Updated `AEvaHUD`
+  - Creates and owns the Boss HUD widget separately from the existing Canvas debug HUD.
+  - Updates the Boss HUD from `AEvaResearchFacilityDirector::GetActiveAdam()`.
+  - Hides the Boss HUD when ADAM is defeated, Stage Clear is reached, or the encounter is inactive.
+
+- Updated `AEvaAdamBossCharacter`
+  - Added `DebugBoss` (`bDebugBoss`) and `DebugBossHP`.
+  - With `DebugBoss=true`, ADAM max HP is now `500` for short defeat-to-StageClear verification.
+  - Normal ADAM HP remains `2500` when `DebugBoss=false`.
+  - ADAM overhead label remains `ADAM` only.
+  - ADAM overhead HP bar and numeric overhead HP are disabled.
+  - Phase 2 no longer changes the overhead label to `ADAM P2`; Phase is shown in Boss HUD instead.
+  - Tracks last summon count and total summon count for Boss HUD debug output.
+
+- Updated `AEvaAdamBossAIController`
+  - Tracks ADAM debug state:
+    - `Acquiring Target`
+    - `Chasing`
+    - `Attack`
+    - `Charge`
+    - `Roar / Summon`
+    - `No Valid Target`
+  - Records recent boss events:
+    - `Attack started`
+    - `Charge started`
+    - `Roar started / Summon started`
+  - Tracks current target distance.
+  - Tracks last summon count.
+
+- Updated `AEvaZombieCharacter`
+  - Ordinary enemies now show overhead:
+    - enemy name
+    - HP bar
+  - Applies to:
+    - Zombie
+    - FAST
+    - ARMORED
+    - LONG ARM
+    - COMPOSITE
+    - HUNTER
+  - Ordinary enemy overhead display does not show numeric HP in normal play.
+  - Debug numeric HP can be enabled per actor with `bDebugHealthNumbersVisible` or globally with:
+    - `Eva.DebugEnemyHealthNumbers 1`
+  - When enabled, it shows `CurrentHP / MaxHP` under the overhead HP bar.
+
+### Changed files
+
+- `Source/AdaptiveHorror/UI/EvaBossHUDWidget.h`
+- `Source/AdaptiveHorror/UI/EvaBossHUDWidget.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.h`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.h`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `DEV_LOG.md`
+
+### Build / test verification
+
+- Command:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`
+- Results:
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests AdaptiveHorror: exit code 0.
+  - Automation log confirms 15 successful tests and 0 failures.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -NullRHI -unattended -nop4 -nosplash -ExecCmds="Quit"`
+  - Result: exit code 0.
+- `git diff --check`:
+  - No whitespace errors. CRLF conversion warnings only.
+
+### PIE/manual verification status
+
+- Not visually confirmed in this environment:
+  - Boss HUD appears at top center only during ADAM encounter.
+  - ADAM overhead label shows only `ADAM`.
+  - ADAM has no overhead HP bar.
+  - Boss HP bar, Phase, Current State, Target Distance, Summon Count, and HP debug values update during live ADAM combat.
+  - Ordinary enemies show name + HP bar, and no numeric HP unless debug numeric HP is enabled.
