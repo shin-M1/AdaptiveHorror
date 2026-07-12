@@ -124,6 +124,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Debug")
     bool IsNavigationDebugVisible() const { return bNavigationDebugVisible; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    bool IsRespawnScheduledForDebug() const;
+
 protected:
     virtual void BeginPlay() override;
 
@@ -173,6 +176,11 @@ private:
     void SpawnStoryLog(AEvaResearchFacilityDirector* Director, FName LogId, const FString& Title,
         const FString& Body, const FVector& Location);
     void ResetEnemyTargets();
+    int32 StopAllEnemyCombatForStageClear();
+    void ClearStageClearTimers();
+    void LogStageClearState(const FString& Context, int32 ClearedEnemyAI, bool bClearedTimers) const;
+    void LogPlayerDeathRequest(const FString& Context, const AEvaPlayerCharacter* DeadPlayer,
+        bool bRespawnTimerCreated) const;
     void PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) const;
     int32 CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, float Radius);
 

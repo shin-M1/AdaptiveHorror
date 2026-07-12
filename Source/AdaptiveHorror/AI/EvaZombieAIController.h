@@ -26,8 +26,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|AI")
     void ClearPlayerTarget();
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|AI")
+    void StopCombatForStageClear();
+
     UFUNCTION(BlueprintPure, Category = "EVA|AI")
     AActor* GetPlayerTarget() const { return TargetActor; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|AI")
+    bool IsCombatEnabled() const { return bCombatEnabled; }
 
     UFUNCTION(BlueprintCallable, Category = "EVA|AI")
     void ConfigureCombat(float NewAttackRange, float NewAttackDamage, float NewAttackInterval);
@@ -102,4 +108,5 @@ private:
     FVector LastRepathTargetLocation = FVector::ZeroVector;
     bool bInternalRepathAbort = false;
     bool bIssuingRepathMove = false;
+    bool bCombatEnabled = true;
 };

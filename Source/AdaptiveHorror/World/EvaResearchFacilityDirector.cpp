@@ -89,6 +89,16 @@ void AEvaResearchFacilityDirector::NotifyAdamDefeated(AEvaAdamBossCharacter* Ada
 {
     ActiveAdam = nullptr;
     bAdamEncounterActive = false;
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        if (GameMode->IsGameOver() && !GameMode->IsStageClear())
+        {
+            UE_LOG(LogAdaptiveHorror, Warning,
+                TEXT("[StageClear] Director rejected Adam defeat because player death is already active Adam=%s"),
+                Adam ? *Adam->GetName() : TEXT("None"));
+            return;
+        }
+    }
     CompleteStage();
 }
 
@@ -276,6 +286,16 @@ void AEvaResearchFacilityDirector::CompleteStage()
     if (bStageClear)
     {
         return;
+    }
+
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        if (GameMode->IsGameOver() && !GameMode->IsStageClear())
+        {
+            UE_LOG(LogAdaptiveHorror, Warning,
+                TEXT("[StageClear] Director CompleteStage rejected because player death is already active."));
+            return;
+        }
     }
 
     bStageClear = true;

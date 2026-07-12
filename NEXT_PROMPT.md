@@ -1,5 +1,104 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-12 Cycle 013
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 19 tests succeeded, 0 failures.
+- Runtime smoke with absolute `.uproject` path and `-game -NullRHI -ExecCmds="Quit"`: exit code 0.
+- PIE visual verification is still required; Codex did not visually confirm the Stage Clear regression in viewport.
+
+### Most recent fix
+
+Fixed the Adam defeat / Stage Clear conflict where remaining enemies continued damaging the player after Stage Clear and could trigger Player Death / GAME OVER afterward.
+
+Important implementation notes:
+
+- `AEvaPrototypeGameMode::HandleStageClear()` is now the terminal combat transition.
+- Stage Clear clears respawn/spawn/HUNTER timers.
+- Stage Clear stops all existing enemy AI combat, movement, focus, Tick, and hides overhead labels/HP bars.
+- Post-clear spawn requests are skipped.
+- Post-clear player damage returns `0`.
+- Post-clear `HandleDeath()` / `HandlePlayerDeath()` are rejected.
+- Movement/fire/reload/jump are disabled after Stage Clear; look input is intentionally left available.
+- Director rejects `CompleteStage()` if Player Death was already active first, so Player Death wins if it genuinely happened first.
+- Added logs:
+  - `[StageClear] ...`
+  - `[PlayerDeath] ...`
+- Added automation tests:
+  - `AdaptiveHorror.StageClear.RejectsPlayerDeath`
+  - `AdaptiveHorror.StageClear.SkipsSpawns`
+  - `AdaptiveHorror.StageClear.StopsEnemyCombat`
+  - `AdaptiveHorror.StageClear.Idempotent`
+
+### Next highest-priority task
+
+Run a real PIE manual verification pass for the Stage Clear transition.
+
+Use this procedure:
+
+1. Open `AdaptiveHorror.uproject` in Unreal Editor 5.8.
+2. Start PIE.
+3. Press F4 to start ADAM encounter.
+4. Defeat ADAM with `DebugBoss=true` active.
+5. Confirm Stage Clear appears.
+6. Do not move for 60 seconds after Stage Clear.
+7. Confirm:
+   - player HP no longer decreases
+   - residual enemies stop chasing/attacking
+   - GAME OVER does not appear
+   - checkpoint respawn does not start
+   - camera look remains available
+   - movement/shooting remain disabled
+   - Boss HUD hides
+   - enemy overhead labels/HP bars hide
+
+### If the bug still reproduces
+
+Collect the latest PIE log and search for:
+
+- `[StageClear]`
+- `[PlayerDeath]`
+- `RespawnTimerCreated`
+- `Spawn skipped after clear`
+- enemy AI movement/attack logs after `Context=Begin`
+
+Then fix only the specific path that still runs after Stage Clear.
+
+Likely suspects:
+
+- an Adam-specific timer/delegate still firing after Stage Clear
+- a non-`AEvaZombieAIController` controller path not stopped by `StopAllEnemyCombatForStageClear()`
+- debug restore/F5 re-enabling input after Stage Clear
+- a damage path not going through `AEvaPlayerCharacter::TakeDamage()`
+
+### Files most relevant for next work
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+
+### Completion condition for next pass
+
+- User confirms in PIE that Adam defeat leads to a stable Stage Clear state and the player can no longer die afterward.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- `DEV_LOG.md`, `TODO.md`, `BUILD_CHECK.md`, and `NEXT_PROMPT.md` are updated with actual PIE results.
+
 ## 最新引き継ぎ — 2026-07-12 Cycle 009
 
 あなたはこのプロジェクトのゲームディレクター兼リードエンジニアです。既存設計と現在の `main` ブランチを正として、UE5.8 C++体験版の安定化を続けてください。

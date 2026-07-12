@@ -318,3 +318,56 @@ Troubleshooting if Adam chase still crashes:
 2. Search for same-frame floods of `[AIPath] MoveCompleted` and `[AIRepath] Reason=MoveCompleted`.
 3. If the stack still includes `AEvaZombieAIController::OnMoveCompleted` and `ReissueMoveToTarget`, inspect any MoveTo calls that are not protected by `bIssuingRepathMove`.
 4. If the stack moves to Adam-specific functions, inspect `AEvaAdamBossAIController::TryChargeAttack`, `TryRoarSummon`, and `AEvaAdamBossCharacter::SpawnRoarMinions` separately.
+
+## Cycle 013 Build Check Note - 2026-07-12
+
+Command used:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2
+```
+
+Observed result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- First compile pass found one include issue in the newly added automation test:
+  - `EvaLearningTests.cpp` spawned `AEvaPlayerCharacter` without including `Characters/EvaPlayerCharacter.h`.
+  - Added the include and rebuilt.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: exit code 0.
+- Latest automation log confirmed 19 successful tests and 0 failures.
+
+Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" `
+  -game `
+  -Unattended `
+  -NullRHI `
+  -NoSound `
+  -NoSplash `
+  -ExecCmds="Quit" `
+  -log
+```
+
+- Result: exit code 0.
+- Note: a prior relative-path command using `.\\AdaptiveHorror.uproject` failed to locate the descriptor. Use the absolute `.uproject` path for commandlet smoke checks.
+- Runtime log confirmed `/Engine/Maps/Entry` loaded, runtime navigation built, initial zombie spawned, and the engine exited cleanly via `Quit`.
+
+Stage Clear regression checks added:
+
+- `AdaptiveHorror.StageClear.RejectsPlayerDeath`
+- `AdaptiveHorror.StageClear.SkipsSpawns`
+- `AdaptiveHorror.StageClear.StopsEnemyCombat`
+- `AdaptiveHorror.StageClear.Idempotent`
+
+Manual PIE checks still required:
+
+1. Defeat ADAM and confirm Stage Clear appears.
+2. Wait after Stage Clear and confirm HP no longer decreases.
+3. Confirm residual enemies do not chase/attack after Stage Clear.
+4. Confirm no GAME OVER / checkpoint respawn starts after Stage Clear.
+5. Confirm look input remains available while movement/shooting are disabled.
+6. Confirm Boss HUD and enemy overhead HP bars hide after Stage Clear.

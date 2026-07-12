@@ -48,6 +48,9 @@ public:
     void SetOverheadHealthBarEnabled(bool bEnabled);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void SetOverheadDisplayEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void SetDebugHealthNumbersVisible(bool bVisible);
 
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
@@ -101,6 +104,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     bool bDisplayOverheadHealthBar = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
+    bool bDisplayOverheadVisuals = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     bool bDebugHealthNumbersVisible = false;

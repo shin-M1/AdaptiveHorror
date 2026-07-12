@@ -182,6 +182,11 @@ void AEvaPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 float AEvaPlayerCharacter::TakeDamage(const float DamageAmount, const FDamageEvent& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
+    if (IsStageClearActive())
+    {
+        return 0.0f;
+    }
+
     if (IsDead())
     {
         return 0.0f;
@@ -327,7 +332,7 @@ void AEvaPlayerCharacter::AddRuntimeInputMapping()
 
 void AEvaPlayerCharacter::Move(const FInputActionValue& Value)
 {
-    if (IsDead())
+    if (IsDead() || IsStageClearActive())
     {
         return;
     }
@@ -350,7 +355,7 @@ void AEvaPlayerCharacter::Look(const FInputActionValue& Value)
 
 void AEvaPlayerCharacter::StartSprint()
 {
-    if (!IsDead())
+    if (!IsDead() && !IsStageClearActive())
     {
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
         {
@@ -369,7 +374,7 @@ void AEvaPlayerCharacter::StopSprint()
 
 void AEvaPlayerCharacter::StartJump()
 {
-    if (!IsDead())
+    if (!IsDead() && !IsStageClearActive())
     {
         Jump();
     }
@@ -382,7 +387,7 @@ void AEvaPlayerCharacter::StopJump()
 
 void AEvaPlayerCharacter::FireWeapon()
 {
-    if (!IsDead() && CurrentWeapon)
+    if (!IsDead() && !IsStageClearActive() && CurrentWeapon)
     {
         CurrentWeapon->TryFire();
     }
@@ -390,7 +395,7 @@ void AEvaPlayerCharacter::FireWeapon()
 
 void AEvaPlayerCharacter::ReloadWeapon()
 {
-    if (!IsDead() && CurrentWeapon)
+    if (!IsDead() && !IsStageClearActive() && CurrentWeapon)
     {
         CurrentWeapon->StartReload();
     }
@@ -422,6 +427,11 @@ void AEvaPlayerCharacter::SpawnStarterWeapon()
 
 void AEvaPlayerCharacter::HandleDeath(AActor* DeadActor)
 {
+    if (IsStageClearActive())
+    {
+        return;
+    }
+
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
         MovementComponent->DisableMovement();
@@ -436,6 +446,12 @@ void AEvaPlayerCharacter::HandleDeath(AActor* DeadActor)
     {
         GameMode->HandlePlayerDeath(this);
     }
+}
+
+bool AEvaPlayerCharacter::IsStageClearActive() const
+{
+    const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    return GameMode && GameMode->IsStageClear();
 }
 
 void AEvaPlayerCharacter::DebugIncreaseEvaAnalysis()

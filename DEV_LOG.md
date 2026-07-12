@@ -1167,3 +1167,142 @@ P:
   - ADAM has no overhead HP bar.
   - Boss HP bar, Phase, Current State, Target Distance, Summon Count, and HP debug values update during live ADAM combat.
   - Ordinary enemies show name + HP bar, and no numeric HP unless debug numeric HP is enabled.
+
+## 2026-07-12 - Cycle 013: Stage Clear / Player Death conflict fix
+
+### Goal
+
+- No new content or feature expansion.
+- Fix the post-Adam Stage Clear regression where remaining enemies kept damaging the player, eventually triggering Player Death and disabling movement/look/input after the clear result.
+- Make Stage Clear a stable terminal combat state while preserving Player Death priority if the player dies first.
+
+### Cause
+
+- `AEvaPrototypeGameMode::HandleStageClear()` marked `bStageClear` and cleared a few timers, but existing enemies were still alive, ticking, moving, and able to run attack damage.
+- `AEvaPlayerCharacter::TakeDamage()` and `HandleDeath()` did not reject damage/death transitions after Stage Clear.
+- Director/GameMode state could diverge if Adam defeat and Player Death happened in a tight race.
+
+### Changes
+
+- Updated `AEvaPrototypeGameMode`
+  - Stage Clear now clears combat timers:
+    - respawn
+    - initial/wave spawn
+    - adaptive spawn
+    - HUNTER timed spawn
+    - HUNTER reinsertion
+  - Stage Clear now stops all existing enemy combat for:
+    - normal zombies
+    - evolved zombies
+    - HUNTER
+    - ADAM / boss-tagged enemies
+    - ADAM roar minions
+  - Enemy stop behavior:
+    - clears target/focus
+    - stops MoveTo/path following
+    - disables AI tick
+    - stops/disable character movement
+    - hides overhead labels/HP bars
+  - Stage Clear disables player movement input but resets look ignore state so camera look can remain available.
+  - Stage Clear does not pause the game and does not set global time dilation to zero.
+  - Post-clear spawn requests are skipped and logged.
+  - Post-clear enemy kill notifications are ignored.
+  - Respawn timer is cleared and respawn is rejected if Stage Clear became active.
+  - Added `[StageClear]` logs for:
+    - Begin / AlreadyCleared / player-death-first rejection
+    - PlayerHP / PlayerDead
+    - ActiveZombies / ActiveHunters / ActiveAdam
+    - ClearedEnemyAI / ClearedTimers
+    - PlayerDamageDisabled
+    - PlayerMoveInputDisabled / PlayerLookInputDisabled
+    - IsPaused / GlobalTimeDilation
+    - IgnoreMoveInput / IgnoreLookInput
+    - combat timer activity
+  - Added `[PlayerDeath]` logs for:
+    - DeathRequest
+    - RejectedBecauseStageClear
+    - HP / StageClearState / GameOverState
+    - RespawnTimerCreated / RespawnTimerActive
+    - input ignore state
+
+- Updated `AEvaPlayerCharacter`
+  - Player damage is ignored after Stage Clear.
+  - Player death handling is rejected after Stage Clear.
+  - Movement, sprint, jump, fire, and reload are blocked after Stage Clear.
+  - Look input remains allowed after Stage Clear unless the player is already dead.
+
+- Updated `AEvaZombieAIController`
+  - Added `StopCombatForStageClear()`.
+  - Adds a combat-enabled guard to target acquisition, perception, attack, MoveTo, sidestep/direct fallback, Tick, and MoveCompleted recovery.
+
+- Updated `AEvaZombieCharacter`
+  - Added `SetOverheadDisplayEnabled()` for safe Stage Clear hiding of labels and HP bars.
+  - Overhead labels/HP bars now stay hidden after being disabled instead of being recreated by camera-facing updates.
+
+- Updated `AEvaResearchFacilityDirector`
+  - If Player Death is already active, Adam defeat/CompleteStage is rejected so Director and GameMode do not diverge.
+
+- Updated Automation tests
+  - Added Stage Clear regression coverage:
+    - `AdaptiveHorror.StageClear.RejectsPlayerDeath`
+    - `AdaptiveHorror.StageClear.SkipsSpawns`
+    - `AdaptiveHorror.StageClear.StopsEnemyCombat`
+    - `AdaptiveHorror.StageClear.Idempotent`
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Build / test verification
+
+- Command:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`
+- Results:
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - First build attempt found one test include issue:
+    - `AEvaPlayerCharacter` was spawned in `EvaLearningTests.cpp` with only a forward declaration available.
+    - Fixed by including `Characters/EvaPlayerCharacter.h`.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: exit code 0.
+  - Latest automation log confirmed 19 successful tests and 0 failures.
+- Runtime smoke:
+  - First attempt using relative `.\\AdaptiveHorror.uproject` failed to locate the descriptor.
+  - Re-ran with absolute project path:
+    - `UnrealEditor-Cmd.exe C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Result: exit code 0.
+  - Runtime log confirms `/Engine/Maps/Entry` started, runtime navigation built, initial zombie spawned, then exited by `Quit`.
+- `git diff --check`:
+  - No whitespace errors. CRLF conversion warnings only.
+
+### PIE/manual verification status
+
+- Not visually confirmed by Codex:
+  - Adam defeat followed by Stage Clear no longer allows remaining enemies to reduce player HP.
+  - Residual enemies stop chasing/attacking after Stage Clear.
+  - Player Death no longer starts after Stage Clear.
+  - Boss HUD hides after Stage Clear in live PIE.
+  - Enemy overhead labels/HP bars hide after Stage Clear in live PIE.
+
+### Next manual PIE pass
+
+1. Press F4, defeat ADAM with `DebugBoss=true`.
+2. Confirm Stage Clear appears.
+3. Stand still for 60 seconds after clear.
+4. Confirm player HP no longer decreases.
+5. Confirm residual enemies no longer chase/attack.
+6. Confirm camera look still works while movement/shooting remain disabled.
+7. Confirm no GAME OVER / checkpoint respawn starts after Stage Clear.

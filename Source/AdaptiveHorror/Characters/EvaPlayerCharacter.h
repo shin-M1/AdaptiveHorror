@@ -71,6 +71,7 @@ protected:
     void DebugForceStageClear();
     void DebugPrintTelemetrySnapshot();
     void DebugToggleNavigationVisualization();
+    bool IsStageClearActive() const;
 
     UFUNCTION()
     void HandleDeath(AActor* DeadActor);

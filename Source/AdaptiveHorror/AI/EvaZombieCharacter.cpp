@@ -310,10 +310,21 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
     TypeLabel->SetText(FText::FromString(Label));
     TypeLabel->SetTextRenderColor(Color);
     TypeLabel->SetWorldSize(WorldSize);
-    TypeLabel->SetVisibility(true, true);
-    TypeLabel->SetHiddenInGame(false, true);
+    TypeLabel->SetVisibility(bDisplayOverheadVisuals, true);
+    TypeLabel->SetHiddenInGame(!bDisplayOverheadVisuals, true);
     TypeLabel->SetOwnerNoSee(false);
     TypeLabel->SetOnlyOwnerSee(false);
+}
+
+void AEvaZombieCharacter::SetOverheadDisplayEnabled(const bool bEnabled)
+{
+    bDisplayOverheadVisuals = bEnabled;
+    if (TypeLabel)
+    {
+        TypeLabel->SetVisibility(bEnabled, true);
+        TypeLabel->SetHiddenInGame(!bEnabled, true);
+    }
+    UpdatePrototypeHealthBar();
 }
 
 void AEvaZombieCharacter::SetOverheadHealthBarEnabled(const bool bEnabled)
@@ -353,8 +364,8 @@ void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
     TypeLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 165.0f));
     TypeLabel->SetHorizontalAlignment(EHTA_Center);
     TypeLabel->SetVerticalAlignment(EVRTA_TextCenter);
-    TypeLabel->SetVisibility(true, true);
-    TypeLabel->SetHiddenInGame(false, true);
+    TypeLabel->SetVisibility(bDisplayOverheadVisuals, true);
+    TypeLabel->SetHiddenInGame(!bDisplayOverheadVisuals, true);
     TypeLabel->SetOwnerNoSee(false);
     TypeLabel->SetOnlyOwnerSee(false);
 
@@ -441,6 +452,23 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
         return;
     }
 
+    if (!bDisplayOverheadVisuals)
+    {
+        TypeLabel->SetVisibility(false, true);
+        TypeLabel->SetHiddenInGame(true, true);
+        if (HealthBarLabel)
+        {
+            HealthBarLabel->SetVisibility(false, true);
+            HealthBarLabel->SetHiddenInGame(true, true);
+        }
+        if (HealthValueLabel)
+        {
+            HealthValueLabel->SetVisibility(false, true);
+            HealthValueLabel->SetHiddenInGame(true, true);
+        }
+        return;
+    }
+
     if (HealthComponent && HealthComponent->IsDead())
     {
         TypeLabel->SetVisibility(false, true);
@@ -470,6 +498,7 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     const float DistanceSq = ToCamera.SizeSquared();
     const bool bShouldShow = DistanceSq <= FMath::Square(DebugLabelMaxVisibleDistance);
     TypeLabel->SetVisibility(bShouldShow, true);
+    TypeLabel->SetHiddenInGame(!bShouldShow, true);
     if (HealthBarLabel)
     {
         HealthBarLabel->SetVisibility(bShouldShow && bDisplayOverheadHealthBar, true);
@@ -503,7 +532,7 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
 void AEvaZombieCharacter::UpdatePrototypeHealthBar()
 {
     const bool bAlive = HealthComponent && !HealthComponent->IsDead();
-    const bool bShowBar = bDisplayOverheadHealthBar && bAlive;
+    const bool bShowBar = bDisplayOverheadVisuals && bDisplayOverheadHealthBar && bAlive;
     if (HealthBarLabel)
     {
         const float HealthPercent = HealthComponent ? FMath::Clamp(HealthComponent->GetHealthPercent(), 0.0f, 1.0f) : 0.0f;

@@ -124,6 +124,11 @@ void AEvaZombieAIController::OnMoveCompleted(FAIRequestID RequestID, const FPath
 {
     Super::OnMoveCompleted(RequestID, Result);
 
+    if (!bCombatEnabled)
+    {
+        return;
+    }
+
     const UPathFollowingComponent* PathComponent = GetPathFollowingComponent();
     const FNavPathSharedPtr ActivePath = PathComponent ? PathComponent->GetPath() : nullptr;
     const int32 ActivePathPoints = ActivePath.IsValid() ? ActivePath->GetPathPoints().Num() : 0;
@@ -172,6 +177,11 @@ void AEvaZombieAIController::OnMoveCompleted(FAIRequestID RequestID, const FPath
 void AEvaZombieAIController::Tick(const float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+
+    if (!bCombatEnabled)
+    {
+        return;
+    }
 
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(TargetActor);
     if (!Player || Player->IsDead() || !GetPawn())
@@ -273,6 +283,11 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
 
 void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
 {
+    if (!bCombatEnabled)
+    {
+        return;
+    }
+
     AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(NewTarget);
     if (Player && !Player->IsDead())
     {
@@ -310,8 +325,30 @@ void AEvaZombieAIController::ClearPlayerTarget()
     StopMovement();
 }
 
+void AEvaZombieAIController::StopCombatForStageClear()
+{
+    bCombatEnabled = false;
+    TargetActor = nullptr;
+    bRecoveringSidestep = false;
+    bDirectFallbackActive = false;
+    bInternalRepathAbort = true;
+    ClearFocus(EAIFocusPriority::Gameplay);
+    StopMovement();
+    bInternalRepathAbort = false;
+    if (EvaPerceptionComponent)
+    {
+        EvaPerceptionComponent->Deactivate();
+    }
+    SetActorTickEnabled(false);
+}
+
 void AEvaZombieAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+    if (!bCombatEnabled)
+    {
+        return;
+    }
+
     if (!Cast<AEvaPlayerCharacter>(Actor))
     {
         return;
@@ -356,13 +393,13 @@ void AEvaZombieAIController::ConfigurePerception(const float NewSightRadius, con
 bool AEvaZombieAIController::CanAttackTarget() const
 {
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(TargetActor);
-    return GetPawn() && Player && !Player->IsDead() &&
+    return bCombatEnabled && GetPawn() && Player && !Player->IsDead() &&
         FVector::DistSquared(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) <= FMath::Square(AttackRange);
 }
 
 void AEvaZombieAIController::TryAttackTarget()
 {
-    if (!GetWorld() || !TargetActor)
+    if (!bCombatEnabled || !GetWorld() || !TargetActor)
     {
         return;
     }
@@ -619,6 +656,11 @@ bool AEvaZombieAIController::ReissueMoveToTarget(const TCHAR* RepathReason, cons
 
 bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float AcceptanceRadius)
 {
+    if (!bCombatEnabled)
+    {
+        return false;
+    }
+
     APawn* ControlledPawn = GetPawn();
     if (!GoalActor || !ControlledPawn || !GetWorld())
     {
@@ -687,6 +729,11 @@ bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float 
 
 bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation, const float AcceptanceRadius)
 {
+    if (!bCombatEnabled)
+    {
+        return false;
+    }
+
     APawn* ControlledPawn = GetPawn();
     if (!ControlledPawn || !GetWorld())
     {

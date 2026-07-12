@@ -458,3 +458,26 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: reproduce Adam chase for at least 60 seconds and confirm Unreal Editor no longer exits.
 - [ ] PIE: inspect logs and confirm there is no same-frame flood of `MoveCompleted ResultCode=Invalid`.
 - [ ] PIE: verify Adam charge, roar summon, Phase 2, and defeat still work after the reissue guard.
+
+## Cycle 013 Stage Clear / Player Death conflict follow-up
+
+- [x] Make Stage Clear reject late Player Death requests.
+- [x] Make player damage return `0` after Stage Clear.
+- [x] Prevent movement, sprint, jump, fire, and reload after Stage Clear while leaving look input available.
+- [x] Clear respawn, wave, adaptive, HUNTER timed spawn, and HUNTER reinsertion timers on Stage Clear.
+- [x] Stop existing zombie/evolved/HUNTER/ADAM/minion AI combat on Stage Clear.
+- [x] Hide enemy overhead labels and HP bars after Stage Clear.
+- [x] Skip post-clear spawn requests.
+- [x] Keep Director/GameMode from diverging when Player Death wins before Adam defeat.
+- [x] Add `[StageClear]` and `[PlayerDeath]` diagnostic logs.
+- [x] Add automation tests for post-clear death rejection, spawn skipping, AI stop, and Stage Clear idempotence.
+- [x] Development Editor / Win64 build without Live Coding.
+- [x] Automation RunTests AdaptiveHorror: 19 tests succeeded.
+- [x] Runtime smoke with NullRHI commandlet launch.
+- [ ] PIE: defeat ADAM and confirm Stage Clear appears.
+- [ ] PIE: after Stage Clear, stand still 60 seconds and confirm player HP does not decrease.
+- [ ] PIE: confirm residual enemies no longer chase or attack after Stage Clear.
+- [ ] PIE: confirm GAME OVER / checkpoint respawn does not start after Stage Clear.
+- [ ] PIE: confirm camera look remains available after Stage Clear.
+- [ ] PIE: confirm movement/shooting remain disabled after Stage Clear.
+- [ ] PIE: confirm Boss HUD and enemy overhead HP bars are hidden after Stage Clear.

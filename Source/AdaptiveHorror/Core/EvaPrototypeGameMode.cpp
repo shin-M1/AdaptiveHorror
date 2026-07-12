@@ -28,6 +28,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/HUD.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationData.h"
 #include "NavigationSystem.h"
@@ -233,11 +234,20 @@ void AEvaPrototypeGameMode::BeginPlay()
 
 void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
 {
-    if (bGameOver || bStageClear || !DeadPlayer || !GetWorld())
+    if (bStageClear)
     {
+        LogPlayerDeathRequest(TEXT("RejectedBecauseStageClear"), DeadPlayer, false);
         return;
     }
 
+    if (bGameOver || !DeadPlayer || !GetWorld())
+    {
+        LogPlayerDeathRequest(bGameOver ? TEXT("RejectedBecauseAlreadyGameOver") : TEXT("RejectedInvalidRequest"),
+            DeadPlayer, false);
+        return;
+    }
+
+    LogPlayerDeathRequest(TEXT("DeathRequest"), DeadPlayer, false);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
     if (APlayerController* PlayerController = Cast<APlayerController>(DeadPlayer->GetController()))
@@ -248,6 +258,7 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
     ShowDebugStatusMessage(TEXT("GAME OVER - restoring last checkpoint..."), RespawnDelay);
     GetWorldTimerManager().ClearTimer(RespawnTimer);
     GetWorldTimerManager().SetTimer(RespawnTimer, this, &AEvaPrototypeGameMode::RespawnPlayer, RespawnDelay, false);
+    LogPlayerDeathRequest(TEXT("RespawnTimerCreated"), DeadPlayer, true);
 }
 
 void AEvaPrototypeGameMode::ActivateCheckpoint(const FTransform& CheckpointTransform)
@@ -257,6 +268,13 @@ void AEvaPrototypeGameMode::ActivateCheckpoint(const FTransform& CheckpointTrans
 
 void AEvaPrototypeGameMode::NotifyEnemyKilled(AEvaZombieCharacter* DeadEnemy)
 {
+    if (bStageClear)
+    {
+        UE_LOG(LogAdaptiveHorror, Log, TEXT("[StageClear] NotifyEnemyKilled skipped after clear Enemy=%s"),
+            DeadEnemy ? *DeadEnemy->GetName() : TEXT("None"));
+        return;
+    }
+
     if (!DeadEnemy || DeadEnemy->ActorHasTag(TEXT("Hunter")) || DeadEnemy->ActorHasTag(TEXT("Boss")) ||
         DeadEnemy->ActorHasTag(TEXT("Adam")))
     {
@@ -297,22 +315,42 @@ void AEvaPrototypeGameMode::HandleStageClear()
 {
     if (bStageClear)
     {
+        LogStageClearState(TEXT("AlreadyCleared"), 0, false);
+        return;
+    }
+
+    if (bGameOver)
+    {
+        LogStageClearState(TEXT("RejectedBecausePlayerDeathAlreadyActive"), 0, false);
         return;
     }
 
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
-    GetWorldTimerManager().ClearTimer(RespawnTimer);
-    GetWorldTimerManager().ClearTimer(AdaptiveSpawnTimer);
-    GetWorldTimerManager().ClearTimer(HunterTimeSpawnTimer);
-    GetWorldTimerManager().ClearTimer(HunterReinsertTimer);
-    ResetEnemyTargets();
+    ClearStageClearTimers();
+    const int32 ClearedEnemyAI = StopAllEnemyCombatForStageClear();
+    if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+    {
+        PlayerController->ResetIgnoreMoveInput();
+        PlayerController->ResetIgnoreLookInput();
+        PlayerController->SetIgnoreMoveInput(true);
+    }
+    LogStageClearState(TEXT("Begin"), ClearedEnemyAI, true);
     ShowDebugStatusMessage(TEXT("STAGE CLEAR - ADAM defeated."), 8.0f);
 }
 
 void AEvaPrototypeGameMode::RespawnPlayer()
 {
+    if (bStageClear)
+    {
+        GetWorldTimerManager().ClearTimer(RespawnTimer);
+        PlayerAwaitingRespawn = nullptr;
+        bGameOver = false;
+        LogPlayerDeathRequest(TEXT("RespawnRejectedBecauseStageClear"), nullptr, false);
+        return;
+    }
+
     if (!GetWorld() || !PlayerAwaitingRespawn)
     {
         bGameOver = false;
@@ -967,7 +1005,7 @@ void AEvaPrototypeGameMode::SpawnStoryLog(AEvaResearchFacilityDirector* Director
 
 void AEvaPrototypeGameMode::SpawnPrototypeEnemies()
 {
-    if (!GetWorld())
+    if (!GetWorld() || bGameOver || bStageClear)
     {
         return;
     }
@@ -1124,6 +1162,18 @@ AEvaZombieCharacter* AEvaPrototypeGameMode::SpawnEnemyNearLocation(TSubclassOf<A
     const FVector& Origin, const float MinRadius, const float MaxRadius, const FString& EnemyType,
     const FString& SpawnReason, const EEvaEvolutionType EvolutionType)
 {
+    if (bStageClear)
+    {
+        LastSpawnLocation = Origin;
+        LastSpawnResult = FString::Printf(TEXT("%s skipped: stage clear"), *SpawnReason);
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[StageClear] Spawn skipped after clear Type=%s Reason=%s Requested=%s"),
+            *EnemyType,
+            *SpawnReason,
+            *Origin.ToCompactString());
+        return nullptr;
+    }
+
     if (!GetWorld() || !EnemyClass)
     {
         LastSpawnResult = FString::Printf(TEXT("%s failed: invalid world/class"), *SpawnReason);
@@ -1244,7 +1294,7 @@ AEvaZombieCharacter* AEvaPrototypeGameMode::SpawnEnemyNearLocation(TSubclassOf<A
 
 void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) const
 {
-    if (!Enemy || !GetWorld())
+    if (!Enemy || !GetWorld() || bStageClear)
     {
         return;
     }
@@ -1582,6 +1632,125 @@ void AEvaPrototypeGameMode::ResetEnemyTargets()
             }
         }
     }
+}
+
+int32 AEvaPrototypeGameMode::StopAllEnemyCombatForStageClear()
+{
+    if (!GetWorld())
+    {
+        return 0;
+    }
+
+    int32 ClearedEnemyAI = 0;
+    for (TActorIterator<AEvaZombieCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaZombieCharacter* Enemy = *It;
+        if (!Enemy)
+        {
+            continue;
+        }
+
+        Enemy->SetOverheadDisplayEnabled(false);
+
+        if (UCharacterMovementComponent* MovementComponent = Enemy->GetCharacterMovement())
+        {
+            MovementComponent->StopMovementImmediately();
+            MovementComponent->DisableMovement();
+        }
+
+        AAIController* AIController = Cast<AAIController>(Enemy->GetController());
+        if (AEvaZombieAIController* EvaController = Cast<AEvaZombieAIController>(AIController))
+        {
+            EvaController->StopCombatForStageClear();
+            ++ClearedEnemyAI;
+        }
+        else if (AIController)
+        {
+            AIController->ClearFocus(EAIFocusPriority::Gameplay);
+            AIController->StopMovement();
+            AIController->SetActorTickEnabled(false);
+            ++ClearedEnemyAI;
+        }
+
+        Enemy->SetActorTickEnabled(false);
+    }
+
+    ResetEnemyTargets();
+    CurrentHunter = nullptr;
+    return ClearedEnemyAI;
+}
+
+void AEvaPrototypeGameMode::ClearStageClearTimers()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(RespawnTimer);
+    GetWorldTimerManager().ClearTimer(EnemySpawnTimer);
+    GetWorldTimerManager().ClearTimer(AdaptiveSpawnTimer);
+    GetWorldTimerManager().ClearTimer(HunterTimeSpawnTimer);
+    GetWorldTimerManager().ClearTimer(HunterReinsertTimer);
+}
+
+void AEvaPrototypeGameMode::LogStageClearState(const FString& Context, const int32 ClearedEnemyAI,
+    const bool bClearedTimers) const
+{
+    UWorld* World = GetWorld();
+    const APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+    const AEvaPlayerCharacter* Player = PlayerController ? Cast<AEvaPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
+    const UEvaHealthComponent* PlayerHealth = Player ? Player->GetHealthComponent() : nullptr;
+
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[StageClear] Context=%s PlayerHP=%.1f PlayerDead=%s ActiveZombies=%d ActiveHunters=%d ActiveAdam=%d ClearedEnemyAI=%d ClearedTimers=%s PlayerDamageDisabled=%s PlayerMoveInputDisabled=%s PlayerLookInputDisabled=%s IsPaused=%s GlobalTimeDilation=%.2f IgnoreMoveInput=%s IgnoreLookInput=%s RespawnTimerActive=%s AdaptiveTimerActive=%s HunterTimerActive=%s HunterReinsertTimerActive=%s"),
+        *Context,
+        PlayerHealth ? PlayerHealth->GetCurrentHealth() : -1.0f,
+        Player && Player->IsDead() ? TEXT("true") : TEXT("false"),
+        GetActiveZombieCount(),
+        GetActiveHunterCount(),
+        GetActiveAdamCount(),
+        ClearedEnemyAI,
+        *BoolText(bClearedTimers),
+        *BoolText(bStageClear),
+        *BoolText(PlayerController ? PlayerController->IsMoveInputIgnored() : false),
+        *BoolText(PlayerController ? PlayerController->IsLookInputIgnored() : false),
+        *BoolText(World ? UGameplayStatics::IsGamePaused(World) : false),
+        World ? UGameplayStatics::GetGlobalTimeDilation(World) : 1.0f,
+        *BoolText(PlayerController ? PlayerController->IsMoveInputIgnored() : false),
+        *BoolText(PlayerController ? PlayerController->IsLookInputIgnored() : false),
+        *BoolText(IsRespawnScheduledForDebug()),
+        *BoolText(World ? World->GetTimerManager().IsTimerActive(AdaptiveSpawnTimer) : false),
+        *BoolText(World ? World->GetTimerManager().IsTimerActive(HunterTimeSpawnTimer) : false),
+        *BoolText(World ? World->GetTimerManager().IsTimerActive(HunterReinsertTimer) : false));
+}
+
+void AEvaPrototypeGameMode::LogPlayerDeathRequest(const FString& Context, const AEvaPlayerCharacter* DeadPlayer,
+    const bool bRespawnTimerCreated) const
+{
+    UWorld* World = GetWorld();
+    const APlayerController* PlayerController = DeadPlayer ? Cast<APlayerController>(DeadPlayer->GetController()) :
+        (World ? World->GetFirstPlayerController() : nullptr);
+    const UEvaHealthComponent* Health = DeadPlayer ? DeadPlayer->GetHealthComponent() : nullptr;
+
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[PlayerDeath] Context=%s DeathRequest=%s RejectedBecauseStageClear=%s HP=%.1f PlayerDead=%s StageClearState=%s GameOverState=%s RespawnTimerCreated=%s RespawnTimerActive=%s IgnoreMoveInput=%s IgnoreLookInput=%s"),
+        *Context,
+        *BoolText(DeadPlayer != nullptr),
+        *BoolText(bStageClear),
+        Health ? Health->GetCurrentHealth() : -1.0f,
+        DeadPlayer && DeadPlayer->IsDead() ? TEXT("true") : TEXT("false"),
+        *BoolText(bStageClear),
+        *BoolText(bGameOver),
+        *BoolText(bRespawnTimerCreated),
+        *BoolText(IsRespawnScheduledForDebug()),
+        *BoolText(PlayerController ? PlayerController->IsMoveInputIgnored() : false),
+        *BoolText(PlayerController ? PlayerController->IsLookInputIgnored() : false));
+}
+
+bool AEvaPrototypeGameMode::IsRespawnScheduledForDebug() const
+{
+    return GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(RespawnTimer);
 }
 
 int32 AEvaPrototypeGameMode::CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, const float Radius)

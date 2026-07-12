@@ -3,7 +3,9 @@
 #include "Misc/AutomationTest.h"
 #include "AI/EvaAdamBossCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
+#include "AI/EvaZombieAIController.h"
 #include "AI/EvaZombieCharacter.h"
+#include "Characters/EvaPlayerCharacter.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -214,6 +216,100 @@ bool FEvaAdamDefeatStageClearTest::RunTest(const FString& Parameters)
 
     TestTrue(TEXT("Adam defeat completes the stage"), Director->IsStageClear());
     TestTrue(TEXT("Director zone becomes Clear"), Director->GetCurrentZone() == EEvaFacilityZone::Clear);
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaStageClearRejectsPlayerDeathTest,
+    "AdaptiveHorror.StageClear.RejectsPlayerDeath",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaStageClearRejectsPlayerDeathTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+
+    GameMode->HandleStageClear();
+    GameMode->HandlePlayerDeath(Player);
+
+    TestTrue(TEXT("Stage clear remains active after a late death request"), GameMode->IsStageClear());
+    TestFalse(TEXT("Late death request does not enter game over"), GameMode->IsGameOver());
+    TestFalse(TEXT("Late death request does not schedule respawn"), GameMode->IsRespawnScheduledForDebug());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaStageClearSkipsSpawnsTest,
+    "AdaptiveHorror.StageClear.SkipsSpawns",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaStageClearSkipsSpawnsTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+
+    GameMode->HandleStageClear();
+    AEvaZombieCharacter* SpawnedEnemy = GameMode->SpawnEnemyNearLocation(AEvaZombieCharacter::StaticClass(),
+        FVector::ZeroVector, 100.0f, 200.0f, TEXT("Zombie"), TEXT("AutomationPostClear"));
+
+    TestNull(TEXT("Post-clear spawn requests return null"), SpawnedEnemy);
+    TestTrue(TEXT("Post-clear spawn records skipped reason"),
+        GameMode->GetLastSpawnResult().Contains(TEXT("stage clear")));
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaStageClearStopsEnemyCombatTest,
+    "AdaptiveHorror.StageClear.StopsEnemyCombat",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaStageClearStopsEnemyCombatTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+    AEvaZombieAIController* Controller = World->SpawnActor<AEvaZombieAIController>();
+
+    TestNotNull(TEXT("Zombie spawns for stage clear combat-stop test"), Zombie);
+    TestNotNull(TEXT("Controller spawns for stage clear combat-stop test"), Controller);
+    if (!Zombie || !Controller)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Controller->Possess(Zombie);
+    GameMode->HandleStageClear();
+
+    TestFalse(TEXT("Stage clear disables EVA AI combat"), Controller->IsCombatEnabled());
+    if (UTextRenderComponent* Label = Zombie->GetTypeLabelComponent())
+    {
+        TestFalse(TEXT("Stage clear hides overhead labels"), Label->IsVisible());
+    }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaStageClearIdempotentTest,
+    "AdaptiveHorror.StageClear.Idempotent",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaStageClearIdempotentTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+
+    GameMode->HandleStageClear();
+    GameMode->HandleStageClear();
+
+    TestTrue(TEXT("Repeated stage clear calls keep stage clear active"), GameMode->IsStageClear());
+    TestFalse(TEXT("Repeated stage clear calls do not enter game over"), GameMode->IsGameOver());
+    TestFalse(TEXT("Repeated stage clear calls do not schedule respawn"), GameMode->IsRespawnScheduledForDebug());
+
     World->DestroyWorld(false);
     return true;
 }
