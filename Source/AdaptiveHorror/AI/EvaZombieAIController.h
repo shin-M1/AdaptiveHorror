@@ -101,4 +101,5 @@ private:
     FVector LastProgressSampleLocation = FVector::ZeroVector;
     FVector LastRepathTargetLocation = FVector::ZeroVector;
     bool bInternalRepathAbort = false;
+    bool bIssuingRepathMove = false;
 };

@@ -444,3 +444,17 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: confirm FAST label.
 - [ ] PIE: confirm ARMORED label.
 - [ ] PIE: confirm LONG ARM label.
+
+## Cycle 011 Adam chase crash follow-up
+
+- [x] Inspect crash artifacts for Adam chase crash.
+- [x] Record that WinDbg/cdb were not available locally and UE CrashContext/logs were used for symbolicated analysis.
+- [x] Identify first AdaptiveHorror frame: `AEvaZombieAIController::OnMoveCompleted`.
+- [x] Identify repeated recursive stack: `OnMoveCompleted -> ReissueMoveToTarget -> MoveToActor -> OnMoveCompleted`.
+- [x] Fix only the reentrant MoveTo reissue path with an in-flight guard and pre-call cooldown timestamp.
+- [x] Development Editor / Win64 build without Live Coding.
+- [x] Automation RunTests AdaptiveHorror: 15 tests succeeded.
+- [x] Runtime smoke with NullRHI commandlet launch.
+- [ ] PIE: reproduce Adam chase for at least 60 seconds and confirm Unreal Editor no longer exits.
+- [ ] PIE: inspect logs and confirm there is no same-frame flood of `MoveCompleted ResultCode=Invalid`.
+- [ ] PIE: verify Adam charge, roar summon, Phase 2, and defeat still work after the reissue guard.

@@ -144,7 +144,7 @@ void AEvaZombieAIController::OnMoveCompleted(FAIRequestID RequestID, const FPath
         ActivePathPoints,
         PathComponent ? PathComponent->GetCurrentPathIndex() : INDEX_NONE);
 
-    if (bInternalRepathAbort)
+    if (bInternalRepathAbort || bIssuingRepathMove)
     {
         LogRepathState(TEXT("MoveCompleted"), EPathFollowingRequestResult::Failed, LastProgressDistance);
         return;
@@ -594,9 +594,13 @@ bool AEvaZombieAIController::ReissueMoveToTarget(const TCHAR* RepathReason, cons
     const FVector GoalLocation = TargetActor->GetActorLocation();
     LastMoveRequestGoal = GoalLocation;
     LastRepathTargetLocation = GoalLocation;
+    LastMoveRequestTime = Now;
 
+    bIssuingRepathMove = true;
     const EPathFollowingRequestResult::Type MoveResult =
         MoveToActor(TargetActor, AttackRange * 0.75f, true, true, true, nullptr, true);
+    bIssuingRepathMove = false;
+
     if (MoveResult != EPathFollowingRequestResult::Failed)
     {
         ConsecutiveMoveFailures = 0;
@@ -610,7 +614,6 @@ bool AEvaZombieAIController::ReissueMoveToTarget(const TCHAR* RepathReason, cons
 
     LogRepathState(RepathReason, MoveResult, LastProgressDistance);
     LogPathDiagnostics(RepathReason ? RepathReason : TEXT("Repath"), GoalLocation, MoveResult);
-    LastMoveRequestTime = Now;
     return MoveResult != EPathFollowingRequestResult::Failed;
 }
 

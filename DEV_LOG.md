@@ -967,3 +967,94 @@ P:
 
 - COMPOSITE is the 80% EVA analysis evolved variant.
 - If `[AIRepath] Reason=NoProgress` repeatedly fires while NavMesh is visibly connected, inspect whether the obstacle collision is affecting movement but not cutting path data. If no real NavPath detour exists, fix map/NavMesh authoring rather than forcing AI through code.
+
+## 2026-07-12 - Cycle 011: Adam chase crash dump analysis and access-violation fix
+
+### User-reported crash
+
+- Adam body scale/display: confirmed by user.
+- Adam pursuit: confirmed by user.
+- Crash symptom: after several seconds of Adam chase, PIE freezes and Unreal Editor exits.
+- Windows Event Viewer: `UnrealEditor.exe`, fault module `ucrtbase.dll`, exception code `0xC0000005`.
+- Full dumps present in `C:\CrashDumps`:
+  - `UnrealEditor.exe.29144.dmp`
+  - `UnrealEditor.exe_260712_181459.dmp`
+
+### Crash dump / crash artifact analysis
+
+- `cdb.exe` / `windbg.exe` were not installed or discoverable on PATH or under Windows Kits Debuggers in this environment.
+- Visual Studio 18 Community was present, but no non-interactive WinDbg command-line analysis path was available.
+- Used the UE-generated crash artifacts next to the dump:
+  - `Saved/Crashes/UECC-Windows-3B04608E41723DFD16C5B88742084507_0000/CrashContext.runtime-xml`
+  - `Saved/Crashes/UECC-Windows-3B04608E41723DFD16C5B88742084507_0000/AdaptiveHorror.log`
+- UE crash context reports:
+  - Exception: `Unhandled Exception: EXCEPTION_STACK_OVERFLOW`
+  - Seconds since start: `68`
+  - Game: `UE-AdaptiveHorror`
+  - Build configuration: `Development`
+- First AdaptiveHorror frame:
+  - `AEvaZombieAIController::OnMoveCompleted()`
+  - `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp:133`
+- Repeating call stack pattern:
+  - `AEvaZombieAIController::ReissueMoveToTarget()`
+  - `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp:598`
+  - `AEvaZombieAIController::OnMoveCompleted()`
+  - `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp:170`
+  - AIModule frames
+  - repeated until stack overflow.
+- Crash log corroboration:
+  - `MoveCompleted` with `ResultCode=Invalid` was emitted thousands of times in the same frame for the same controller/pawn.
+  - This matches synchronous or immediate MoveTo completion re-entering `OnMoveCompleted` and reissuing another MoveTo without unwinding the stack.
+- Pointer / access information:
+  - No null game pointer was identified in the symbolicated UE call stack.
+  - The controller, pawn, and target were valid enough for `MoveCompleted` and `ReissueMoveToTarget` to execute repeatedly.
+  - UE crash context classified the failure as stack overflow rather than a direct null read/write/execute access.
+  - The Windows `0xC0000005` report appears to be the external process failure classification after the stack overflow.
+
+### Root cause
+
+- `AEvaAdamBossAIController` inherits `AEvaZombieAIController`, so Adam uses the inherited `OnMoveCompleted` path.
+- `OnMoveCompleted` reissued `MoveToActor(Player)` for non-success/non-aborted results.
+- `ReissueMoveToTarget()` called `MoveToActor()` before updating `LastMoveRequestTime` and without an in-flight request guard.
+- When `MoveToActor()` completed synchronously/immediately with `Invalid` or `AlreadyAtGoal`-adjacent path following state, `OnMoveCompleted()` ran again while the previous reissue was still on the stack.
+- The cooldown check still saw the old timestamp, so it did not stop the nested reissue.
+- Result: `OnMoveCompleted -> ReissueMoveToTarget -> MoveToActor -> OnMoveCompleted` recursion until `EXCEPTION_STACK_OVERFLOW`.
+
+### Fix
+
+- Changed only `AEvaZombieAIController` pursuit reissue safety:
+  - Added `bIssuingRepathMove`.
+  - `OnMoveCompleted()` now returns without reissuing while a reissued MoveTo is currently being submitted.
+  - `ReissueMoveToTarget()` now stamps `LastMoveRequestTime` before calling `MoveToActor()`, so synchronous completion cannot bypass the cooldown.
+- No Adam attack, charge, roar, summon, phase, label, HUD, Zombie, or HUNTER gameplay logic was changed.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Build / test verification
+
+- Command:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`
+- Results:
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests AdaptiveHorror: exit code 0.
+  - Automation log confirms 15 successful tests and 0 failures.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -NullRHI -unattended -nop4 -nosplash -ExecCmds="Quit"`
+  - Result: exit code 0.
+
+### PIE/manual verification status
+
+- Not visually confirmed in this environment:
+  - Adam chase for several seconds/minutes without editor crash.
+  - Adam charge/roar/phase behavior after the stack-overflow fix.
+  - Repeated F4 Adam debug start after this fix.
+- Next PIE pass should reproduce the previous Adam chase scenario and confirm no rapid `MoveCompleted -> ReissueMoveToTarget` recursion appears in logs.

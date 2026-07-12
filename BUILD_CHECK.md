@@ -286,3 +286,35 @@ Required follow-up:
 2. Re-run `Scripts\RunBuildCheck.ps1 -MaxParallelActions 2`.
 3. Run automation tests.
 4. Perform PIE manual verification for safe enemy spawning and stuck-log reduction.
+
+## Cycle 011 Build Check Note - 2026-07-12
+
+Command used:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1 -MaxParallelActions 2
+```
+
+Observed result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: exit code 0.
+- Latest automation log confirmed 15 successful tests and 0 failures.
+- Runtime smoke commandlet launch with `-game -NullRHI -ExecCmds="Quit"` exited with code 0.
+
+Crash-specific note:
+
+- The Adam chase crash was classified by UE CrashContext as `EXCEPTION_STACK_OVERFLOW`.
+- First AdaptiveHorror frame: `AEvaZombieAIController::OnMoveCompleted`.
+- Repeating stack: `OnMoveCompleted -> ReissueMoveToTarget -> MoveToActor -> OnMoveCompleted`.
+- Fix: guard reentrant MoveTo reissue and stamp `LastMoveRequestTime` before calling `MoveToActor`.
+- PIE visual verification is still required in Unreal Editor; Codex did not visually confirm the Adam chase regression.
+
+Troubleshooting if Adam chase still crashes:
+
+1. Search the latest PIE log for `EXCEPTION_STACK_OVERFLOW`.
+2. Search for same-frame floods of `[AIPath] MoveCompleted` and `[AIRepath] Reason=MoveCompleted`.
+3. If the stack still includes `AEvaZombieAIController::OnMoveCompleted` and `ReissueMoveToTarget`, inspect any MoveTo calls that are not protected by `bIssuingRepathMove`.
+4. If the stack moves to Adam-specific functions, inspect `AEvaAdamBossAIController::TryChargeAttack`, `TryRoarSummon`, and `AEvaAdamBossCharacter::SpawnRoarMinions` separately.

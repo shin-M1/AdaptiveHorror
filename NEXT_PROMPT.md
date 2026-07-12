@@ -873,3 +873,58 @@ If F4 still does not show ADAM:
 - Search logs for `[AdamDebug]`.
 - Check `ExistingAdamCount`, `SpawnAttempted`, `SpawnResult`, `AdamClass`, `NavProjected`, `AIController`, `Possessed`, `PlayerTarget`, and `DestroyReason`.
 - If `SpawnResult` is valid but the visual looks like a zombie, check for any remaining non-ADAM `ConfigureEvolution()` call path.
+
+## Latest Handoff - 2026-07-12 Cycle 011
+
+Continue from the Adam chase crash fix.
+
+Current important state:
+
+- User reported Unreal Editor exit during Adam chase after several seconds.
+- Windows Event Viewer showed `ucrtbase.dll` and `0xC0000005`, but UE CrashContext identified the crash as `Unhandled Exception: EXCEPTION_STACK_OVERFLOW`.
+- Crash artifacts analyzed:
+  - `Saved/Crashes/UECC-Windows-3B04608E41723DFD16C5B88742084507_0000/CrashContext.runtime-xml`
+  - `Saved/Crashes/UECC-Windows-3B04608E41723DFD16C5B88742084507_0000/AdaptiveHorror.log`
+- WinDbg/cdb were not available in this environment; Visual Studio was installed but not usable for non-interactive dump analysis here.
+- First AdaptiveHorror frame:
+  - `AEvaZombieAIController::OnMoveCompleted()`
+  - `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp:133`
+- Repeating stack:
+  - `AEvaZombieAIController::ReissueMoveToTarget()`
+  - `AEvaZombieAIController::OnMoveCompleted()`
+  - repeated through AIModule until stack overflow.
+- Root cause:
+  - Adam inherits `AEvaZombieAIController` path completion handling.
+  - `ReissueMoveToTarget()` could call `MoveToActor()` and receive synchronous/immediate `MoveCompleted` before `LastMoveRequestTime` was updated.
+  - `OnMoveCompleted()` then reissued another MoveTo on the same call stack.
+- Fix applied:
+  - Added `bIssuingRepathMove` to `AEvaZombieAIController`.
+  - `OnMoveCompleted()` now refuses to reissue while a reissued MoveTo is in flight.
+  - `LastMoveRequestTime` is now stamped before `MoveToActor()` inside `ReissueMoveToTarget()`.
+- No Adam attack/charge/roar/summon/phase logic was changed.
+- Development Editor / Win64 build without Live Coding succeeds.
+- `Automation RunTests AdaptiveHorror` succeeds: 15 tests, 0 failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -ExecCmds="Quit"` exits with code 0.
+
+Immediate next PIE checks:
+
+1. Open the editor after the successful build.
+2. Start PIE and press F4 to begin Adam encounter.
+3. Let Adam chase the player for at least 60 seconds.
+4. Confirm Unreal Editor does not freeze or exit.
+5. Confirm the log does not show same-frame flooding of:
+   - `[AIPath] MoveCompleted`
+   - `[AIRepath] Reason=MoveCompleted`
+6. Confirm Adam still:
+   - tracks the player,
+   - uses melee,
+   - uses charge,
+   - uses roar summon,
+   - enters Phase 2,
+   - can be defeated to Stage Clear.
+7. If a crash still occurs, analyze the new CrashContext first before changing gameplay code.
+
+Important caution:
+
+- Do not add new Adam features until the Adam chase crash is visually confirmed fixed in PIE.
+- If a new stack points to Adam-specific `TryChargeAttack`, `TryRoarSummon`, `SpawnRoarMinions`, `ActiveSummons`, `Destroy`, or `EndPlay`, fix only that exact root cause.
