@@ -217,6 +217,7 @@ void AEvaZombieCharacter::Tick(const float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     UpdatePrototypeVisualAnimation(DeltaSeconds);
+    RefreshDebugIntentDisplay(false);
     UpdatePrototypeDebugLabelFacing();
 }
 
@@ -230,6 +231,7 @@ void AEvaZombieCharacter::BeginPlay()
     EnsurePrototypeDebugLabelInitialized();
     ConfigureEvolution(EvolutionType);
     EnsurePrototypeDebugLabelInitialized();
+    RefreshDebugIntentDisplay(true);
     LogPrototypeDebugLabelState(TEXT("BeginPlay"));
 }
 
@@ -430,6 +432,7 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
         MovementComponent->MaxWalkSpeed = MovementSpeed;
     }
     ApplyEvolutionToController();
+    RefreshDebugIntentDisplay(true);
 }
 
 void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FColor& Color, const float WorldSize)
@@ -452,12 +455,13 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
 void AEvaZombieCharacter::SetDebugIntentText(const FString& IntentText)
 {
     EnsurePrototypeDebugLabelInitialized();
-    if (CurrentDebugIntentText == IntentText)
+    const FString SafeIntent = IntentText.IsEmpty() ? FString(TEXT("IDLE")) : IntentText;
+    if (CurrentDebugIntentText == SafeIntent)
     {
         return;
     }
 
-    CurrentDebugIntentText = IntentText;
+    CurrentDebugIntentText = SafeIntent;
     if (DebugIntentLabel)
     {
         DebugIntentLabel->SetText(FText::FromString(CurrentDebugIntentText));
@@ -465,6 +469,93 @@ void AEvaZombieCharacter::SetDebugIntentText(const FString& IntentText)
         DebugIntentLabel->SetVisibility(bShouldShow, true);
         DebugIntentLabel->SetHiddenInGame(!bShouldShow, true);
     }
+}
+
+FString AEvaZombieCharacter::GetResolvedDebugIntentText() const
+{
+    if (HealthComponent && HealthComponent->IsDead())
+    {
+        return TEXT("");
+    }
+
+    if (ActorHasTag(TEXT("Hunter")) && CurrentDebugIntentText.StartsWith(TEXT("ANTI-")))
+    {
+        return CurrentDebugIntentText;
+    }
+
+    const AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(GetController());
+    if (ZombieController)
+    {
+        const FString ControllerIntent = ZombieController->GetCurrentActionIntent();
+        if (!ControllerIntent.IsEmpty())
+        {
+            return ControllerIntent;
+        }
+    }
+
+    if (!CurrentDebugIntentText.IsEmpty())
+    {
+        return CurrentDebugIntentText;
+    }
+
+    if (!GetController())
+    {
+        return GetVelocity().Size2D() > 12.0f ? FString(TEXT("CHASE")) : FString(TEXT("IDLE"));
+    }
+
+    return TEXT("IDLE");
+}
+
+void AEvaZombieCharacter::RefreshDebugIntentDisplay(const bool bForceLog)
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (!bForceLog && Now - LastDebugIntentRefreshTime < 0.45f)
+    {
+        return;
+    }
+    LastDebugIntentRefreshTime = Now;
+
+    EnsurePrototypeDebugLabelInitialized();
+
+    const FString ResolvedIntent = GetResolvedDebugIntentText();
+    bool bIntentChanged = false;
+    if (!ResolvedIntent.IsEmpty() && CurrentDebugIntentText != ResolvedIntent)
+    {
+        CurrentDebugIntentText = ResolvedIntent;
+        bIntentChanged = true;
+        if (DebugIntentLabel)
+        {
+            DebugIntentLabel->SetText(FText::FromString(CurrentDebugIntentText));
+        }
+    }
+
+    const bool bShouldShow = ShouldShowDebugIntentLabel();
+    if (DebugIntentLabel)
+    {
+        DebugIntentLabel->SetVisibility(bShouldShow, true);
+        DebugIntentLabel->SetHiddenInGame(!bShouldShow, true);
+    }
+
+    const bool bVisibilityChanged = bLastDebugIntentVisible != bShouldShow;
+    const bool bShouldLog = bForceLog || bIntentChanged || bVisibilityChanged ||
+        (bShouldShow && Now - LastEnemyIntentLogTime >= 5.0f);
+    if (bShouldLog)
+    {
+        LastEnemyIntentLogTime = Now;
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[EnemyIntent] Actor=%s EnemyType=%s Intent=%s DebugVisible=%s ControllerValid=%s"),
+            *GetName(),
+            *UEnum::GetValueAsString(EvolutionType),
+            CurrentDebugIntentText.IsEmpty() ? TEXT("None") : *CurrentDebugIntentText,
+            bShouldShow ? TEXT("true") : TEXT("false"),
+            Cast<AEvaZombieAIController>(GetController()) ? TEXT("true") : TEXT("false"));
+    }
+    bLastDebugIntentVisible = bShouldShow;
 }
 
 void AEvaZombieCharacter::SetOverheadDisplayEnabled(const bool bEnabled)

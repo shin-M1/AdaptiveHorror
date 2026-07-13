@@ -279,6 +279,7 @@ private:
     void StartAdaptationProfileUpdates();
     void StopAdaptationProfileUpdates();
     void UpdateAdaptationProfileForGameplay();
+    void SyncEnemyDebugIntentDisplays(bool bForceLog) const;
 
     UPROPERTY()
     TObjectPtr<UStaticMesh> RuntimeCubeMesh;

@@ -315,6 +315,7 @@ void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
             GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
             *NewTarget->GetName(),
             GetPawn() ? FVector::Dist(GetPawn()->GetActorLocation(), NewTarget->GetActorLocation()) : -1.0f);
+        SetCurrentActionIntent(TEXT("CHASE"));
         if (GetPawn())
         {
             MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
@@ -329,7 +330,7 @@ void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
 void AEvaZombieAIController::ClearPlayerTarget()
 {
     TargetActor = nullptr;
-    SetCurrentActionIntent(TEXT(""));
+    SetCurrentActionIntent(TEXT("IDLE"));
     ClearFocus(EAIFocusPriority::Gameplay);
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
@@ -340,7 +341,7 @@ void AEvaZombieAIController::StopCombatForStageClear()
 {
     bCombatEnabled = false;
     TargetActor = nullptr;
-    SetCurrentActionIntent(TEXT(""));
+    SetCurrentActionIntent(TEXT("IDLE"));
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
     bInternalRepathAbort = true;
@@ -505,18 +506,59 @@ bool AEvaZombieAIController::ApplyCurrentGameplayAdaptation(const bool bForceApp
     return true;
 }
 
+FString AEvaZombieAIController::GetCurrentActionIntent() const
+{
+    return ResolveCurrentActionIntent();
+}
+
+void AEvaZombieAIController::EnsureCurrentActionIntent()
+{
+    SetCurrentActionIntent(ResolveCurrentActionIntent());
+}
+
 void AEvaZombieAIController::SetCurrentActionIntent(const FString& NewIntent)
 {
-    if (CurrentActionIntent == NewIntent)
+    const FString SafeIntent = NewIntent.IsEmpty() ? ResolveCurrentActionIntent() : NewIntent;
+    if (CurrentActionIntent == SafeIntent)
     {
         return;
     }
 
-    CurrentActionIntent = NewIntent;
+    CurrentActionIntent = SafeIntent;
     if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
     {
         Zombie->SetDebugIntentText(CurrentActionIntent);
     }
+}
+
+FString AEvaZombieAIController::ResolveCurrentActionIntent() const
+{
+    if (!bCombatEnabled)
+    {
+        return TEXT("IDLE");
+    }
+
+    if (!CurrentActionIntent.IsEmpty())
+    {
+        return CurrentActionIntent;
+    }
+
+    if (!GetPawn())
+    {
+        return TEXT("IDLE");
+    }
+
+    if (TargetActor)
+    {
+        const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(TargetActor);
+        if (Player && Player->IsDead())
+        {
+            return TEXT("IDLE");
+        }
+        return CanAttackTarget() ? FString(TEXT("ATTACK")) : FString(TEXT("CHASE"));
+    }
+
+    return GetMoveStatus() == EPathFollowingStatus::Moving ? FString(TEXT("SEARCH")) : FString(TEXT("IDLE"));
 }
 
 bool AEvaZombieAIController::CanAttackTarget() const

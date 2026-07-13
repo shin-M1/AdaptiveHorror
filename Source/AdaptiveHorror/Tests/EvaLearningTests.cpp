@@ -937,4 +937,87 @@ bool FEvaCompositeHybridPolishTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaEnemyIntentInitializesAfterSpawnTest,
+    "AdaptiveHorror.GameplayPass.Polish.IntentInitializesAfterSpawn",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaEnemyIntentInitializesAfterSpawnTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    const EEvaEvolutionType Types[] =
+    {
+        EEvaEvolutionType::None,
+        EEvaEvolutionType::Fast,
+        EEvaEvolutionType::Armored,
+        EEvaEvolutionType::LongArm,
+        EEvaEvolutionType::Composite
+    };
+
+    for (const EEvaEvolutionType Type : Types)
+    {
+        AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+        TestNotNull(TEXT("Zombie spawns for intent initialization"), Zombie);
+        if (!Zombie)
+        {
+            continue;
+        }
+
+        Zombie->ConfigureEvolution(Type);
+        Zombie->RefreshDebugIntentDisplay(true);
+        TestFalse(TEXT("Spawned enemy resolves a non-empty intent"), Zombie->GetResolvedDebugIntentText().IsEmpty());
+        if (UTextRenderComponent* IntentLabel = Zombie->GetDebugIntentLabelComponent())
+        {
+            TestFalse(TEXT("Debug OFF keeps intent label hidden"), IntentLabel->IsVisible());
+            TestFalse(TEXT("Intent label text is not empty after refresh"), IntentLabel->Text.ToString().IsEmpty());
+        }
+    }
+
+    AEvaHunterCharacter* Hunter = World->SpawnActor<AEvaHunterCharacter>();
+    TestNotNull(TEXT("Hunter spawns for intent initialization"), Hunter);
+    if (Hunter)
+    {
+        Hunter->SetHunterCounterType(EEvaHunterCounterType::AntiRanger);
+        Hunter->RefreshDebugIntentDisplay(true);
+        TestTrue(TEXT("Hunter preserves counter intent"),
+            Hunter->GetResolvedDebugIntentText().Contains(TEXT("ANTI-RANGER")));
+    }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaEnemyIntentControllerFallbackTest,
+    "AdaptiveHorror.GameplayPass.Polish.IntentControllerFallback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaEnemyIntentControllerFallbackTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+    AEvaZombieAIController* Controller = World->SpawnActor<AEvaZombieAIController>();
+
+    TestNotNull(TEXT("Zombie spawns for controller intent fallback"), Zombie);
+    TestNotNull(TEXT("Controller spawns for controller intent fallback"), Controller);
+    if (!Zombie || !Controller)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Controller->Possess(Zombie);
+    Controller->EnsureCurrentActionIntent();
+    Zombie->RefreshDebugIntentDisplay(true);
+
+    TestFalse(TEXT("Controller returns a non-empty fallback intent"), Controller->GetCurrentActionIntent().IsEmpty());
+    TestFalse(TEXT("Existing enemy refresh resolves non-empty intent"), Zombie->GetResolvedDebugIntentText().IsEmpty());
+    if (UTextRenderComponent* IntentLabel = Zombie->GetDebugIntentLabelComponent())
+    {
+        TestFalse(TEXT("Debug OFF hides refreshed intent label"), IntentLabel->IsVisible());
+        TestFalse(TEXT("Refreshed intent label stores text"), IntentLabel->Text.ToString().IsEmpty());
+    }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
 #endif

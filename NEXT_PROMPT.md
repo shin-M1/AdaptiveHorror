@@ -1,5 +1,93 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 020 Enemy Intent Display Consistency
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms Gameplay Pass 1 Polish in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 37 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- `git diff --check`: succeeded, no whitespace errors. CRLF conversion warnings only.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Fixed inconsistent overhead Intent display for existing/spawned enemies while Debug HUD is ON.
+- Zombie AI intent now resolves to a safe non-empty state instead of staying blank:
+  - `CHASE`
+  - `ATTACK`
+  - `SEARCH`
+  - `IDLE`
+- Spawn priming now forces an intent refresh for initial zombies, wave zombies, evolved/adaptive spawns, HUNTER, and HUNTER reinsertion paths that use the common enemy priming flow.
+- Debug HUD F9/N now synchronizes existing enemies, so already-spawned enemies update when Debug HUD is toggled or pages are switched.
+- Debug Intent labels are still hidden in normal play and remain separate from enemy name / HP bar.
+- ADAM was intentionally not given an overhead Intent label.
+- Added low-frequency `[EnemyIntent]` logs:
+  - Actor
+  - EnemyType
+  - Intent
+  - DebugVisible
+  - ControllerValid
+- Added automation coverage for:
+  - Spawned enemy intent initialization.
+  - Controller fallback intent.
+  - Debug OFF hiding the intent label while keeping text initialized.
+  - HUNTER counter intent preservation.
+
+### Next highest-priority task
+
+Run PIE and verify only the overhead Intent display consistency. Do not add new features, enemies, weapons, maps, or balance changes.
+
+PIE checklist:
+
+1. Press F9 and confirm Debug HUD turns ON.
+2. Confirm overhead Intent appears for:
+   - Initial Zombie.
+   - Wave Zombie.
+   - FAST.
+   - ARMORED.
+   - LONG ARM.
+   - COMPOSITE.
+   - HUNTER.
+   - HUNTER reinserted individual.
+3. Confirm no displayed enemy has an empty Intent.
+4. Confirm reasonable fallback text appears when state is not yet assigned, e.g. `IDLE`, `SEARCH`, or `CHASE`.
+5. Confirm N page switching keeps existing enemy Intent labels synchronized.
+6. Confirm F9 Debug OFF hides Intent labels for all existing enemies.
+7. Confirm normal enemy name and HP bar remain readable and do not overlap more than before.
+8. Confirm ADAM does not receive an overhead Intent label.
+9. Confirm gameplay loop, enemy behavior, HUNTER, ADAM, and Stage Clear still behave as before.
+
+If a problem remains:
+
+- Fix only the Intent display inconsistency.
+- Do not change AI balance, path following, spawn rules, ADAM, HUNTER behavior, Stage Clear, UI flow, audio, or visual presentation unless the Intent display change directly caused the regression.
+
+### Important files
+
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that all target enemies show non-empty Intent while Debug HUD is ON.
+- User confirms Intent hides for all enemies when Debug HUD is OFF.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 019 Gameplay Pass 1 Polish
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

@@ -1,5 +1,27 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 020 status - Enemy Intent Display Consistency
+
+- [x] Fixed blank/unsynced overhead Intent for existing enemies when Debug HUD is toggled ON.
+- [x] Added safe fallback Intent from actual AI state: `CHASE`, `ATTACK`, `SEARCH`, or `IDLE`.
+- [x] Initialized Intent on `SetPlayerTarget()` and spawn/prime refresh paths.
+- [x] Synced existing enemies when Debug HUD is toggled or paged.
+- [x] Kept Debug HUD OFF hiding Intent labels.
+- [x] Preserved HUNTER `ANTI-*` counter display during controller initialization.
+- [x] Added `[EnemyIntent]` low-frequency logs.
+- [x] Added Automation for spawn-time Intent initialization and controller fallback Intent.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 37 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+- [x] `git diff --check` succeeded with no whitespace errors.
+
+### Next TODO
+
+- [ ] PIE-verify Debug HUD ON updates Intent for already-spawned enemies.
+- [ ] PIE-verify initial Zombie, Wave Zombie, FAST, ARMORED, LONG ARM, COMPOSITE, HUNTER, and HUNTER reinsertion all show non-empty Intent.
+- [ ] PIE-verify Debug HUD OFF hides all Intent labels.
+- [ ] PIE-verify Intent labels still do not overlap enemy name / HP bars.
+
 ## Cycle 019 status - Gameplay Pass 1 Polish
 
 - [x] Confirmed work continued on `feature/gameplay-pass1`.

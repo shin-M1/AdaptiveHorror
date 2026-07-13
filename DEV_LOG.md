@@ -1,5 +1,75 @@
 # Development Log
 
+## 2026-07-14 - Cycle 020: Enemy Intent Display Consistency Fix
+
+Branch: `feature/gameplay-pass1`
+
+### Scope
+
+- Fixed inconsistent overhead Intent display from the Gameplay Pass 1 Polish PIE check.
+- No AI balance, movement tuning, enemy behavior tuning, HUNTER tier/reinsertion, ADAM, Stage Clear, player death, UI flow, weapon, map, visual/audio, or horror-presentation changes were made.
+
+### Implemented
+
+- Intent state safety:
+  - `AEvaZombieAIController::GetCurrentActionIntent()` now resolves a safe non-empty state from actual AI state when the explicit intent has not been set yet.
+  - Fallback states are `CHASE`, `ATTACK`, `SEARCH`, or `IDLE`.
+  - `SetPlayerTarget()` initializes intent to `CHASE`.
+  - Target clear / combat stop resolves to `IDLE` while display rules still hide it outside active gameplay / Stage Clear.
+- Existing enemy display sync:
+  - `AEvaZombieCharacter::RefreshDebugIntentDisplay()` refreshes the existing Intent component at low frequency and never recreates widgets/components.
+  - Spawned enemies, evolved enemies, primed enemies, and controller-delayed enemies now get a safe initial Intent instead of staying blank.
+  - Debug HUD toggle/page actions sync existing enemies immediately.
+  - Debug HUD OFF hides all Intent labels.
+- HUNTER display safety:
+  - HUNTER `ANTI-*` counter text is preserved and not overwritten by fallback `IDLE` during controller initialization.
+- Logging:
+  - Added low-frequency `[EnemyIntent]` logs with Actor, EnemyType, Intent, DebugVisible, and ControllerValid.
+- Automation:
+  - Added tests for spawn-time Intent initialization and controller fallback Intent.
+  - Existing Stage Clear hidden-Intent coverage remains active.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 37 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest smoke log showed no project Fatal / Assertion. `EnsurePrototypePlayer` appears as a normal log context, not an engine ensure.
+- Automation/log confirmation:
+  - `[EnemyIntent]` logs appeared for `None`, `Fast`, `Armored`, `LongArm`, `Composite`, and `Hunter` test actors.
+  - Debug OFF hidden state was verified by Automation.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- PIE viewport confirmation that all existing/spawned enemies show Intent consistently after toggling Debug HUD ON.
+- PIE confirmation for HUNTER reinsertion display, because runtime smoke does not enter live gameplay.
+
+### Known risks / follow-up
+
+- Runtime smoke starts in Title flow, so live combat Intent visibility still needs one PIE pass.
+- Intent text intentionally falls back to simple states (`IDLE` / `CHASE` / `SEARCH`) when no richer action has been set yet.
+
 ## 2026-07-14 - Cycle 019: Gameplay Pass 1 Polish
 
 Branch: `feature/gameplay-pass1`

@@ -54,7 +54,10 @@ public:
     FString GetCurrentAdaptationSummary() const { return CurrentAdaptationTuning.DebugSummary; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
-    FString GetCurrentActionIntent() const { return CurrentActionIntent; }
+    FString GetCurrentActionIntent() const;
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adaptation")
+    void EnsureCurrentActionIntent();
 
 protected:
     virtual void OnPossess(APawn* InPawn) override;
@@ -78,6 +81,7 @@ protected:
     bool TryMoveForAdaptationRole(const FEvaEnemyAdaptationTuning& Tuning, const FVector& PawnLocation,
         const FVector& TargetLocation);
     void SetCurrentActionIntent(const FString& NewIntent);
+    FString ResolveCurrentActionIntent() const;
     void LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation, EPathFollowingRequestResult::Type MoveResult) const;
     void LogRepathState(const TCHAR* RepathReason, EPathFollowingRequestResult::Type MoveResult, float RecentMoveDistance) const;
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;

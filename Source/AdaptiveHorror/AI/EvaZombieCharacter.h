@@ -51,6 +51,12 @@ public:
     void SetDebugIntentText(const FString& IntentText);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void RefreshDebugIntentDisplay(bool bForceLog = false);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    FString GetResolvedDebugIntentText() const;
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void SetOverheadHealthBarEnabled(bool bEnabled);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
@@ -181,6 +187,9 @@ protected:
     float PrototypeVisualActionEndTime = -1000.0f;
     FName PrototypeVisualAction = NAME_None;
 
+    float LastDebugIntentRefreshTime = -1000.0f;
+    float LastEnemyIntentLogTime = -1000.0f;
+    bool bLastDebugIntentVisible = false;
     bool bDefeatHandled = false;
     FString CurrentDebugIntentText;
 };

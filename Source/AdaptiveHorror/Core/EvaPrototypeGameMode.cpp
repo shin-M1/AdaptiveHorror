@@ -1634,6 +1634,8 @@ void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) cons
     {
         ZombieController->SetPlayerTarget(PlayerPawn);
         ZombieController->ApplyCurrentGameplayAdaptation(true);
+        ZombieController->EnsureCurrentActionIntent();
+        Enemy->RefreshDebugIntentDisplay(true);
         UE_LOG(LogAdaptiveHorror, Log, TEXT("[AI] Enemy primed for pursuit Enemy=%s Controller=%s Target=%s Distance=%.1f"),
             *Enemy->GetName(),
             *ZombieController->GetName(),
@@ -1642,6 +1644,7 @@ void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) cons
     }
     else
     {
+        Enemy->RefreshDebugIntentDisplay(true);
         UE_LOG(LogAdaptiveHorror, Warning, TEXT("[AI] Enemy spawned without EVA AI controller Enemy=%s Controller=%s"),
             *Enemy->GetName(),
             Enemy->GetController() ? *Enemy->GetController()->GetName() : TEXT("None"));
@@ -1821,6 +1824,32 @@ void AEvaPrototypeGameMode::UpdateAdaptationProfileForGameplay()
             Learning->UpdateAdaptationProfile(false);
         }
     }
+}
+
+void AEvaPrototypeGameMode::SyncEnemyDebugIntentDisplays(const bool bForceLog) const
+{
+#if !UE_BUILD_SHIPPING
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    for (TActorIterator<AEvaZombieCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaZombieCharacter* Enemy = *It;
+        if (!Enemy)
+        {
+            continue;
+        }
+        if (AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(Enemy->GetController()))
+        {
+            ZombieController->EnsureCurrentActionIntent();
+        }
+        Enemy->RefreshDebugIntentDisplay(bForceLog);
+    }
+#else
+    (void)bForceLog;
+#endif
 }
 
 AActor* AEvaPrototypeGameMode::SpawnArenaBox(const FVector& Location, const FVector& Scale, const FRotator& Rotation)
@@ -2798,6 +2827,7 @@ void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
             }
             ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG N: page %d/%d"),
                 DebugHUDPageIndex + 1, DebugHUDPageCount), 3.0f);
+            SyncEnemyDebugIntentDisplays(true);
             return;
         }
 
@@ -2818,6 +2848,7 @@ void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
     }
 
     LogNavigationStatus(TEXT("DebugToggleNavigationVisualization"));
+    SyncEnemyDebugIntentDisplays(true);
     ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9: Debug HUD %s page %d/%d / Navigation visualization %s"),
         bDebugHUDVisible ? TEXT("ON") : TEXT("OFF"),
         DebugHUDPageIndex + 1,

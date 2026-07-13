@@ -1,5 +1,41 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 020 execution result - Enemy Intent Display Consistency
+
+Date: 2026-07-14
+
+Branch: `feature/gameplay-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Latest automation backup log confirmed 37 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+- Latest smoke log did not show project Fatal / Ensure / Assertion.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+Notes:
+
+- No new include additions were required for the intent consistency fix.
+- Automation now includes intent initialization/fallback checks for spawned evolved enemies and HUNTER counter intent preservation.
+- Runtime smoke starts in Title flow, so PIE viewport verification is still required for actual overhead Intent visibility across all spawned enemy paths.
+- `Automation_AdaptiveHorror.slnx` was regenerated during build checks but its unrelated VisionOS generated-line change was not kept.
+
 ## Cycle 019 execution result - Gameplay Pass 1 Polish
 
 Date: 2026-07-14
