@@ -1,5 +1,36 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 019 status - Gameplay Pass 1 Polish
+
+- [x] Confirmed work continued on `feature/gameplay-pass1`.
+- [x] Split Debug HUD into 3 pages.
+- [x] Kept F9 as Debug HUD ON/OFF and reused N for page advance without adding new keys.
+- [x] Prevented Debug HUD from drawing during non-gameplay terminal/menu states.
+- [x] Added short readable Role / Intent / Hybrid labels.
+- [x] Added Debug-only enemy overhead intent label component.
+- [x] Kept normal play overhead display to enemy name + HP bar.
+- [x] Split HUNTER label into normal `HUNTER Tn` plus Debug-only counter intent line.
+- [x] Strengthened FAST flank priority within clamp.
+- [x] Strengthened ARMORED frontliner identity while reducing sidestep/disengage.
+- [x] Strengthened LONG ARM mid-range pressure and protected long-reach attacks from WorldStatic wall hits.
+- [x] Kept COMPOSITE bounded and limited to at most 2 hybrid roles.
+- [x] Added Automation coverage for Debug HUD pages, hidden debug-intent labels, role tuning, COMPOSITE hybrid limits, clamp safety, and Stage Clear intent hiding.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 35 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+
+### Next TODO
+
+- [ ] PIE-verify Debug HUD readability at 1280x720.
+- [ ] PIE-verify F9 toggles Debug HUD and Navigation as expected.
+- [ ] PIE-verify N advances Debug pages without toggling Navigation visualization.
+- [ ] PIE-verify overhead Intent labels do not overlap enemy name / HP bars.
+- [ ] PIE-verify FAST feels like a flank attacker.
+- [ ] PIE-verify ARMORED feels slower and front-holding.
+- [ ] PIE-verify LONG ARM attacks clearly from longer range without wall hits.
+- [ ] PIE-verify COMPOSITE Hybrid Type stays readable and fair.
+- [ ] PIE-verify HUNTER counter line remains readable without changing HUNTER balance.
+
 ## Cycle 018 status - Gameplay Pass 1
 
 - [x] Create `feature/gameplay-pass1` from latest `main`.

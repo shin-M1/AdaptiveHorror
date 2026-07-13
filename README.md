@@ -1,5 +1,28 @@
 # Adaptive Horror FPS Demo
 
+## Gameplay Pass 1 Polish debug controls - Cycle 019
+
+Current branch: `feature/gameplay-pass1`.
+
+Debug HUD is now paged to avoid overlap:
+
+- `F9`: toggles Debug HUD ON/OFF and preserves the existing Navigation visualization toggle behavior.
+- `N`: advances Debug HUD pages while keeping Navigation visualization unchanged.
+- `DEBUG 1/3`: EVA / Gameplay.
+- `DEBUG 2/3`: Enemy Adaptation.
+- `DEBUG 3/3`: Navigation / Spawn.
+
+Debug HUD is hidden outside active gameplay.
+
+When Debug HUD is ON, enemies can show a short overhead intent line such as:
+
+- `FLANK LEFT`
+- `HOLD FRONT`
+- `KEEP DISTANCE`
+- `ANTI-RANGER`
+
+Normal play still shows enemy name + HP bar only. HUNTER normally shows `HUNTER Tn`; its counter type is shown on the debug-intent line only.
+
 ## Gameplay Pass 1 adaptive behavior - Cycle 018
 
 Current branch: `feature/gameplay-pass1`.

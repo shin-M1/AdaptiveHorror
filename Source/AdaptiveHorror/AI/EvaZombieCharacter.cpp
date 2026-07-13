@@ -158,6 +158,21 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     HealthValueLabel->SetOwnerNoSee(false);
     HealthValueLabel->SetOnlyOwnerSee(false);
 
+    DebugIntentLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("DebugIntentLabel"));
+    DebugIntentLabel->SetupAttachment(GetCapsuleComponent());
+    DebugIntentLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    DebugIntentLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 193.0f));
+    DebugIntentLabel->SetRelativeRotation(FRotator::ZeroRotator);
+    DebugIntentLabel->SetHorizontalAlignment(EHTA_Center);
+    DebugIntentLabel->SetVerticalAlignment(EVRTA_TextCenter);
+    DebugIntentLabel->SetText(FText::GetEmpty());
+    DebugIntentLabel->SetTextRenderColor(FColor::Cyan);
+    DebugIntentLabel->SetWorldSize(22.0f);
+    DebugIntentLabel->SetVisibility(false, true);
+    DebugIntentLabel->SetHiddenInGame(true, true);
+    DebugIntentLabel->SetOwnerNoSee(false);
+    DebugIntentLabel->SetOnlyOwnerSee(false);
+
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (CubeMesh.Succeeded())
@@ -308,6 +323,7 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     if (bArmored)
     {
         NewMaxHealth *= 1.30f;
+        MovementSpeed *= 0.92f;
         HeadDamageMultiplier = 0.5f;
         BodyScale = FVector(FMath::Max(BodyScale.X, 0.82f), FMath::Max(BodyScale.Y, 0.66f), FMath::Max(BodyScale.Z, 1.10f));
         HeadScale = FVector(FMath::Max(HeadScale.X, 0.48f));
@@ -433,6 +449,24 @@ void AEvaZombieCharacter::SetPrototypeDebugLabel(const FString& Label, const FCo
     TypeLabel->SetOnlyOwnerSee(false);
 }
 
+void AEvaZombieCharacter::SetDebugIntentText(const FString& IntentText)
+{
+    EnsurePrototypeDebugLabelInitialized();
+    if (CurrentDebugIntentText == IntentText)
+    {
+        return;
+    }
+
+    CurrentDebugIntentText = IntentText;
+    if (DebugIntentLabel)
+    {
+        DebugIntentLabel->SetText(FText::FromString(CurrentDebugIntentText));
+        const bool bShouldShow = ShouldShowDebugIntentLabel();
+        DebugIntentLabel->SetVisibility(bShouldShow, true);
+        DebugIntentLabel->SetHiddenInGame(!bShouldShow, true);
+    }
+}
+
 void AEvaZombieCharacter::SetOverheadDisplayEnabled(const bool bEnabled)
 {
     bDisplayOverheadVisuals = bEnabled;
@@ -440,6 +474,11 @@ void AEvaZombieCharacter::SetOverheadDisplayEnabled(const bool bEnabled)
     {
         TypeLabel->SetVisibility(bEnabled, true);
         TypeLabel->SetHiddenInGame(!bEnabled, true);
+    }
+    if (DebugIntentLabel)
+    {
+        DebugIntentLabel->SetVisibility(false, true);
+        DebugIntentLabel->SetHiddenInGame(true, true);
     }
     UpdatePrototypeHealthBar();
 }
@@ -645,6 +684,29 @@ void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
         HealthValueLabel->SetOnlyOwnerSee(false);
     }
 
+    if (DebugIntentLabel)
+    {
+        if (!DebugIntentLabel->IsRegistered() && GetWorld())
+        {
+            DebugIntentLabel->RegisterComponent();
+        }
+        if (DebugIntentLabel->GetAttachParent() != GetCapsuleComponent())
+        {
+            DebugIntentLabel->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+        }
+        DebugIntentLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        DebugIntentLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 193.0f));
+        DebugIntentLabel->SetHorizontalAlignment(EHTA_Center);
+        DebugIntentLabel->SetVerticalAlignment(EVRTA_TextCenter);
+        DebugIntentLabel->SetTextRenderColor(FColor::Cyan);
+        DebugIntentLabel->SetWorldSize(22.0f);
+        DebugIntentLabel->SetOwnerNoSee(false);
+        DebugIntentLabel->SetOnlyOwnerSee(false);
+        const bool bShouldShow = ShouldShowDebugIntentLabel();
+        DebugIntentLabel->SetVisibility(bShouldShow, true);
+        DebugIntentLabel->SetHiddenInGame(!bShouldShow, true);
+    }
+
     UpdatePrototypeHealthBar();
 }
 
@@ -706,6 +768,11 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
             HealthValueLabel->SetVisibility(false, true);
             HealthValueLabel->SetHiddenInGame(true, true);
         }
+        if (DebugIntentLabel)
+        {
+            DebugIntentLabel->SetVisibility(false, true);
+            DebugIntentLabel->SetHiddenInGame(true, true);
+        }
         return;
     }
 
@@ -720,6 +787,11 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
         {
             HealthValueLabel->SetVisibility(false, true);
         }
+        if (DebugIntentLabel)
+        {
+            DebugIntentLabel->SetVisibility(false, true);
+            DebugIntentLabel->SetHiddenInGame(true, true);
+        }
         return;
     }
 
@@ -730,6 +802,12 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     {
         TypeLabel->SetVisibility(true, true);
         TypeLabel->SetHiddenInGame(false, true);
+        if (DebugIntentLabel)
+        {
+            const bool bShowIntent = ShouldShowDebugIntentLabel();
+            DebugIntentLabel->SetVisibility(bShowIntent, true);
+            DebugIntentLabel->SetHiddenInGame(!bShowIntent, true);
+        }
         return;
     }
 
@@ -750,6 +828,12 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
         HealthValueLabel->SetVisibility(bShowHealthValue, true);
         HealthValueLabel->SetHiddenInGame(!bShowHealthValue, true);
     }
+    if (DebugIntentLabel)
+    {
+        const bool bShowIntent = bShouldShow && ShouldShowDebugIntentLabel();
+        DebugIntentLabel->SetVisibility(bShowIntent, true);
+        DebugIntentLabel->SetHiddenInGame(!bShowIntent, true);
+    }
     if (!bShouldShow || ToCamera.IsNearlyZero())
     {
         return;
@@ -766,6 +850,10 @@ void AEvaZombieCharacter::UpdatePrototypeDebugLabelFacing()
     if (HealthValueLabel)
     {
         HealthValueLabel->SetWorldRotation(FacingRotation);
+    }
+    if (DebugIntentLabel)
+    {
+        DebugIntentLabel->SetWorldRotation(FacingRotation);
     }
 }
 
@@ -806,6 +894,21 @@ bool AEvaZombieCharacter::ShouldShowDebugHealthNumbers() const
 {
 #if !UE_BUILD_SHIPPING
     return bDebugHealthNumbersVisible || CVarEvaDebugEnemyHealthNumbers.GetValueOnGameThread() != 0;
+#else
+    return false;
+#endif
+}
+
+bool AEvaZombieCharacter::ShouldShowDebugIntentLabel() const
+{
+#if !UE_BUILD_SHIPPING
+    if (CurrentDebugIntentText.IsEmpty() || !bDisplayOverheadVisuals || (HealthComponent && HealthComponent->IsDead()))
+    {
+        return false;
+    }
+
+    const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    return GameMode && GameMode->IsGameplayActive() && GameMode->IsDebugHUDVisible();
 #else
     return false;
 #endif

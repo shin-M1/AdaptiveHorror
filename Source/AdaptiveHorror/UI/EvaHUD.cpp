@@ -3,6 +3,7 @@
 #include "AI/EvaAdamBossCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "AI/EvaTelemetryTypes.h"
+#include "AI/EvaZombieAIController.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Components/EvaHealthComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
@@ -10,7 +11,9 @@
 #include "Engine/Canvas.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "UI/EvaBossHUDWidget.h"
 #include "Weapons/EvaWeaponBase.h"
 #include "World/EvaResearchFacilityDirector.h"
@@ -149,6 +152,28 @@ void AEvaHUD::DrawHUD()
         default: return FString(TEXT("None"));
         }
     };
+    auto HunterCounterToString = [](const EEvaHunterCounterType Counter)
+    {
+        switch (Counter)
+        {
+        case EEvaHunterCounterType::AntiBerserker: return FString(TEXT("Anti-Berserker"));
+        case EEvaHunterCounterType::AntiRanger: return FString(TEXT("Anti-Ranger"));
+        case EEvaHunterCounterType::AntiGhost: return FString(TEXT("Anti-Ghost"));
+        case EEvaHunterCounterType::AntiExplorer: return FString(TEXT("Anti-Explorer"));
+        default: return FString(TEXT("None"));
+        }
+    };
+    auto MoveStatusToString = [](const EPathFollowingStatus::Type Status)
+    {
+        switch (Status)
+        {
+        case EPathFollowingStatus::Idle: return FString(TEXT("Idle"));
+        case EPathFollowingStatus::Waiting: return FString(TEXT("Waiting"));
+        case EPathFollowingStatus::Paused: return FString(TEXT("Paused"));
+        case EPathFollowingStatus::Moving: return FString(TEXT("Moving"));
+        default: return FString(TEXT("Unknown"));
+        }
+    };
 
     float Y = 35.0f;
     const float LineHeight = 24.0f;
@@ -166,49 +191,92 @@ void AEvaHUD::DrawHUD()
     DrawStat(FString::Printf(TEXT("STYLE: %s"), *StyleText));
     DrawStat(FString::Printf(TEXT("HUNTER: %s  TIER %d"), *HunterStateToString(HunterState), HunterTier));
 
-    if (GameMode && GameMode->IsDebugHUDVisible())
-    {
-        DrawStat(FString::Printf(TEXT("KILLS: %d"), Stats.KillCount));
-        DrawStat(FString::Printf(TEXT("ACCURACY: %.1f%%"), Telemetry->GetAccuracy() * 100.0f));
-        DrawStat(FString::Printf(TEXT("HEADSHOTS: %.1f%%"), Telemetry->GetHeadshotRate() * 100.0f));
-        DrawStat(FString::Printf(TEXT("PREFERRED DIST: %.0f  CLOSE %.2f  LONG %.2f"),
-            AdaptationProfile.PreferredCombatDistance,
-            AdaptationProfile.CloseRangeRatio,
-            AdaptationProfile.LongRangeRatio));
-        DrawStat(FString::Printf(TEXT("PROFILE: Agg %.2f  Stealth %.2f  Explore %.2f  Sprint %.2f"),
-            AdaptationProfile.AggressionScore,
-            AdaptationProfile.StealthScore,
-            AdaptationProfile.ExplorationScore,
-            AdaptationProfile.SprintUsage));
-        DrawStat(FString::Printf(TEXT("EVA ADAPT: %s"), *DirectiveToString(AdaptationDirective)));
-        DrawStat(FString::Printf(TEXT("NEXT EVOLUTION: %s"), *EvolutionToString(NextEvolution)));
-        DrawStat(FString::Printf(TEXT("ENEMY ROLE: %s"), *UEnum::GetValueAsString(EnemyTuning.BehaviorRole)));
-        DrawStat(FString::Printf(TEXT("APPLIED: SPD %.2f RNG %.2f CD %.2f DMG %.2f SIDE %.2f"),
-            EnemyTuning.MoveSpeedMultiplier,
-            EnemyTuning.AttackRangeMultiplier,
-            EnemyTuning.AttackCooldownMultiplier,
-            EnemyTuning.DamageMultiplier,
-            EnemyTuning.SidestepChance));
-        DrawStat(FString::Printf(TEXT("HUNTER COUNTER: %s"), *UEnum::GetValueAsString(HunterCounterType)));
-        DrawStat(FString::Printf(TEXT("ACTIVE ZOMBIES: %d  HUNTERS: %d  ADAM: %d"),
-            GameMode->GetActiveZombieCount(), GameMode->GetActiveHunterCount(), GameMode->GetActiveAdamCount()));
-        DrawStat(FString::Printf(TEXT("SPAWN: %s"), *GameMode->GetLastSpawnResult()));
-        DrawStat(FString::Printf(TEXT("SPAWN LOC: %s"), *GameMode->GetLastSpawnLocation().ToCompactString()));
-        DrawStat(FString::Printf(TEXT("NAVMESH: %s  NAV DEBUG: %s  FALLBACK: %d  STUCK: %d"),
-            GameMode->IsNavMeshAvailable() ? TEXT("YES") : TEXT("NO"),
-            GameMode->IsNavigationDebugVisible() ? TEXT("ON") : TEXT("OFF"),
-            GameMode->GetFallbackMovementCount(),
-            GameMode->GetStuckEnemyCount()));
-    }
     const AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
-    if (Director)
+    const bool bShowDebugHUD = GameMode && GameMode->IsGameplayActive() && GameMode->IsDebugHUDVisible();
+    FString FirstEnemyIntent(TEXT("None"));
+    FString FirstMoveStatus(TEXT("None"));
+    if (bShowDebugHUD && World)
+    {
+        for (TActorIterator<AEvaZombieAIController> It(World); It; ++It)
+        {
+            const AEvaZombieAIController* ZombieController = *It;
+            if (!ZombieController || !ZombieController->GetPawn() || !ZombieController->IsCombatEnabled())
+            {
+                continue;
+            }
+
+            const FString ControllerIntent = ZombieController->GetCurrentActionIntent();
+            FirstEnemyIntent = ControllerIntent.IsEmpty() ? FString(TEXT("None")) : ControllerIntent;
+            FirstMoveStatus = MoveStatusToString(ZombieController->GetMoveStatus());
+            break;
+        }
+    }
+
+    if (bShowDebugHUD)
+    {
+        const int32 PageCount = FMath::Max(1, GameMode->GetDebugHUDPageCount());
+        const int32 PageIndex = FMath::Clamp(GameMode->GetDebugHUDPageIndex(), 0, PageCount - 1);
+        float DebugY = 35.0f;
+        const float DebugX = FMath::Max(520.0f, Canvas->ClipX - 545.0f);
+        const float DebugLineHeight = 21.0f;
+        auto DrawDebugStat = [this, &DebugY, DebugX, DebugLineHeight](const FString& Text)
+        {
+            DrawText(Text, FLinearColor(0.55f, 0.95f, 1.0f), DebugX, DebugY, nullptr, 0.92f);
+            DebugY += DebugLineHeight;
+        };
+
+        DrawDebugStat(FString::Printf(TEXT("DEBUG %d/%d"), PageIndex + 1, PageCount));
+        if (PageIndex == 0)
+        {
+            DrawDebugStat(TEXT("PAGE: EVA / GAMEPLAY"));
+            DrawDebugStat(FString::Printf(TEXT("Style: %s"), *StyleText));
+            DrawDebugStat(FString::Printf(TEXT("Analysis: %.0f%%"), AnalysisRate));
+            DrawDebugStat(FString::Printf(TEXT("Stage: %s"), *StageToString(AnalysisStage)));
+            DrawDebugStat(FString::Printf(TEXT("Preferred Dist: %.0f"), AdaptationProfile.PreferredCombatDistance));
+            DrawDebugStat(FString::Printf(TEXT("Aggression: %.2f"), AdaptationProfile.AggressionScore));
+            DrawDebugStat(FString::Printf(TEXT("Stealth: %.2f"), AdaptationProfile.StealthScore));
+            DrawDebugStat(FString::Printf(TEXT("Exploration: %.2f"), AdaptationProfile.ExplorationScore));
+            DrawDebugStat(FString::Printf(TEXT("Current Adapt: %s"), *DirectiveToString(AdaptationDirective)));
+            DrawDebugStat(FString::Printf(TEXT("Next Evolution: %s"), *EvolutionToString(NextEvolution)));
+            DrawDebugStat(FString::Printf(TEXT("HUNTER Counter: %s"), *HunterCounterToString(HunterCounterType)));
+        }
+        else if (PageIndex == 1)
+        {
+            DrawDebugStat(TEXT("PAGE: ENEMY ADAPTATION"));
+            DrawDebugStat(FString::Printf(TEXT("Enemy Role: %s"),
+                EnemyTuning.RoleLabel.IsEmpty() ? TEXT("CHASE") : *EnemyTuning.RoleLabel));
+            DrawDebugStat(FString::Printf(TEXT("Action Intent: %s"), *FirstEnemyIntent));
+            DrawDebugStat(FString::Printf(TEXT("Speed x%.2f"), EnemyTuning.MoveSpeedMultiplier));
+            DrawDebugStat(FString::Printf(TEXT("Range x%.2f"), EnemyTuning.AttackRangeMultiplier));
+            DrawDebugStat(FString::Printf(TEXT("Cooldown x%.2f"), EnemyTuning.AttackCooldownMultiplier));
+            DrawDebugStat(FString::Printf(TEXT("Damage x%.2f"), EnemyTuning.DamageMultiplier));
+            DrawDebugStat(FString::Printf(TEXT("Sidestep %.2f"), EnemyTuning.SidestepChance));
+            DrawDebugStat(FString::Printf(TEXT("COMPOSITE: %s"),
+                EnemyTuning.CompositeHybridType.IsEmpty() ? TEXT("None") : *EnemyTuning.CompositeHybridType));
+            DrawDebugStat(FString::Printf(TEXT("Hybrid Roles: %d/2"), EnemyTuning.CompositeHybridRoleCount));
+            DrawDebugStat(FString::Printf(TEXT("HUNTER Type: %s"), *HunterCounterToString(HunterCounterType)));
+        }
+        else
+        {
+            DrawDebugStat(TEXT("PAGE: NAV / SPAWN"));
+            DrawDebugStat(FString::Printf(TEXT("Nav Ready: %s"), GameMode->IsNavMeshAvailable() ? TEXT("YES") : TEXT("NO")));
+            DrawDebugStat(FString::Printf(TEXT("RecastNavMesh: %s"), GameMode->IsNavMeshAvailable() ? TEXT("READY") : TEXT("NOT READY")));
+            DrawDebugStat(FString::Printf(TEXT("MoveTo: %s"), *FirstMoveStatus));
+            DrawDebugStat(FString::Printf(TEXT("Fallback: %d"), GameMode->GetFallbackMovementCount()));
+            DrawDebugStat(FString::Printf(TEXT("Stuck: %d"), GameMode->GetStuckEnemyCount()));
+            DrawDebugStat(FString::Printf(TEXT("Active Z/H/A: %d / %d / %d"),
+                GameMode->GetActiveZombieCount(), GameMode->GetActiveHunterCount(), GameMode->GetActiveAdamCount()));
+            DrawDebugStat(FString::Printf(TEXT("Spawn: %s"), *GameMode->GetLastSpawnResult()));
+            DrawDebugStat(FString::Printf(TEXT("Spawn Loc: %s"), *GameMode->GetLastSpawnLocation().ToCompactString()));
+            DrawDebugStat(FString::Printf(TEXT("Zone: %s"), Director ? *Director->GetCurrentZoneName() : TEXT("None")));
+            DrawDebugStat(FString::Printf(TEXT("Objective: %s"), Director ? *Director->GetObjectiveText() : TEXT("None")));
+        }
+    }
+
+    if (Director && !bShowDebugHUD)
     {
         DrawStat(FString::Printf(TEXT("ZONE: %s"), *Director->GetCurrentZoneName()));
         DrawStat(FString::Printf(TEXT("OBJECTIVE: %s"), *Director->GetObjectiveText()));
-        if (GameMode && GameMode->IsDebugHUDVisible())
-        {
-            DrawStat(FString::Printf(TEXT("EVA LOGS: %d / 5"), Director->GetCollectedStoryLogCount()));
-        }
     }
 
     const float CenterX = Canvas->ClipX * 0.5f;

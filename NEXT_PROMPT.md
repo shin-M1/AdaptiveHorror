@@ -1,5 +1,88 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 019 Gameplay Pass 1 Polish
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms the Gameplay Pass 1 Polish in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 35 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- PIE visual/gameplay confirmation is still required; Codex did not visually inspect the viewport.
+
+### Most recent implementation
+
+- Debug HUD:
+  - Split into 3 pages.
+  - F9 toggles Debug HUD ON/OFF and preserves existing Navigation visualization toggle behavior.
+  - N advances Debug HUD pages without toggling Navigation visualization.
+  - Page 1: EVA / Gameplay.
+  - Page 2: Enemy Adaptation.
+  - Page 3: Navigation / Spawn.
+- Enemy role visibility:
+  - Added Debug-only overhead Intent labels for enemies/HUNTER.
+  - Intent labels update only when the actual AI intent changes.
+  - Intent labels hide when Debug HUD is off, enemy dies, overhead display is disabled, or Stage Clear stops combat.
+- Role polish:
+  - FAST has clearer flank/sidestep behavior.
+  - ARMORED is slower and less likely to sidestep/disengage.
+  - LONG ARM has clearer mid-range attack pressure with wall-hit protection for long-reach attacks.
+  - COMPOSITE remains bounded, exposes a short Hybrid Type, and keeps its selected hybrid for a minimum hold window.
+  - HUNTER balance was not broadly changed; only counter display readability was improved.
+
+### Next highest-priority task
+
+Run PIE and verify only the Gameplay Pass 1 Polish. Do not add new enemies, weapons, maps, debug keys, or large UI changes.
+
+PIE checklist:
+
+1. Confirm F9 toggles Debug HUD and Navigation visualization.
+2. Confirm N advances DEBUG 1/3 -> 2/3 -> 3/3 without toggling Navigation visualization.
+3. Confirm Debug HUD does not overlap normal HUD at 1280x720.
+4. Confirm Debug HUD is hidden in Title / Game Over / Stage Clear.
+5. Confirm enemy overhead Intent labels appear only while Debug HUD is ON.
+6. Confirm Intent labels do not overlap enemy name / HP bar.
+7. Confirm FAST visibly flanks and feels faster without getting stuck.
+8. Confirm ARMORED feels slower and front-holding without blocking all paths.
+9. Confirm LONG ARM attacks from a clearer longer range and does not attack through walls.
+10. Confirm COMPOSITE shows a readable Hybrid Type and feels like a bounded counter, not an all-max enemy.
+11. Confirm HUNTER still feels unchanged in balance, with improved counter readability.
+12. Confirm existing zombie chase, HUNTER reinsertion, ADAM, Stage Clear, death/respawn, UI flow, visual/audio/horror presentation, HP bars, and Boss HUD still work.
+
+If a problem is found:
+
+- Fix only the observed Gameplay Pass 1 Polish regression.
+- Preserve Runtime NavMesh, path-following/repathing, spawn safety, HUNTER reinsertion, ADAM, Stage Clear, Player Death, Title, Pause, Settings, Game Over, Visual / Audio, Horror Immersion, Boss HUD, and enemy HP bars.
+
+### Important files
+
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms the Debug HUD pages and Intent labels are readable in PIE.
+- User confirms FAST / ARMORED / LONG ARM / COMPOSITE differences are more visible without game-loop regression.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 018 Gameplay Pass 1
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

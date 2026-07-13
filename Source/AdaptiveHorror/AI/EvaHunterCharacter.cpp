@@ -123,9 +123,8 @@ void AEvaHunterCharacter::InitializeHunterTier(const int32 NewHunterTier)
 void AEvaHunterCharacter::SetHunterCounterType(const EEvaHunterCounterType NewCounterType)
 {
     HunterCounterType = NewCounterType;
-    SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d [%s]"),
-        HunterTier,
-        *EvaHunterCounterToShortLabel(HunterCounterType)), FColor::Red, 46.0f);
+    SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d"), HunterTier), FColor::Red, 50.0f);
+    SetDebugIntentText(EvaHunterCounterToShortLabel(HunterCounterType));
     UE_LOG(LogAdaptiveHorror, Log, TEXT("[HunterAdapt] Label Actor=%s Tier=%d Counter=%s"),
         *GetName(),
         HunterTier,

@@ -3,6 +3,49 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 
+namespace
+{
+FString EvaShortCombatStyle(const EEvaCombatStyle Style)
+{
+    switch (Style)
+    {
+    case EEvaCombatStyle::Berserker:
+        return TEXT("Berserker");
+    case EEvaCombatStyle::Tactician:
+        return TEXT("Tactician");
+    case EEvaCombatStyle::Ranger:
+        return TEXT("Ranger");
+    case EEvaCombatStyle::Ghost:
+        return TEXT("Ghost");
+    case EEvaCombatStyle::Explorer:
+        return TEXT("Explorer");
+    default:
+        return TEXT("Unknown");
+    }
+}
+
+FString EvaShortRoleLabel(const EEvaEnemyBehaviorRole Role, const FString& CompositeHybridType)
+{
+    switch (Role)
+    {
+    case EEvaEnemyBehaviorRole::Flanker:
+        return TEXT("FLANK");
+    case EEvaEnemyBehaviorRole::Frontliner:
+        return TEXT("HOLD FRONT");
+    case EEvaEnemyBehaviorRole::MidRangePressure:
+        return TEXT("KEEP DISTANCE");
+    case EEvaEnemyBehaviorRole::Searcher:
+        return TEXT("SEARCH LAST SEEN");
+    case EEvaEnemyBehaviorRole::Ambusher:
+        return TEXT("AMBUSH");
+    case EEvaEnemyBehaviorRole::CompositeAdaptive:
+        return CompositeHybridType.IsEmpty() ? FString(TEXT("COMPOSITE HYBRID")) : CompositeHybridType;
+    default:
+        return TEXT("CHASE");
+    }
+}
+}
+
 void UEvaLearningSubsystem::RecordShot(const FName WeaponName)
 {
     ++AggregateTelemetry.ShotCount;
@@ -375,48 +418,65 @@ FEvaEnemyAdaptationTuning UEvaLearningSubsystem::BuildEnemyAdaptationTuning(
     {
     case EEvaEvolutionType::Fast:
         Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Flanker;
-        Tuning.MoveSpeedMultiplier *= 1.18f;
-        Tuning.AttackCooldownMultiplier *= 0.94f;
-        Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.38f);
+        Tuning.MoveSpeedMultiplier *= 1.22f;
+        Tuning.AttackCooldownMultiplier *= 0.92f;
+        Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance,
+            Profile.CombatStyle == EEvaCombatStyle::Ranger ? 0.58f : 0.50f);
         break;
     case EEvaEvolutionType::Armored:
         Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Frontliner;
-        Tuning.MoveSpeedMultiplier *= 0.88f;
-        Tuning.HealthMultiplier *= 1.20f;
+        Tuning.MoveSpeedMultiplier *= 0.86f;
+        Tuning.HealthMultiplier *= 1.22f;
         Tuning.AttackCooldownMultiplier *= 1.06f;
-        Tuning.SidestepChance *= 0.55f;
+        Tuning.SidestepChance *= 0.35f;
         break;
     case EEvaEvolutionType::LongArm:
         Tuning.BehaviorRole = EEvaEnemyBehaviorRole::MidRangePressure;
-        Tuning.AttackRangeMultiplier *= 1.28f;
+        Tuning.AttackRangeMultiplier *= 1.36f;
         Tuning.DamageMultiplier *= 1.08f;
-        Tuning.AttackCooldownMultiplier *= 1.08f;
+        Tuning.AttackCooldownMultiplier *= 1.06f;
         break;
     case EEvaEvolutionType::Composite:
         Tuning.BehaviorRole = EEvaEnemyBehaviorRole::CompositeAdaptive;
+        Tuning.CompositeHybridHoldSeconds = 7.0f;
         if (Profile.CombatStyle == EEvaCombatStyle::Ranger)
         {
-            Tuning.MoveSpeedMultiplier *= 1.14f;
-            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.52f);
+            Tuning.CompositeHybridType = TEXT("ANTI-RANGER");
+            Tuning.CompositeHybridRoleCount = 2;
+            Tuning.MoveSpeedMultiplier *= 1.16f;
+            Tuning.HealthMultiplier *= 1.06f;
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.56f);
         }
         else if (Profile.CombatStyle == EEvaCombatStyle::Berserker)
         {
-            Tuning.HealthMultiplier *= 1.12f;
-            Tuning.AttackCooldownMultiplier *= 0.94f;
+            Tuning.CompositeHybridType = TEXT("ANTI-BERSERKER");
+            Tuning.CompositeHybridRoleCount = 2;
+            Tuning.AttackRangeMultiplier *= 1.18f;
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.48f);
+            Tuning.AttackCooldownMultiplier *= 1.02f;
         }
         else if (Profile.CombatStyle == EEvaCombatStyle::Ghost)
         {
-            Tuning.SearchDuration = FMath::Max(Tuning.SearchDuration, 8.0f);
-            Tuning.MoveSpeedMultiplier *= 1.08f;
+            Tuning.CompositeHybridType = TEXT("ANTI-GHOST");
+            Tuning.CompositeHybridRoleCount = 2;
+            Tuning.SearchDuration = FMath::Max(Tuning.SearchDuration, 8.5f);
+            Tuning.MoveSpeedMultiplier *= 1.10f;
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.40f);
         }
         else if (Profile.CombatStyle == EEvaCombatStyle::Explorer)
         {
-            Tuning.AttackRangeMultiplier *= 1.12f;
-            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.34f);
+            Tuning.CompositeHybridType = TEXT("ANTI-EXPLORER");
+            Tuning.CompositeHybridRoleCount = 2;
+            Tuning.HealthMultiplier *= 1.08f;
+            Tuning.AttackRangeMultiplier *= 1.08f;
+            Tuning.SearchDuration = FMath::Max(Tuning.SearchDuration, 6.5f);
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.28f);
         }
         else
         {
-            Tuning.MoveSpeedMultiplier *= 1.05f;
+            Tuning.CompositeHybridType = TEXT("TACTICAL HYBRID");
+            Tuning.CompositeHybridRoleCount = 1;
+            Tuning.MoveSpeedMultiplier *= 1.07f;
             Tuning.AttackRangeMultiplier *= 1.08f;
         }
         break;
@@ -432,9 +492,11 @@ FEvaEnemyAdaptationTuning UEvaLearningSubsystem::BuildEnemyAdaptationTuning(
     Tuning.SidestepChance *= 0.65f + AnalysisAlpha * 0.35f;
 
     ClampTuning(Tuning);
-    Tuning.DebugSummary = FString::Printf(TEXT("%s/%s spd%.2f rng%.2f cd%.2f side%.2f"),
-        *UEnum::GetValueAsString(Tuning.BehaviorRole),
-        *UEnum::GetValueAsString(Tuning.CounteredStyle),
+    Tuning.RoleLabel = EvaShortRoleLabel(Tuning.BehaviorRole, Tuning.CompositeHybridType);
+    Tuning.IntentLabel = Tuning.RoleLabel;
+    Tuning.DebugSummary = FString::Printf(TEXT("%s vs %s spd%.2f rng%.2f cd%.2f side%.2f"),
+        *Tuning.RoleLabel,
+        *EvaShortCombatStyle(Tuning.CounteredStyle),
         Tuning.MoveSpeedMultiplier,
         Tuning.AttackRangeMultiplier,
         Tuning.AttackCooldownMultiplier,
@@ -561,6 +623,8 @@ void UEvaLearningSubsystem::ClampTuning(FEvaEnemyAdaptationTuning& Tuning)
     Tuning.AttackRangeMultiplier = FMath::Clamp(Tuning.AttackRangeMultiplier, 0.90f, 1.55f);
     Tuning.HealthMultiplier = FMath::Clamp(Tuning.HealthMultiplier, 0.90f, 1.35f);
     Tuning.DamageMultiplier = FMath::Clamp(Tuning.DamageMultiplier, 0.85f, 1.18f);
+    Tuning.CompositeHybridRoleCount = FMath::Clamp(Tuning.CompositeHybridRoleCount, 0, 2);
+    Tuning.CompositeHybridHoldSeconds = FMath::Clamp(Tuning.CompositeHybridHoldSeconds, 0.0f, 12.0f);
 }
 
 void UEvaLearningSubsystem::AddObservationMass(const float BaseAmount, const float ObserverAccuracy)

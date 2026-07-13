@@ -284,12 +284,17 @@ bool FEvaStageClearStopsEnemyCombatTest::RunTest(const FString& Parameters)
     }
 
     Controller->Possess(Zombie);
+    Zombie->SetDebugIntentText(TEXT("FLANK"));
     GameMode->HandleStageClear();
 
     TestFalse(TEXT("Stage clear disables EVA AI combat"), Controller->IsCombatEnabled());
     if (UTextRenderComponent* Label = Zombie->GetTypeLabelComponent())
     {
         TestFalse(TEXT("Stage clear hides overhead labels"), Label->IsVisible());
+    }
+    if (UTextRenderComponent* IntentLabel = Zombie->GetDebugIntentLabelComponent())
+    {
+        TestFalse(TEXT("Stage clear hides debug intent label"), IntentLabel->IsVisible());
     }
 
     World->DestroyWorld(false);
@@ -821,6 +826,114 @@ bool FEvaZombieCompositeStatsBoundedTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Composite label is visible on type component"),
         Zombie->GetTypeLabelComponent() && Zombie->GetTypeLabelComponent()->Text.ToString().Contains(TEXT("COMPOSITE")));
     World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaGameplayDebugHUDPageBoundsTest,
+    "AdaptiveHorror.GameplayPass.Polish.DebugHUDPageBounds",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaGameplayDebugHUDPageBoundsTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+
+    TestNotNull(TEXT("GameMode spawns for debug HUD page test"), GameMode);
+    TestNotNull(TEXT("Zombie spawns for debug intent visibility test"), Zombie);
+    if (!GameMode || !Zombie)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    TestEqual(TEXT("Debug HUD uses three pages"), GameMode->GetDebugHUDPageCount(), 3);
+    TestTrue(TEXT("Debug HUD default page is in range"),
+        GameMode->GetDebugHUDPageIndex() >= 0 && GameMode->GetDebugHUDPageIndex() < GameMode->GetDebugHUDPageCount());
+
+    Zombie->SetDebugIntentText(TEXT("FLANK"));
+    TestTrue(TEXT("Debug intent component exists"), Zombie->GetDebugIntentLabelComponent() != nullptr);
+    if (UTextRenderComponent* IntentLabel = Zombie->GetDebugIntentLabelComponent())
+    {
+        TestFalse(TEXT("Debug intent stays hidden while Debug HUD is off"), IntentLabel->IsVisible());
+    }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaGameplayRolePolishTuningTest,
+    "AdaptiveHorror.GameplayPass.Polish.RoleTuning",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaGameplayRolePolishTuningTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordShot(TEXT("Handgun"));
+    Learning->RecordHit(true, 2200.0f);
+    Learning->DebugAddAnalysis(75.0f);
+    Learning->UpdateAdaptationProfile(true);
+
+    const FEvaEnemyAdaptationTuning StandardTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::None);
+    const FEvaEnemyAdaptationTuning FastTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::Fast);
+    const FEvaEnemyAdaptationTuning ArmoredTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::Armored);
+    const FEvaEnemyAdaptationTuning LongArmTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::LongArm);
+
+    TestTrue(TEXT("FAST prioritizes flank/sidestep more than standard"),
+        FastTuning.SidestepChance > StandardTuning.SidestepChance);
+    TestTrue(TEXT("ARMORED sidesteps/disengages less than standard"),
+        ArmoredTuning.SidestepChance < StandardTuning.SidestepChance);
+    TestTrue(TEXT("LONG ARM attack range is longer than standard"),
+        LongArmTuning.AttackRangeMultiplier > StandardTuning.AttackRangeMultiplier);
+
+    const FEvaEnemyAdaptationTuning Tunings[] = { StandardTuning, FastTuning, ArmoredTuning, LongArmTuning };
+    for (const FEvaEnemyAdaptationTuning& Tuning : Tunings)
+    {
+        TestTrue(TEXT("Speed multiplier remains clamped"),
+            Tuning.MoveSpeedMultiplier >= 0.72f && Tuning.MoveSpeedMultiplier <= 1.35f);
+        TestTrue(TEXT("Range multiplier remains clamped"),
+            Tuning.AttackRangeMultiplier >= 0.90f && Tuning.AttackRangeMultiplier <= 1.55f);
+        TestTrue(TEXT("Cooldown multiplier remains clamped"),
+            Tuning.AttackCooldownMultiplier >= 0.75f && Tuning.AttackCooldownMultiplier <= 1.35f);
+        TestTrue(TEXT("Damage multiplier remains clamped"),
+            Tuning.DamageMultiplier >= 0.85f && Tuning.DamageMultiplier <= 1.18f);
+        TestTrue(TEXT("Sidestep chance remains clamped"),
+            Tuning.SidestepChance >= 0.0f && Tuning.SidestepChance <= 0.65f);
+        TestTrue(TEXT("Role label is short and readable"), !Tuning.RoleLabel.IsEmpty() && Tuning.RoleLabel.Len() <= 24);
+    }
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaCompositeHybridPolishTest,
+    "AdaptiveHorror.GameplayPass.Polish.CompositeHybrid",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaCompositeHybridPolishTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordShot(TEXT("Handgun"));
+    Learning->RecordHit(true, 2400.0f);
+    Learning->DebugAddAnalysis(90.0f);
+    Learning->UpdateAdaptationProfile(true);
+
+    const FEvaEnemyAdaptationTuning CompositeTuning =
+        Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::Composite);
+
+    TestTrue(TEXT("COMPOSITE remains adaptive role"),
+        CompositeTuning.BehaviorRole == EEvaEnemyBehaviorRole::CompositeAdaptive);
+    TestTrue(TEXT("COMPOSITE chooses at most two hybrid roles"),
+        CompositeTuning.CompositeHybridRoleCount >= 1 && CompositeTuning.CompositeHybridRoleCount <= 2);
+    TestTrue(TEXT("COMPOSITE exposes a hybrid type"), !CompositeTuning.CompositeHybridType.IsEmpty());
+    TestTrue(TEXT("COMPOSITE hybrid has a nonzero hold duration"),
+        CompositeTuning.CompositeHybridHoldSeconds >= 4.0f);
+    TestTrue(TEXT("COMPOSITE tuning remains clamped"),
+        CompositeTuning.MoveSpeedMultiplier <= 1.35f &&
+        CompositeTuning.AttackRangeMultiplier <= 1.55f &&
+        CompositeTuning.DamageMultiplier <= 1.18f &&
+        CompositeTuning.SidestepChance <= 0.65f);
     return true;
 }
 

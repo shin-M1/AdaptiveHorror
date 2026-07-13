@@ -53,6 +53,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
     FString GetCurrentAdaptationSummary() const { return CurrentAdaptationTuning.DebugSummary; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FString GetCurrentActionIntent() const { return CurrentActionIntent; }
+
 protected:
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
@@ -74,6 +77,7 @@ protected:
     bool ReissueMoveToTarget(const TCHAR* RepathReason, bool bAbortCurrentMove);
     bool TryMoveForAdaptationRole(const FEvaEnemyAdaptationTuning& Tuning, const FVector& PawnLocation,
         const FVector& TargetLocation);
+    void SetCurrentActionIntent(const FString& NewIntent);
     void LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation, EPathFollowingRequestResult::Type MoveResult) const;
     void LogRepathState(const TCHAR* RepathReason, EPathFollowingRequestResult::Type MoveResult, float RecentMoveDistance) const;
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;
@@ -112,6 +116,8 @@ private:
     EEvaAdaptationDirective LastAppliedDirective = EEvaAdaptationDirective::None;
     FEvaPlayerAdaptationProfile LastAdaptationProfile;
     FEvaEnemyAdaptationTuning CurrentAdaptationTuning;
+    FEvaEnemyAdaptationTuning LockedCompositeTuning;
+    FString CurrentActionIntent;
     float LastMoveRequestTime = -1000.0f;
     float LastMoveDiagnosticLogTime = -1000.0f;
     FVector LastMoveRequestGoal = FVector::ZeroVector;
@@ -130,4 +136,6 @@ private:
     bool bInternalRepathAbort = false;
     bool bIssuingRepathMove = false;
     bool bCombatEnabled = true;
+    bool bHasLockedCompositeTuning = false;
+    float LastCompositeHybridLockTime = -1000.0f;
 };

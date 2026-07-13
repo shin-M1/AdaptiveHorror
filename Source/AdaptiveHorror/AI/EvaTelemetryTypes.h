@@ -225,5 +225,20 @@ struct ADAPTIVEHORROR_API FEvaEnemyAdaptationTuning
     float DamageMultiplier = 1.0f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    FString RoleLabel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    FString IntentLabel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    FString CompositeHybridType;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    int32 CompositeHybridRoleCount = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float CompositeHybridHoldSeconds = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
     FString DebugSummary;
 };

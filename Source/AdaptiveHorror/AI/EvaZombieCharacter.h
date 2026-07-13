@@ -41,8 +41,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UTextRenderComponent* GetTypeLabelComponent() const { return TypeLabel; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UTextRenderComponent* GetDebugIntentLabelComponent() const { return DebugIntentLabel; }
+
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void EnsurePrototypeDebugLabelInitialized();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void SetDebugIntentText(const FString& IntentText);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void SetOverheadHealthBarEnabled(bool bEnabled);
@@ -80,6 +86,7 @@ protected:
     void UpdatePrototypeHealthBar();
     void LogPrototypeDebugLabelState(const FString& Context) const;
     bool ShouldShowDebugHealthNumbers() const;
+    bool ShouldShowDebugIntentLabel() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -116,6 +123,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> HealthValueLabel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UTextRenderComponent> DebugIntentLabel;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     float DebugLabelMaxVisibleDistance = 12000.0f;
@@ -172,4 +182,5 @@ protected:
     FName PrototypeVisualAction = NAME_None;
 
     bool bDefeatHandled = false;
+    FString CurrentDebugIntentText;
 };

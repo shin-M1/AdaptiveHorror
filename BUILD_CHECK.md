@@ -1,5 +1,40 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 019 execution result - Gameplay Pass 1 Polish
+
+Date: 2026-07-14
+
+Branch: `feature/gameplay-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Latest automation backup log confirmed 35 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+- Latest smoke log did not show project Fatal / Ensure / Assertion.
+
+Notes:
+
+- The build passed after adding new includes for `InputCoreTypes.h`, `EngineUtils.h`, and `Navigation/PathFollowingComponent.h`.
+- Automation confirms the new Debug HUD page bounds, debug-intent hidden state, role tuning differences, COMPOSITE hybrid limits, clamp safety, and Stage Clear intent hiding.
+- Runtime smoke starts in Title flow, so it does not produce live FAST / ARMORED / LONG ARM / COMPOSITE / HUNTER combat role logs. Confirm those in PIE or a future gameplay-directed smoke command.
+- PIE viewport confirmation was not performed by Codex and remains manual.
+
 ## Cycle 018 execution result - Gameplay Pass 1
 
 Date: 2026-07-14

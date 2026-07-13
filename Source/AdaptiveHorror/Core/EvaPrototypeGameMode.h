@@ -161,6 +161,12 @@ public:
     bool IsDebugHUDVisible() const { return bDebugHUDVisible; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    int32 GetDebugHUDPageIndex() const { return DebugHUDPageIndex; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    int32 GetDebugHUDPageCount() const { return DebugHUDPageCount; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
     bool IsRespawnScheduledForDebug() const;
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
@@ -326,6 +332,8 @@ private:
     bool bInitialZombieSpawned = false;
     bool bNavigationDebugVisible = false;
     bool bDebugHUDVisible = false;
+    int32 DebugHUDPageIndex = 0;
+    static constexpr int32 DebugHUDPageCount = 3;
     bool bRuntimeNavigationReady = false;
     bool bRuntimeNavigationFailed = false;
     int32 NavigationReadinessAttempts = 0;

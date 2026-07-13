@@ -1,5 +1,89 @@
 # Development Log
 
+## 2026-07-14 - Cycle 019: Gameplay Pass 1 Polish
+
+Branch: `feature/gameplay-pass1`
+
+### Scope
+
+- Polished the existing Gameplay Pass 1 only.
+- Focused on three issues from PIE feedback:
+  - Debug HUD overlap/readability.
+  - FAST / ARMORED / LONG ARM / COMPOSITE behavior differences being too subtle.
+  - Hard-to-see internal enemy role/intent state.
+- No new enemies, weapons, maps, debug keys, game-flow changes, NavMesh rewrite, HUNTER reinsertion changes, ADAM changes, Stage Clear changes, or UI-flow rewrites were made.
+
+### Implemented
+
+- Debug HUD pagination:
+  - F9 keeps the existing Debug HUD ON/OFF role.
+  - N now advances Debug HUD pages without toggling the green Navigation visualization.
+  - Debug HUD is split into 3 pages: EVA / Gameplay, Enemy Adaptation, Navigation / Spawn.
+  - Debug text is drawn on a right-side panel so it no longer stacks over the normal HUD.
+  - Debug HUD is gated to active gameplay and remains hidden during Title / Game Over / Stage Clear.
+- Enemy role / intent visibility:
+  - Added a separate overhead debug-intent label component for normal enemies and HUNTER.
+  - It is only visible while Debug HUD is enabled.
+  - The label is updated only when the actual AI intent changes.
+  - Intent display is hidden on death, Stage Clear, or when overhead visuals are disabled.
+  - HUNTER normal label is now `HUNTER Tn`; the counter type is shown as the debug-intent line.
+- Role polish:
+  - FAST: stronger flank/sidestep preference, slightly clearer speed pressure, stronger Ranger-side flanking, and a slightly larger post-attack disengage.
+  - ARMORED: slower baseline movement, lower sidestep/disengage tendency, and preserved frontliner pressure.
+  - LONG ARM: clearer mid-range pressure via higher bounded attack-range tuning and line-of-sight protection for long-reach attacks.
+  - COMPOSITE: still bounded hybrid, now exposes a short Hybrid Type and keeps a selected hybrid for a minimum hold window instead of changing every tick.
+- Automation:
+  - Added tests for Debug HUD page bounds, debug-intent hidden state while debug is off, role tuning differences, COMPOSITE max-two-role hybrid, hybrid hold duration, clamp safety, and Stage Clear intent hiding.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `README.md`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `git status`, `git branch --show-current`, `git log --oneline -5` checked before work.
+- Confirmed branch: `feature/gameplay-pass1`.
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 35 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest smoke log contained no project Fatal / Ensure / Assertion.
+- `git diff --check`: run after documentation update before commit.
+
+### Not verified by Codex
+
+- PIE visual readability of the 3-page Debug HUD at 1280x720.
+- PIE confirmation that overhead Intent labels do not visually overlap in combat.
+- PIE feel of FAST flanking, ARMORED front pressure, LONG ARM range pressure, and COMPOSITE hybrid selection.
+- Runtime smoke starts in Title flow, so live combat role logs (`FAST Role`, `ARMORED Role`, `LONG ARM Role`, `COMPOSITE Hybrid Type`, `HUNTER Counter Type`) still require PIE or a gameplay-directed runtime session. Automation/logs verify the static tuning and labels, but not actual viewport feel.
+
+### Known risks / follow-up
+
+- F9 still toggles the existing Navigation visualization alongside Debug HUD visibility. N only changes Debug HUD pages and does not toggle Navigation visualization.
+- COMPOSITE hybrid values are intentionally conservative; tune only after PIE feel testing.
+- UE startup logs still include unrelated engine/internal automation error-test lines; project automation completed with exit code 0.
+
 ## 2026-07-14 - Cycle 018: Gameplay Pass 1
 
 Branch: `feature/gameplay-pass1`

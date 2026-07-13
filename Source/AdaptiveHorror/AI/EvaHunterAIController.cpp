@@ -10,6 +10,26 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+FString EvaHunterCounterShortText(const EEvaHunterCounterType CounterType)
+{
+    switch (CounterType)
+    {
+    case EEvaHunterCounterType::AntiBerserker:
+        return TEXT("ANTI-BERSERKER");
+    case EEvaHunterCounterType::AntiRanger:
+        return TEXT("ANTI-RANGER");
+    case EEvaHunterCounterType::AntiGhost:
+        return TEXT("ANTI-GHOST");
+    case EEvaHunterCounterType::AntiExplorer:
+        return TEXT("ANTI-EXPLORER");
+    default:
+        return TEXT("OBSERVE");
+    }
+}
+}
+
 AEvaHunterAIController::AEvaHunterAIController()
 {
     PrimaryActorTick.TickInterval = 0.10f;
@@ -183,6 +203,7 @@ void AEvaHunterAIController::InitializeCounterProfile()
         MovementComponent->MaxWalkSpeed = FMath::Clamp(HunterSpeed, 420.0f, 540.0f);
     }
     Hunter->SetHunterCounterType(LockedCounterType);
+    SetCurrentActionIntent(EvaHunterCounterShortText(LockedCounterType));
     bCounterProfileLocked = true;
 
     UE_LOG(LogAdaptiveHorror, Log,
@@ -221,10 +242,16 @@ void AEvaHunterAIController::ExecuteCounterBehavior(const EEvaCombatStyle Observ
             const FVector AwayDirection = (PawnLocation - TargetLocation).GetSafeNormal2D();
             const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, AwayDirection).GetSafeNormal2D();
             const FVector Side = FMath::RandBool() ? RightDirection : -RightDirection;
-            MoveToLocationOrDirect(PawnLocation + (AwayDirection * 520.0f + Side * 320.0f), 90.0f);
+            if (MoveToLocationOrDirect(PawnLocation + (AwayDirection * 520.0f + Side * 320.0f), 90.0f))
+            {
+                SetCurrentActionIntent(TEXT("ANTI-BERSERKER"));
+            }
             return;
         }
-        MoveToActorOrDirect(TargetActor, PreferredBerserkerCounterRange * 0.75f);
+        if (MoveToActorOrDirect(TargetActor, PreferredBerserkerCounterRange * 0.75f))
+        {
+            SetCurrentActionIntent(TEXT("ANTI-BERSERKER"));
+        }
         return;
     case EEvaCombatStyle::Ranger:
     {
@@ -233,12 +260,18 @@ void AEvaHunterAIController::ExecuteCounterBehavior(const EEvaCombatStyle Observ
         const FVector Side = FMath::RandBool() ? RightDirection : -RightDirection;
         if (!Side.IsNearlyZero())
         {
-            MoveToLocationOrDirect(PawnLocation + ToTarget * 260.0f + Side * 420.0f, 80.0f);
+            if (MoveToLocationOrDirect(PawnLocation + ToTarget * 260.0f + Side * 420.0f, 80.0f))
+            {
+                SetCurrentActionIntent(TEXT("ANTI-RANGER"));
+            }
             return;
         }
         if (AActor* Cover = FindNearestTaggedActor(TEXT("EvaCover"), PawnLocation))
         {
-            MoveToLocationOrDirect(Cover->GetActorLocation(), 90.0f);
+            if (MoveToLocationOrDirect(Cover->GetActorLocation(), 90.0f))
+            {
+                SetCurrentActionIntent(TEXT("ANTI-RANGER"));
+            }
             return;
         }
         break;
@@ -246,14 +279,20 @@ void AEvaHunterAIController::ExecuteCounterBehavior(const EEvaCombatStyle Observ
     case EEvaCombatStyle::Ghost:
         if (AActor* HideSpot = FindNearestTaggedActor(TEXT("EvaHideSpot"), TargetLocation))
         {
-            MoveToLocationOrDirect(HideSpot->GetActorLocation(), 100.0f);
+            if (MoveToLocationOrDirect(HideSpot->GetActorLocation(), 100.0f))
+            {
+                SetCurrentActionIntent(TEXT("ANTI-GHOST"));
+            }
             return;
         }
         break;
     case EEvaCombatStyle::Explorer:
         if (AActor* AmbushPoint = FindNearestTaggedActor(TEXT("EvaAmbushPoint"), TargetLocation))
         {
-            MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 100.0f);
+            if (MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 100.0f))
+            {
+                SetCurrentActionIntent(TEXT("ANTI-EXPLORER"));
+            }
             return;
         }
         break;
@@ -261,7 +300,10 @@ void AEvaHunterAIController::ExecuteCounterBehavior(const EEvaCombatStyle Observ
         break;
     }
 
-    MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
+    if (MoveToActorOrDirect(TargetActor, AttackRange * 0.75f))
+    {
+        SetCurrentActionIntent(TEXT("CHASE"));
+    }
 }
 
 EEvaCombatStyle AEvaHunterAIController::CounterTypeToCombatStyle(const EEvaHunterCounterType CounterType) const

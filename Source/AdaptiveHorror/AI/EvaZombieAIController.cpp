@@ -286,6 +286,7 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
     else
     {
         SetFocus(TargetActor);
+        SetCurrentActionIntent(TEXT("CHASE"));
         MoveToActorOrDirect(TargetActor, AttackRange * 0.75f);
     }
 }
@@ -328,6 +329,7 @@ void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
 void AEvaZombieAIController::ClearPlayerTarget()
 {
     TargetActor = nullptr;
+    SetCurrentActionIntent(TEXT(""));
     ClearFocus(EAIFocusPriority::Gameplay);
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
@@ -338,6 +340,7 @@ void AEvaZombieAIController::StopCombatForStageClear()
 {
     bCombatEnabled = false;
     TargetActor = nullptr;
+    SetCurrentActionIntent(TEXT(""));
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
     bInternalRepathAbort = true;
@@ -427,7 +430,26 @@ bool AEvaZombieAIController::ApplyCurrentGameplayAdaptation(const bool bForceApp
     const FEvaPlayerAdaptationProfile Profile = Learning->UpdateAdaptationProfile(false);
     const EEvaEvolutionType EvolutionType = Cast<AEvaZombieCharacter>(ControlledPawn) ?
         Cast<AEvaZombieCharacter>(ControlledPawn)->GetEvolutionType() : EEvaEvolutionType::None;
-    const FEvaEnemyAdaptationTuning Tuning = Learning->BuildEnemyAdaptationTuning(EvolutionType);
+    FEvaEnemyAdaptationTuning Tuning = Learning->BuildEnemyAdaptationTuning(EvolutionType);
+    if (EvolutionType == EEvaEvolutionType::Composite)
+    {
+        const float HoldSeconds = FMath::Max(0.0f, bHasLockedCompositeTuning ?
+            LockedCompositeTuning.CompositeHybridHoldSeconds : Tuning.CompositeHybridHoldSeconds);
+        if (bHasLockedCompositeTuning && Now - LastCompositeHybridLockTime < HoldSeconds)
+        {
+            Tuning = LockedCompositeTuning;
+        }
+        else
+        {
+            LockedCompositeTuning = Tuning;
+            LastCompositeHybridLockTime = Now;
+            bHasLockedCompositeTuning = true;
+        }
+    }
+    else
+    {
+        bHasLockedCompositeTuning = false;
+    }
 
     const bool bProfileChanged = LastAdaptationProfile.CombatStyle != Profile.CombatStyle ||
         LastAdaptationProfile.EvaStage != Profile.EvaStage ||
@@ -460,10 +482,13 @@ bool AEvaZombieAIController::ApplyCurrentGameplayAdaptation(const bool bForceApp
     }
 
     UE_LOG(LogAdaptiveHorror, Log,
-        TEXT("[EnemyAdapt] Applied Pawn=%s Evolution=%s Role=%s Counter=%s Style=%s Speed=%.2f Range=%.2f Cooldown=%.2f Damage=%.2f Side=%.2f Search=%.1f Summary=%s"),
+        TEXT("[EnemyAdapt] Applied Pawn=%s Evolution=%s Role=%s Label=%s Hybrid=%s HybridRoles=%d Counter=%s Style=%s Speed=%.2f Range=%.2f Cooldown=%.2f Damage=%.2f Side=%.2f Search=%.1f Summary=%s"),
         *ControlledPawn->GetName(),
         *UEnum::GetValueAsString(Tuning.EvolutionType),
         *UEnum::GetValueAsString(Tuning.BehaviorRole),
+        *Tuning.RoleLabel,
+        Tuning.CompositeHybridType.IsEmpty() ? TEXT("None") : *Tuning.CompositeHybridType,
+        Tuning.CompositeHybridRoleCount,
         *UEnum::GetValueAsString(Tuning.HunterCounterType),
         *UEnum::GetValueAsString(Profile.CombatStyle),
         Tuning.MoveSpeedMultiplier,
@@ -473,14 +498,52 @@ bool AEvaZombieAIController::ApplyCurrentGameplayAdaptation(const bool bForceApp
         Tuning.SidestepChance,
         Tuning.SearchDuration,
         *Tuning.DebugSummary);
+    if (CurrentActionIntent.IsEmpty() && !Tuning.IntentLabel.IsEmpty())
+    {
+        SetCurrentActionIntent(Tuning.IntentLabel);
+    }
     return true;
+}
+
+void AEvaZombieAIController::SetCurrentActionIntent(const FString& NewIntent)
+{
+    if (CurrentActionIntent == NewIntent)
+    {
+        return;
+    }
+
+    CurrentActionIntent = NewIntent;
+    if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
+    {
+        Zombie->SetDebugIntentText(CurrentActionIntent);
+    }
 }
 
 bool AEvaZombieAIController::CanAttackTarget() const
 {
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(TargetActor);
-    return bCombatEnabled && GetPawn() && Player && !Player->IsDead() &&
-        FVector::DistSquared(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) <= FMath::Square(AttackRange);
+    if (!bCombatEnabled || !GetPawn() || !Player || Player->IsDead() ||
+        FVector::DistSquared(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) > FMath::Square(AttackRange))
+    {
+        return false;
+    }
+
+    const bool bLongReachAttack = CurrentAdaptationTuning.BehaviorRole == EEvaEnemyBehaviorRole::MidRangePressure ||
+        CurrentAdaptationTuning.EvolutionType == EEvaEvolutionType::LongArm;
+    if (bLongReachAttack && GetWorld())
+    {
+        FHitResult ObstacleHit;
+        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaEnemyAttackLineOfSight), false, GetPawn());
+        QueryParams.AddIgnoredActor(TargetActor);
+        const FVector TraceStart = GetPawn()->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+        const FVector TraceEnd = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+        if (GetWorld()->LineTraceSingleByChannel(ObstacleHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void AEvaZombieAIController::TryAttackTarget()
@@ -504,6 +567,7 @@ void AEvaZombieAIController::TryAttackTarget()
     }
 
     LastAttackTime = Now;
+    SetCurrentActionIntent(TEXT("ATTACK"));
     UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, this, GetPawn(), UDamageType::StaticClass());
     if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
     {
@@ -523,7 +587,10 @@ void AEvaZombieAIController::TryAttackTarget()
                 (FMath::RandBool() ? RightDirection : -RightDirection) * 0.75f).GetSafeNormal2D();
             if (!RetreatDirection.IsNearlyZero())
             {
-                MoveToLocationOrDirect(PawnLocation + RetreatDirection * 280.0f, 70.0f);
+                if (MoveToLocationOrDirect(PawnLocation + RetreatDirection * 320.0f, 70.0f))
+                {
+                    SetCurrentActionIntent(TEXT("DISENGAGE"));
+                }
             }
         }
     }
@@ -745,52 +812,128 @@ bool AEvaZombieAIController::TryMoveForAdaptationRole(const FEvaEnemyAdaptationT
             return false;
         }
         const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, ToTarget).GetSafeNormal2D();
-        const FVector Side = bPreferRightDetour ? RightDirection : -RightDirection;
+        const bool bMoveRight = bPreferRightDetour;
+        const FVector Side = bMoveRight ? RightDirection : -RightDirection;
         bPreferRightDetour = !bPreferRightDetour;
-        return MoveToLocationOrDirect(PawnLocation + ToTarget * 180.0f + Side * 460.0f, 80.0f);
+        const bool bMoved = MoveToLocationOrDirect(PawnLocation + ToTarget * 220.0f + Side * 560.0f, 80.0f);
+        if (bMoved)
+        {
+            SetCurrentActionIntent(bMoveRight ? TEXT("FLANK RIGHT") : TEXT("FLANK LEFT"));
+        }
+        return bMoved;
     }
     case EEvaEnemyBehaviorRole::Frontliner:
-        return MoveToActorOrDirect(TargetActor, AttackRange * 0.70f);
+    {
+        const bool bMoved = MoveToActorOrDirect(TargetActor, AttackRange * 0.68f);
+        if (bMoved)
+        {
+            SetCurrentActionIntent(TEXT("HOLD FRONT"));
+        }
+        return bMoved;
+    }
     case EEvaEnemyBehaviorRole::MidRangePressure:
     {
         const float DistanceSq = FVector::DistSquared2D(PawnLocation, TargetLocation);
         if (DistanceSq < FMath::Square(AttackRange * 0.58f))
         {
             const FVector AwayDirection = (PawnLocation - TargetLocation).GetSafeNormal2D();
-            return !AwayDirection.IsNearlyZero() &&
-                MoveToLocationOrDirect(PawnLocation + AwayDirection * 260.0f, 90.0f);
+            const bool bMoved = !AwayDirection.IsNearlyZero() &&
+                MoveToLocationOrDirect(PawnLocation + AwayDirection * 300.0f, 90.0f);
+            if (bMoved)
+            {
+                SetCurrentActionIntent(TEXT("KEEP DISTANCE"));
+            }
+            return bMoved;
         }
         if (DistanceSq > FMath::Square(AttackRange * 1.45f))
         {
-            return MoveToActorOrDirect(TargetActor, AttackRange * 0.82f);
+            const bool bMoved = MoveToActorOrDirect(TargetActor, AttackRange * 0.82f);
+            if (bMoved)
+            {
+                SetCurrentActionIntent(TEXT("PRESSURE"));
+            }
+            return bMoved;
         }
         return false;
     }
     case EEvaEnemyBehaviorRole::Searcher:
         if (AActor* HideSpot = FindNearestTaggedActor(TEXT("EvaHideSpot"), TargetLocation))
         {
-            return MoveToLocationOrDirect(HideSpot->GetActorLocation(), 110.0f);
+            const bool bMoved = MoveToLocationOrDirect(HideSpot->GetActorLocation(), 110.0f);
+            if (bMoved)
+            {
+                SetCurrentActionIntent(TEXT("SEARCH LAST SEEN"));
+            }
+            return bMoved;
         }
         return false;
     case EEvaEnemyBehaviorRole::Ambusher:
         if (AActor* AmbushPoint = FindNearestTaggedActor(TEXT("EvaAmbushPoint"), TargetLocation))
         {
-            return MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 110.0f);
+            const bool bMoved = MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 110.0f);
+            if (bMoved)
+            {
+                SetCurrentActionIntent(TEXT("AMBUSH"));
+            }
+            return bMoved;
         }
         return false;
     case EEvaEnemyBehaviorRole::CompositeAdaptive:
         if (Tuning.CounteredStyle == EEvaCombatStyle::Ranger || Tuning.CounteredStyle == EEvaCombatStyle::Ghost)
         {
             const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, ToTarget).GetSafeNormal2D();
-            const FVector Side = bPreferRightDetour ? RightDirection : -RightDirection;
+            const bool bMoveRight = bPreferRightDetour;
+            const FVector Side = bMoveRight ? RightDirection : -RightDirection;
             bPreferRightDetour = !bPreferRightDetour;
-            return MoveToLocationOrDirect(PawnLocation + ToTarget * 140.0f + Side * 380.0f, 80.0f);
+            const bool bMoved = MoveToLocationOrDirect(PawnLocation + ToTarget * 180.0f + Side * 460.0f, 80.0f);
+            if (bMoved)
+            {
+                const FString Intent = Tuning.CompositeHybridType.IsEmpty() ?
+                    FString(bMoveRight ? TEXT("FLANK RIGHT") : TEXT("FLANK LEFT")) : Tuning.CompositeHybridType;
+                SetCurrentActionIntent(Intent);
+            }
+            return bMoved;
+        }
+        if (Tuning.CounteredStyle == EEvaCombatStyle::Berserker)
+        {
+            const float DistanceSq = FVector::DistSquared2D(PawnLocation, TargetLocation);
+            if (DistanceSq < FMath::Square(AttackRange * 0.90f))
+            {
+                const FVector AwayDirection = (PawnLocation - TargetLocation).GetSafeNormal2D();
+                const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, AwayDirection).GetSafeNormal2D();
+                const FVector Side = bPreferRightDetour ? RightDirection : -RightDirection;
+                bPreferRightDetour = !bPreferRightDetour;
+                const bool bMoved = !AwayDirection.IsNearlyZero() &&
+                    MoveToLocationOrDirect(PawnLocation + AwayDirection * 320.0f + Side * 220.0f, 90.0f);
+                if (bMoved)
+                {
+                    const FString Intent = Tuning.CompositeHybridType.IsEmpty() ?
+                        FString(TEXT("ANTI-BERSERKER")) : Tuning.CompositeHybridType;
+                    SetCurrentActionIntent(Intent);
+                }
+                return bMoved;
+            }
+            const bool bMoved = MoveToActorOrDirect(TargetActor, AttackRange * 0.78f);
+            if (bMoved)
+            {
+                const FString Intent = Tuning.CompositeHybridType.IsEmpty() ?
+                    FString(TEXT("ANTI-BERSERKER")) : Tuning.CompositeHybridType;
+                SetCurrentActionIntent(Intent);
+            }
+            return bMoved;
         }
         if (Tuning.CounteredStyle == EEvaCombatStyle::Explorer)
         {
             if (AActor* AmbushPoint = FindNearestTaggedActor(TEXT("EvaAmbushPoint"), TargetLocation))
             {
-                return MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 110.0f);
+                const bool bMoved = MoveToLocationOrDirect(AmbushPoint->GetActorLocation(), 110.0f);
+                if (bMoved)
+                {
+                    const FString Intent = Tuning.CompositeHybridType.IsEmpty() ?
+                        FString(TEXT("ANTI-EXPLORER")) : Tuning.CompositeHybridType;
+                    SetCurrentActionIntent(Intent);
+                }
+                return bMoved;
             }
         }
         return false;

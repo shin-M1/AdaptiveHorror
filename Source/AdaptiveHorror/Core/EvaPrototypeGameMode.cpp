@@ -34,6 +34,7 @@
 #include "GameFramework/HUD.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationData.h"
 #include "NavigationSystem.h"
@@ -2780,19 +2781,47 @@ void AEvaPrototypeGameMode::DebugPrintTelemetrySnapshot()
 void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
 {
 #if !UE_BUILD_SHIPPING
-    bNavigationDebugVisible = !bNavigationDebugVisible;
-    bDebugHUDVisible = !bDebugHUDVisible;
-
     if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
     {
+        const bool bPressedNextPage = PlayerController->WasInputKeyJustPressed(EKeys::N) &&
+            !PlayerController->WasInputKeyJustPressed(EKeys::F9);
+        if (bPressedNextPage)
+        {
+            if (bDebugHUDVisible)
+            {
+                DebugHUDPageIndex = (DebugHUDPageIndex + 1) % DebugHUDPageCount;
+            }
+            else
+            {
+                bDebugHUDVisible = true;
+                DebugHUDPageIndex = 0;
+            }
+            ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG N: page %d/%d"),
+                DebugHUDPageIndex + 1, DebugHUDPageCount), 3.0f);
+            return;
+        }
+
+        bDebugHUDVisible = !bDebugHUDVisible;
+        if (!bDebugHUDVisible)
+        {
+            DebugHUDPageIndex = 0;
+            bNavigationDebugVisible = false;
+        }
+        else
+        {
+            bNavigationDebugVisible = !bNavigationDebugVisible;
+        }
+
         PlayerController->ConsoleCommand(TEXT("Show Navigation"), true);
         PlayerController->ConsoleCommand(bNavigationDebugVisible ? TEXT("ShowFlag.Navigation 1") :
             TEXT("ShowFlag.Navigation 0"), true);
     }
 
     LogNavigationStatus(TEXT("DebugToggleNavigationVisualization"));
-    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9/N: Debug HUD %s / Navigation visualization %s"),
+    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9: Debug HUD %s page %d/%d / Navigation visualization %s"),
         bDebugHUDVisible ? TEXT("ON") : TEXT("OFF"),
+        DebugHUDPageIndex + 1,
+        DebugHUDPageCount,
         bNavigationDebugVisible ? TEXT("ON") : TEXT("OFF")), 4.0f);
 #endif
 }
