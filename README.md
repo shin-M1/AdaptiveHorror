@@ -149,3 +149,86 @@ Evolution label note:
 
 - `COMPOSITE` is the 80% EVA analysis evolved variant.
 - FAST / ARMORED / LONG ARM labels still need PIE visual confirmation after the latest ADAM/repath pass.
+
+## Core game UI flow - Cycle 014
+
+The prototype now boots into a basic title/menu flow instead of immediately starting combat.
+
+### Launch and title
+
+- Open `AdaptiveHorror.uproject` in UE5.8 and start PIE.
+- The game enters `Title` state and shows `ADAPTIVE HORROR`.
+- Buttons:
+  - `NEW GAME`: resets the current demo session and starts gameplay.
+  - `CONTINUE - Not Available`: intentionally disabled until real save data exists.
+  - `SETTINGS`: opens prototype settings.
+  - `EXIT`: calls the UE quit path.
+
+### In-game controls
+
+- `Esc`: pause/resume while gameplay is active.
+- Pause menu:
+  - `RESUME`
+  - `RESTART FROM CHECKPOINT`
+  - `SETTINGS`
+  - `RETURN TO TITLE`
+  - `EXIT GAME`
+- Player death opens an explicit `GAME OVER` screen with retry/restart/title options.
+- Adam defeat opens a `MISSION COMPLETE` Stage Clear screen with retry/title/exit options.
+
+### Settings
+
+Settings are stored in `UEvaSettingsSaveGame` slot `EvaPrototypeSettings`.
+
+Implemented:
+
+- Master Volume.
+- BGM Volume.
+- SFX Volume.
+- Mouse Sensitivity.
+- Invert Mouse Y.
+
+Placeholder fields exist for future UI/application logic:
+
+- Fullscreen / Windowed.
+- Resolution.
+- Graphics Quality.
+
+### HUD and debug keys
+
+Normal HUD now prioritizes:
+
+- HP.
+- Ammo.
+- Crosshair.
+- Current objective.
+- EVA analysis/stage.
+- HUNTER state.
+- Boss HUD during Adam combat.
+
+Detailed debug values are hidden until `F9` or `N` toggles Debug HUD / Navigation visualization.
+
+Current debug keys:
+
+- `F1`: EVA analysis +20.
+- `F2`: force HUNTER deployment.
+- `F3`: force infected wave.
+- `F4`: move to ADAM arena and start/confirm ADAM encounter.
+- `F5`: restore player HP/ammo.
+- `F6`: force Stage Clear.
+- `F7`: print telemetry snapshot.
+- `F9` / `N`: toggle Debug HUD and navigation visualization.
+- `P`: unbound.
+- `F8`: intentionally unbound because it conflicts with PIE Eject.
+
+### Audio status
+
+- Minimal procedural UI tones are generated in C++ for click/menu/game-over/stage-clear feedback.
+- Real BGM, gunshot/reload/damage, enemy, HUNTER, and Adam sound assets are still TODO.
+
+### Known limitations
+
+- PIE visual confirmation is still required for the new title/pause/settings/game-over/stage-clear widgets.
+- Runtime smoke confirms the game loads into Title state but cannot validate visual layout or audio because it runs with NullRHI/NoSound.
+- Title mode still uses the runtime map/pawn as a dark background; gameplay input and combat spawning are blocked until `NEW GAME`.
+- Fullscreen/resolution/graphics quality are stored placeholders and are not applied to renderer/window settings yet.

@@ -10,6 +10,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
+#include "Core/EvaSettingsSaveGame.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -468,6 +469,124 @@ bool FEvaEnemyDebugLabelReadableDefaultTest::RunTest(const FString& Parameters)
     }
 
     World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaGameFlowTitleModeBlocksCombatTest,
+    "AdaptiveHorror.GameFlow.TitleModeBlocksCombat",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaGameFlowTitleModeBlocksCombatTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    TestNotNull(TEXT("GameMode spawns for title flow test"), GameMode);
+    if (!GameMode)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    GameMode->EnterTitleMode();
+
+    TestTrue(TEXT("Title mode sets flow state to Title"),
+        GameMode->GetGameFlowState() == EEvaGameFlowState::Title);
+    TestFalse(TEXT("Title mode is not active gameplay"), GameMode->IsGameplayActive());
+    TestFalse(TEXT("Title mode blocks player damage"), GameMode->CanPlayerTakeDamage());
+    TestFalse(TEXT("Title mode is not game over"), GameMode->IsGameOver());
+    TestFalse(TEXT("Title mode is not stage clear"), GameMode->IsStageClear());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaGameFlowNewGameClearsTerminalStatesTest,
+    "AdaptiveHorror.GameFlow.NewGameClearsTerminalStates",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaGameFlowNewGameClearsTerminalStatesTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    TestNotNull(TEXT("GameMode spawns for new game flow test"), GameMode);
+    if (!GameMode)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    GameMode->HandleStageClear();
+    TestTrue(TEXT("Stage clear state is active before reset"), GameMode->IsStageClear());
+
+    GameMode->StartNewGameFlow();
+
+    TestTrue(TEXT("New Game sets flow state to Playing"),
+        GameMode->GetGameFlowState() == EEvaGameFlowState::Playing);
+    TestTrue(TEXT("New Game enables gameplay"), GameMode->IsGameplayActive());
+    TestTrue(TEXT("New Game enables player damage"), GameMode->CanPlayerTakeDamage());
+    TestFalse(TEXT("New Game clears game over"), GameMode->IsGameOver());
+    TestFalse(TEXT("New Game clears stage clear"), GameMode->IsStageClear());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaGameFlowRetryClearsGameOverTest,
+    "AdaptiveHorror.GameFlow.RetryClearsGameOver",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaGameFlowRetryClearsGameOverTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+    TestNotNull(TEXT("GameMode spawns for retry flow test"), GameMode);
+    TestNotNull(TEXT("Player spawns for retry flow test"), Player);
+    if (!GameMode || !Player)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    GameMode->StartNewGameFlow();
+    GameMode->HandlePlayerDeath(Player);
+    TestTrue(TEXT("Death enters game over"), GameMode->IsGameOver());
+    TestTrue(TEXT("Death sets flow state to PlayerDead"),
+        GameMode->GetGameFlowState() == EEvaGameFlowState::PlayerDead);
+
+    GameMode->RetryFromCheckpointFlow();
+
+    TestTrue(TEXT("Retry returns to Playing"),
+        GameMode->GetGameFlowState() == EEvaGameFlowState::Playing);
+    TestFalse(TEXT("Retry clears game over"), GameMode->IsGameOver());
+    TestFalse(TEXT("Retry does not schedule the legacy auto-respawn timer"), GameMode->IsRespawnScheduledForDebug());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaSettingsSaveDefaultsTest,
+    "AdaptiveHorror.Settings.Defaults",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaSettingsSaveDefaultsTest::RunTest(const FString& Parameters)
+{
+    const UEvaSettingsSaveGame* Settings = NewObject<UEvaSettingsSaveGame>();
+    TestNotNull(TEXT("Settings save object can be created"), Settings);
+    if (!Settings)
+    {
+        return false;
+    }
+
+    TestTrue(TEXT("Master volume default is normalized"),
+        Settings->MasterVolume >= 0.0f && Settings->MasterVolume <= 1.0f);
+    TestTrue(TEXT("BGM volume default is normalized"),
+        Settings->BGMVolume >= 0.0f && Settings->BGMVolume <= 1.0f);
+    TestTrue(TEXT("SFX volume default is normalized"),
+        Settings->SFXVolume >= 0.0f && Settings->SFXVolume <= 1.0f);
+    TestTrue(TEXT("Mouse sensitivity default is gameplay-safe"),
+        Settings->MouseSensitivity >= 0.1f && Settings->MouseSensitivity <= 5.0f);
+    TestFalse(TEXT("Mouse Y inversion is disabled by default"), Settings->bInvertMouseY);
     return true;
 }
 

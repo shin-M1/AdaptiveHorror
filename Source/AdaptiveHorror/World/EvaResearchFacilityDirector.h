@@ -34,6 +34,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
     void CompleteStage();
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    void ResetForNewGame();
+
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     EEvaFacilityZone GetCurrentZone() const { return CurrentZone; }
 

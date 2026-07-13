@@ -34,6 +34,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Telemetry")
     void RecordDamageTaken(float DamageAmount, FName DamageSource);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Telemetry")
+    void ResetTelemetry();
+
     UFUNCTION(BlueprintPure, Category = "EVA|Telemetry")
     float GetHeadshotRate() const;
 

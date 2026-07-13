@@ -1306,3 +1306,125 @@ P:
 5. Confirm residual enemies no longer chase/attack.
 6. Confirm camera look still works while movement/shooting remain disabled.
 7. Confirm no GAME OVER / checkpoint respawn starts after Stage Clear.
+
+## 2026-07-14 - Cycle 014 Core game UI flow
+
+### Implementation summary
+
+- Added the first playable front-end flow for the prototype:
+  - Launch now enters `Title` flow instead of immediately starting combat.
+  - `NEW GAME` resets combat/session state and enters `Playing`.
+  - `Esc` toggles `Paused` / `Playing`.
+  - Player death now opens an explicit `GAME OVER` menu instead of auto-respawning after a timer.
+  - Adam defeat / Stage Clear opens a `MISSION COMPLETE` menu.
+  - Menus support retry/restart, return to title, and exit.
+- Added `EEvaGameFlowState` / `EEvaSettingsReturnTarget` for minimal state management.
+- Added C++ UMG menu widgets:
+  - `UEvaTitleMenuWidget`
+  - `UEvaPauseMenuWidget`
+  - `UEvaGameOverWidget`
+  - `UEvaStageClearWidget`
+  - `UEvaSettingsWidget`
+- Added local settings save object:
+  - Master/BGM/SFX volume values.
+  - Mouse sensitivity.
+  - Invert Mouse Y.
+  - Placeholder Fullscreen / Resolution / Graphics Quality fields for the future settings UI.
+- Added simple procedural UI tones for click, pause/menu open, game over, and stage clear events.
+- Split normal HUD and debug HUD:
+  - Normal HUD keeps HP, ammo, EVA analysis/stage, HUNTER state, objective, and crosshair.
+  - Debug stats are shown only when Debug HUD is toggled with `F9/N`.
+  - Title/loading states hide the gameplay HUD.
+  - Old canvas `GAME OVER` / `STAGE CLEAR TODO` overlays were removed in favor of widgets.
+- Preserved the existing Stage Clear safety fixes:
+  - Stage Clear still blocks player damage/death, stops enemy combat, clears spawn timers, and hides boss/enemy combat UI.
+- Added flow reset helpers:
+  - `UEvaLearningSubsystem::ResetLearning()`
+  - `UEvaPlayerTelemetryComponent::ResetTelemetry()`
+  - `AEvaResearchFacilityDirector::ResetForNewGame()`
+- Set the runtime-generated point light to Movable to reduce runtime graybox lighting warnings.
+- Added automation coverage for title blocking combat, new-game reset, retry flow, and settings defaults.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaGameFlowTypes.h`
+- `Source/AdaptiveHorror/Core/EvaSettingsSaveGame.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Components/EvaPlayerTelemetryComponent.h`
+- `Source/AdaptiveHorror/Components/EvaPlayerTelemetryComponent.cpp`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.h`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+- `README.md`
+- `TECH_SPEC.md`
+
+### Build / test verification
+
+- Initial git state:
+  - Started from `main`, clean working tree.
+  - Created branch `feature/core-game-ui-flow`.
+- `Scripts/RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation log confirms 21 successful tests and exit code 0.
+- First build pass found UE5.8/MSVC issues in the new UI code and they were fixed:
+  - `Slot` local variable shadowing `UWidget::Slot`.
+  - Ambiguous `TSubclassOf` ternary expressions.
+  - `TObjectPtr<USlider>` reference mismatch.
+  - `UGameplayStatics::QuitGame` replaced with `UKismetSystemLibrary::QuitGame`.
+  - `bHunterEncounterTriggered` typo corrected to existing `bHunterEventTriggered`.
+  - Retry flow no longer overwrites the pending respawn pawn with `nullptr` in controller-less automation worlds.
+- Runtime smoke:
+  - Command:
+    - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Result: exit code 0.
+  - Log confirms `EvaPrototypeGameMode` loaded and transitioned `Loading -> Title`.
+- `git diff --check`:
+  - No whitespace errors. CRLF conversion warnings only.
+
+### PIE/manual verification status
+
+- Not visually confirmed by Codex in PIE:
+  - Title screen appears and buttons are clickable.
+  - New Game starts gameplay from title.
+  - Esc pause/resume works without duplicate widgets.
+  - Settings sliders/check box are visible and apply correctly.
+  - Player death opens Game Over and Retry works.
+  - Adam defeat opens the new Stage Clear widget.
+  - Return to Title works after Pause / Game Over / Stage Clear.
+  - UI tones are audible in PIE.
+  - Lighting rebuild warning is fully gone in viewport.
+
+### Known limitations
+
+- Settings UI stores Fullscreen / Resolution / Graphics Quality fields but does not yet apply renderer/window changes.
+- Audio is procedural placeholder UI sound only; gameplay/enemy/BGM audio remains TODO.
+- Title mode still uses the runtime map/pawn as a dark background, but gameplay input and combat spawning are locked until `NEW GAME`.
+- Runtime smoke uses NullRHI, so it cannot prove visual menu layout or audible UI tones.
+
+### Next recommended work
+
+Run a real PIE pass focused only on UI flow:
+
+1. Launch PIE and confirm title screen.
+2. `NEW GAME` -> verify movement, shooting, HUD, and initial zombie.
+3. Press `Esc` -> Resume / Settings / Return to Title.
+4. Kill the player -> Game Over -> Retry.
+5. Press F4, defeat Adam -> Stage Clear -> Return to Title.
+6. Start a second New Game and confirm no old Stage Clear / Adam / HUNTER state remains.

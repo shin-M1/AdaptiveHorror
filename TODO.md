@@ -481,3 +481,37 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: confirm camera look remains available after Stage Clear.
 - [ ] PIE: confirm movement/shooting remain disabled after Stage Clear.
 - [ ] PIE: confirm Boss HUD and enemy overhead HP bars are hidden after Stage Clear.
+
+## Cycle 014 Core game UI flow
+
+- [x] Create dedicated branch `feature/core-game-ui-flow`.
+- [x] Add `Title / Playing / Paused / PlayerDead / StageCleared / Loading` flow state.
+- [x] Add title menu with NEW GAME / disabled CONTINUE / SETTINGS / EXIT.
+- [x] Add New Game reset flow for player, telemetry, EVA learning, Director, combat timers, enemies, HUNTER, Adam, Stage Clear, and Game Over state.
+- [x] Add Esc pause/resume flow and pause menu.
+- [x] Add Game Over menu and remove the legacy auto-respawn-only death loop.
+- [x] Add Stage Clear menu and remove old canvas `STAGE CLEAR TODO` overlay.
+- [x] Add Return to Title from Pause / Game Over / Stage Clear.
+- [x] Add settings save object and settings widget for Master/BGM/SFX volume, mouse sensitivity, and invert Y.
+- [x] Add placeholder settings fields for fullscreen/windowed, resolution, and graphics quality.
+- [x] Add simple procedural UI tones for click/menu/game over/stage clear feedback.
+- [x] Split normal HUD and debug HUD; move detailed debug stats behind F9/N.
+- [x] Keep F8 unassigned because it conflicts with PIE Eject.
+- [x] Set runtime point light to Movable.
+- [x] Add automation tests for title blocking combat, new-game reset, retry flow, and settings defaults.
+- [x] Live Codingなし Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror`: 21 tests succeeded.
+- [x] Runtime smoke with NullRHI succeeded; game loads into Title state.
+- [x] `git diff --check` passed with CRLF warnings only.
+- [ ] PIE: confirm title screen is visible and readable.
+- [ ] PIE: confirm NEW GAME starts gameplay and hides cursor.
+- [ ] PIE: confirm Esc pause/resume does not create duplicate widgets.
+- [ ] PIE: confirm Settings values apply and persist after returning to menu.
+- [ ] PIE: confirm Player Death opens Game Over and Retry restores checkpoint safely.
+- [ ] PIE: confirm Adam defeat opens the new Stage Clear widget.
+- [ ] PIE: confirm Return to Title works from Pause / Game Over / Stage Clear.
+- [ ] PIE: confirm second New Game has no stale Adam / HUNTER / Stage Clear / telemetry state.
+- [ ] PIE: confirm UI tones are audible.
+- [ ] Implement real BGM/SFX assets or structured sound components for gameplay/enemy/boss events.
+- [ ] Apply fullscreen/window mode, resolution, and graphics quality settings for real.
+- [ ] Add confirmation dialog for Return to Title / Exit Game if needed.

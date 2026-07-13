@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AI/EvaTelemetryTypes.h"
+#include "Core/EvaGameFlowTypes.h"
 #include "GameFramework/GameModeBase.h"
 #include "TimerManager.h"
 #include "EvaPrototypeGameMode.generated.h"
@@ -44,6 +45,33 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Game")
     void HandleStageClear();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void EnterTitleMode();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void StartNewGameFlow();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void PauseGameFlow();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void ResumeGameFlow();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void RetryFromCheckpointFlow();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Game")
+    void ReturnToTitleFlow();
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Game")
+    EEvaGameFlowState GetGameFlowState() const { return GameFlowState; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Game")
+    bool IsGameplayActive() const { return GameFlowState == EEvaGameFlowState::Playing && !bGameOver && !bStageClear; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Game")
+    bool CanPlayerTakeDamage() const { return IsGameplayActive(); }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Game")
     bool IsStageClear() const { return bStageClear; }
@@ -125,6 +153,9 @@ public:
     bool IsNavigationDebugVisible() const { return bNavigationDebugVisible; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    bool IsDebugHUDVisible() const { return bDebugHUDVisible; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
     bool IsRespawnScheduledForDebug() const;
 
 protected:
@@ -178,6 +209,8 @@ private:
     void ResetEnemyTargets();
     int32 StopAllEnemyCombatForStageClear();
     void ClearStageClearTimers();
+    void CleanupCombatActorsForFlowReset();
+    void SetGameFlowState(EEvaGameFlowState NewState);
     void LogStageClearState(const FString& Context, int32 ClearedEnemyAI, bool bClearedTimers) const;
     void LogPlayerDeathRequest(const FString& Context, const AEvaPlayerCharacter* DeadPlayer,
         bool bRespawnTimerCreated) const;
@@ -201,6 +234,7 @@ private:
     FTimerHandle HunterReinsertTimer;
     FTimerHandle NavigationReadinessTimer;
     bool bGameOver = false;
+    EEvaGameFlowState GameFlowState = EEvaGameFlowState::Loading;
 
     UPROPERTY()
     TObjectPtr<AEvaHunterCharacter> CurrentHunter;
@@ -233,6 +267,7 @@ private:
 
     bool bInitialZombieSpawned = false;
     bool bNavigationDebugVisible = false;
+    bool bDebugHUDVisible = false;
     bool bRuntimeNavigationReady = false;
     bool bRuntimeNavigationFailed = false;
     int32 NavigationReadinessAttempts = 0;

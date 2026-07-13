@@ -182,9 +182,12 @@ void AEvaPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 float AEvaPlayerCharacter::TakeDamage(const float DamageAmount, const FDamageEvent& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
-    if (IsStageClearActive())
+    if (const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {
-        return 0.0f;
+        if (!GameMode->CanPlayerTakeDamage())
+        {
+            return 0.0f;
+        }
     }
 
     if (IsDead())
@@ -207,6 +210,11 @@ float AEvaPlayerCharacter::TakeDamage(const float DamageAmount, const FDamageEve
 bool AEvaPlayerCharacter::IsDead() const
 {
     return HealthComponent && HealthComponent->IsDead();
+}
+
+void AEvaPlayerCharacter::SetMouseSensitivity(const float NewMouseSensitivity)
+{
+    MouseSensitivity = FMath::Clamp(NewMouseSensitivity, 0.1f, 5.0f);
 }
 
 void AEvaPlayerCharacter::ResetForCheckpoint(const FTransform& CheckpointTransform)
@@ -332,7 +340,7 @@ void AEvaPlayerCharacter::AddRuntimeInputMapping()
 
 void AEvaPlayerCharacter::Move(const FInputActionValue& Value)
 {
-    if (IsDead() || IsStageClearActive())
+    if (!IsGameplayInputAllowed())
     {
         return;
     }
@@ -344,18 +352,18 @@ void AEvaPlayerCharacter::Move(const FInputActionValue& Value)
 
 void AEvaPlayerCharacter::Look(const FInputActionValue& Value)
 {
-    if (!IsDead())
+    if (IsLookInputAllowed())
     {
         const FVector2D LookValue = Value.Get<FVector2D>();
-        const float PitchInput = bInvertMouseY ? LookValue.Y : -LookValue.Y;
-        AddControllerYawInput(LookValue.X);
+        const float PitchInput = (bInvertMouseY ? LookValue.Y : -LookValue.Y) * MouseSensitivity;
+        AddControllerYawInput(LookValue.X * MouseSensitivity);
         AddControllerPitchInput(PitchInput);
     }
 }
 
 void AEvaPlayerCharacter::StartSprint()
 {
-    if (!IsDead() && !IsStageClearActive())
+    if (IsGameplayInputAllowed())
     {
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
         {
@@ -374,7 +382,7 @@ void AEvaPlayerCharacter::StopSprint()
 
 void AEvaPlayerCharacter::StartJump()
 {
-    if (!IsDead() && !IsStageClearActive())
+    if (IsGameplayInputAllowed())
     {
         Jump();
     }
@@ -387,7 +395,7 @@ void AEvaPlayerCharacter::StopJump()
 
 void AEvaPlayerCharacter::FireWeapon()
 {
-    if (!IsDead() && !IsStageClearActive() && CurrentWeapon)
+    if (IsGameplayInputAllowed() && CurrentWeapon)
     {
         CurrentWeapon->TryFire();
     }
@@ -395,7 +403,7 @@ void AEvaPlayerCharacter::FireWeapon()
 
 void AEvaPlayerCharacter::ReloadWeapon()
 {
-    if (!IsDead() && !IsStageClearActive() && CurrentWeapon)
+    if (IsGameplayInputAllowed() && CurrentWeapon)
     {
         CurrentWeapon->StartReload();
     }
@@ -452,6 +460,32 @@ bool AEvaPlayerCharacter::IsStageClearActive() const
 {
     const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
     return GameMode && GameMode->IsStageClear();
+}
+
+bool AEvaPlayerCharacter::IsGameplayInputAllowed() const
+{
+    if (IsDead())
+    {
+        return false;
+    }
+
+    const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    return !GameMode || GameMode->IsGameplayActive();
+}
+
+bool AEvaPlayerCharacter::IsLookInputAllowed() const
+{
+    if (IsDead())
+    {
+        return false;
+    }
+
+    const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    if (!GameMode)
+    {
+        return true;
+    }
+    return GameMode->IsGameplayActive() || GameMode->IsStageClear();
 }
 
 void AEvaPlayerCharacter::DebugIncreaseEvaAnalysis()

@@ -1,5 +1,117 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 014 Core game UI flow
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+### Current verified state
+
+- Branch created for the work: `feature/core-game-ui-flow`.
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 21 tests succeeded, 0 failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke log confirms `EvaPrototypeGameMode` loads and transitions `Loading -> Title`.
+- PIE visual verification is still required; Codex did not visually confirm the new menus in the viewport.
+
+### Most recent implementation
+
+Implemented the first complete prototype UI/screen-transition foundation:
+
+- Title screen:
+  - `NEW GAME`
+  - disabled `CONTINUE - Not Available`
+  - `SETTINGS`
+  - `EXIT`
+- New Game flow:
+  - resets player HP/ammo via checkpoint reset,
+  - resets telemetry,
+  - resets EVA learning/analysis,
+  - clears HUNTER/Adam/stage/game-over state,
+  - clears combat actors/timers,
+  - returns input to Game Only.
+- Pause flow:
+  - `Esc` toggles pause/resume while playing,
+  - pause menu supports Resume, Restart From Checkpoint, Settings, Return to Title, Exit Game.
+- Game Over flow:
+  - player death enters `PlayerDead`,
+  - stops combat actors,
+  - opens explicit Game Over menu,
+  - Retry uses checkpoint flow.
+- Stage Clear flow:
+  - Adam defeat opens `MISSION COMPLETE`,
+  - old canvas `STAGE CLEAR TODO` overlay removed,
+  - existing Stage Clear safety behavior preserved.
+- Settings:
+  - `UEvaSettingsSaveGame` stores Master/BGM/SFX volume, mouse sensitivity, invert Y, and placeholder window/resolution/quality fields.
+  - Settings widget applies mouse sensitivity and invert Y immediately.
+- Audio:
+  - minimal procedural UI tones for clicks and major menu events.
+  - Gameplay/BGM/enemy/boss audio remains TODO.
+- HUD:
+  - normal HUD reduced to gameplay essentials,
+  - detailed debug HUD moved behind F9/N toggle,
+  - gameplay HUD hidden in Title/Loading.
+- Tests:
+  - Added title blocking combat,
+  - new-game terminal-state reset,
+  - retry clears game over,
+  - settings default range tests.
+
+### Important files
+
+- `Source/AdaptiveHorror/Core/EvaGameFlowTypes.h`
+- `Source/AdaptiveHorror/Core/EvaSettingsSaveGame.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.h`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+
+### Next highest-priority task
+
+Run a real PIE manual verification pass for the new UI flow. Do not add new AI/enemy content until this is confirmed.
+
+Recommended PIE script:
+
+1. Launch PIE.
+2. Confirm title screen appears and cursor is visible.
+3. Click `SETTINGS`, adjust mouse sensitivity / invert Y, Back.
+4. Click `NEW GAME`.
+5. Confirm cursor hides, FPS movement and shooting work, HUD appears, initial zombie spawns.
+6. Press `Esc`.
+7. Confirm Pause menu appears once; Resume works; Esc again does not duplicate widgets.
+8. Open Settings from Pause, return to Pause, Resume.
+9. Force or receive player death.
+10. Confirm Game Over menu appears and Retry restores checkpoint safely.
+11. Press F4, defeat Adam, confirm `MISSION COMPLETE` menu appears.
+12. Return to Title.
+13. Start a second New Game and confirm no stale Adam / HUNTER / Stage Clear / Game Over / telemetry state remains.
+14. Confirm UI tones are audible where expected.
+
+### If issues are found
+
+- If input remains blocked after New Game/Resume, inspect `AEvaPlayerController::ApplyGameplayInputMode()` and `AEvaPrototypeGameMode::SetGameFlowState()`.
+- If widgets duplicate, inspect `CloseAllMenus()`, `RemoveWidget()`, and the relevant `Show*Menu()` method.
+- If combat spawns during Title, inspect `StartCombatSpawningAfterNavigationReady()` and `IsGameplayActive()`.
+- If Stage Clear and Game Over overlap, preserve the existing Stage Clear / Player Death priority rules; fix only the path that violates them.
+- If UI audio is silent, inspect `AEvaPlayerController::PlayTone()` and platform audio initialization; do not mark gameplay audio complete yet.
+
+### Completion condition for next pass
+
+- User confirms the complete Title -> New Game -> Pause -> Game Over/Retry -> Adam defeat -> Stage Clear -> Return to Title -> second New Game loop in PIE.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- `DEV_LOG.md`, `TODO.md`, `BUILD_CHECK.md`, and `NEXT_PROMPT.md` are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-12 Cycle 013
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
