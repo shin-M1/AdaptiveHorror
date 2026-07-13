@@ -590,4 +590,66 @@ bool FEvaSettingsSaveDefaultsTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaHorrorBlackoutFlowGuardTest,
+    "AdaptiveHorror.Horror.BlackoutFlowGuard",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaHorrorBlackoutFlowGuardTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPrototypeGameMode* GameMode = World->SpawnActor<AEvaPrototypeGameMode>();
+    TestNotNull(TEXT("GameMode spawns for blackout guard test"), GameMode);
+    if (!GameMode)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    GameMode->EnterTitleMode();
+    GameMode->TriggerBlackout(1.0f, true);
+    TestFalse(TEXT("Blackout does not start in Title flow"), GameMode->IsBlackoutActive());
+
+    GameMode->StartNewGameFlow();
+    GameMode->TriggerBlackout(1.0f, true);
+    TestTrue(TEXT("Blackout can start during active gameplay"), GameMode->IsBlackoutActive());
+    TestTrue(TEXT("Blackout exposes a clamped overlay intensity"),
+        GameMode->GetBlackoutOverlayIntensity() >= 0.0f && GameMode->GetBlackoutOverlayIntensity() <= 1.0f);
+
+    GameMode->HandleStageClear();
+    TestFalse(TEXT("Stage Clear stops active blackout"), GameMode->IsBlackoutActive());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaPlayerHorrorFeedbackClampTest,
+    "AdaptiveHorror.Horror.PlayerFeedbackClamp",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaPlayerHorrorFeedbackClampTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+    TestNotNull(TEXT("Player spawns for horror feedback test"), Player);
+    if (!Player)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Player->TriggerDamageFeedback(999.0f);
+    TestTrue(TEXT("Damage feedback intensity is clamped"),
+        Player->GetDamageFeedbackIntensity() >= 0.0f && Player->GetDamageFeedbackIntensity() <= 1.0f);
+    TestTrue(TEXT("Low-health vignette intensity is clamped"),
+        Player->GetLowHealthVignetteIntensity() >= 0.0f && Player->GetLowHealthVignetteIntensity() <= 1.0f);
+
+    Player->SetFlashlightEnabled(false);
+    TestFalse(TEXT("Flashlight state can be disabled"), Player->IsFlashlightEnabled());
+    Player->SetFlashlightEnabled(true);
+    TestTrue(TEXT("Flashlight state can be enabled"), Player->IsFlashlightEnabled());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
 #endif

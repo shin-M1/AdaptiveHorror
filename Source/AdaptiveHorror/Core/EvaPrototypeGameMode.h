@@ -9,9 +9,14 @@
 
 class AEvaPlayerCharacter;
 class AEvaHunterCharacter;
+class AEvaAdamBossCharacter;
 class AEvaResearchFacilityDirector;
 class AEvaZombieCharacter;
+class UDirectionalLightComponent;
+class UExponentialHeightFogComponent;
 class UPrimitiveComponent;
+class UPointLightComponent;
+class USkyLightComponent;
 class UStaticMesh;
 
 UCLASS(Blueprintable)
@@ -158,8 +163,48 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Debug")
     bool IsRespawnScheduledForDebug() const;
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerBlackout(float Duration = 3.5f, bool bForce = false);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerHunterArrivalEffect(const FVector& ArrivalLocation);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerAdamEntranceEffect(AEvaAdamBossCharacter* Adam);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerAdamChargeEffect(AEvaAdamBossCharacter* Adam);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerAdamRoarEffect(AEvaAdamBossCharacter* Adam);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerAdamPhaseTwoEffect(AEvaAdamBossCharacter* Adam);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerDoorEffect(const FVector& Location, const FString& DoorLabel);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerPlayerDamageEffect(float DamageAmount);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    bool IsBlackoutActive() const { return bBlackoutActive; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    float GetBlackoutOverlayIntensity() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    float GetHorrorPulseIntensity() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    bool ShouldDisplayHorrorWarning() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    FString GetHorrorWarningText() const { return LastHorrorWarningText; }
+
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Prototype")
     bool bBuildRuntimeArena = true;
@@ -216,6 +261,15 @@ private:
         bool bRespawnTimerCreated) const;
     void PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) const;
     int32 CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, float Radius);
+    bool CanRunHorrorEffect(bool bAllowDuringPaused = false) const;
+    void BeginHorrorRuntimeEffects();
+    void StopHorrorRuntimeEffects(bool bRestoreLighting = true);
+    void UpdateEmergencyLightFlicker();
+    void RestoreHorrorLighting();
+    void EndBlackout();
+    void PlayAmbientPulse();
+    void SetHorrorWarning(const FString& Message, float Duration);
+    void SpawnRuntimeFog();
 
     UPROPERTY()
     TObjectPtr<UStaticMesh> RuntimeCubeMesh;
@@ -275,4 +329,36 @@ private:
 
     UPROPERTY()
     TArray<TObjectPtr<UPrimitiveComponent>> RuntimeFloorComponents;
+
+    UPROPERTY()
+    TObjectPtr<UDirectionalLightComponent> RuntimeDirectionalLightComponent;
+
+    UPROPERTY()
+    TObjectPtr<USkyLightComponent> RuntimeSkyLightComponent;
+
+    UPROPERTY()
+    TObjectPtr<UPointLightComponent> RuntimeMainPointLightComponent;
+
+    UPROPERTY()
+    TArray<TObjectPtr<UPointLightComponent>> RuntimeEmergencyLightComponents;
+
+    UPROPERTY()
+    TObjectPtr<UExponentialHeightFogComponent> RuntimeFogComponent;
+
+    TArray<float> RuntimeEmergencyLightBaseIntensities;
+    float RuntimeDirectionalLightBaseIntensity = 1.35f;
+    float RuntimeSkyLightBaseIntensity = 0.28f;
+    float RuntimeMainPointLightBaseIntensity = 4200.0f;
+    FTimerHandle EmergencyLightFlickerTimer;
+    FTimerHandle BlackoutTimer;
+    FTimerHandle AmbientPulseTimer;
+    bool bBlackoutActive = false;
+    float BlackoutEndTime = -1000.0f;
+    float HorrorPulseEndTime = -1000.0f;
+    float LastHorrorWarningTime = -1000.0f;
+    float HorrorWarningDuration = 0.0f;
+    FString LastHorrorWarningText;
+
+    UPROPERTY()
+    TWeakObjectPtr<AEvaAdamBossCharacter> LastAdamEntranceEffectActor;
 };

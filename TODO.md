@@ -573,3 +573,27 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] Confirm temporary UI/gameplay/enemy/boss tones are audible and not too loud.
 - [ ] Confirm emergency lighting is darker/readable and no unwanted “Lighting needs to be rebuilt” warning appears.
 - [ ] Confirm NavMesh / zombie chase / Stage Clear / Game Flow remain unchanged in PIE.
+## Cycle 017 clean TODO - Horror Immersion Pass 1
+
+- [x] Merge `feature/visual-audio-pass1` into `main` before starting this pass.
+- [x] Create and work on `feature/horror-immersion-pass1`.
+- [x] Add gameplay-only blackout effect.
+- [x] Add emergency-light flicker with `Eva.ReduceFlashing` comfort CVar.
+- [x] Add prototype flashlight on `F`.
+- [x] Add lightweight runtime fog.
+- [x] Add ambient pulse / breathing / damage feedback placeholders.
+- [x] Add HUNTER arrival cue.
+- [x] Add ADAM entrance / charge / roar / Phase 2 presentation cues.
+- [x] Add `Eva.DebugBlackout [seconds]` debug command.
+- [x] Keep Title / Pause / Game Over / Stage Clear protected from horror overlays.
+- [x] Add Automation coverage for blackout flow guard and player feedback clamps.
+- [x] Development Editor / Win64 build without Live Coding succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded with 25 project tests.
+- [x] Runtime smoke succeeded with NullRHI / NoSound.
+- [ ] PIE visual confirmation: blackout readability and restore.
+- [ ] PIE visual confirmation: emergency flicker comfort and `Eva.ReduceFlashing`.
+- [ ] PIE visual confirmation: flashlight usefulness.
+- [ ] PIE visual confirmation: fog does not obscure gameplay too much.
+- [ ] PIE visual confirmation: damage flash / vignette / camera shake feel.
+- [ ] PIE audio confirmation: ambient pulse and Adam/HUNTER cues are audible but not overpowering.
+- [ ] PIE regression check: existing zombie/HUNTER/ADAM/Stage Clear/Game Over flow remains stable.

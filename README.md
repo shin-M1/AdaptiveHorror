@@ -1,5 +1,16 @@
 # Adaptive Horror FPS Demo
 
+## Horror immersion pass controls - Cycle 017
+
+Gameplay controls now include:
+
+- `F`: toggle prototype flashlight.
+- `Eva.DebugBlackout [seconds]`: console command for a short blackout while gameplay is active.
+- `Eva.ReduceFlashing 1`: reduce emergency-light flicker intensity.
+- `Eva.ReduceCameraShake 1`: reduce prototype horror camera shake.
+
+Existing debug keys remain unchanged: F1 analysis, F2 HUNTER, F3 wave, F4 ADAM arena, F5 restore, F6 Stage Clear, F7 telemetry, F9/N debug HUD/nav.
+
 ## Current Slice — Cycle 003
 
 Runtime生成の研究施設Grayboxが6区画構成になりました。

@@ -6,6 +6,7 @@
 #include "Components/EvaHealthComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -13,6 +14,7 @@
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
@@ -25,7 +27,7 @@
 
 AEvaPlayerCharacter::AEvaPlayerCharacter()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
 
     GetCapsuleComponent()->InitCapsuleSize(42.0f, 92.0f);
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
@@ -34,6 +36,20 @@ AEvaPlayerCharacter::AEvaPlayerCharacter()
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(0.0f, 0.0f, 64.0f));
     FirstPersonCamera->bUsePawnControlRotation = true;
+    BaseCameraRelativeLocation = FirstPersonCamera->GetRelativeLocation();
+    BaseCameraRelativeRotation = FirstPersonCamera->GetRelativeRotation();
+
+    FlashlightComponent = CreateDefaultSubobject<USpotLightComponent>(TEXT("FlashlightComponent"));
+    FlashlightComponent->SetupAttachment(FirstPersonCamera);
+    FlashlightComponent->SetMobility(EComponentMobility::Movable);
+    FlashlightComponent->SetRelativeLocation(FVector(28.0f, 0.0f, -6.0f));
+    FlashlightComponent->SetRelativeRotation(FRotator::ZeroRotator);
+    FlashlightComponent->SetIntensity(5600.0f);
+    FlashlightComponent->SetAttenuationRadius(1900.0f);
+    FlashlightComponent->SetInnerConeAngle(15.0f);
+    FlashlightComponent->SetOuterConeAngle(32.0f);
+    FlashlightComponent->SetLightColor(FLinearColor(0.82f, 0.90f, 1.0f));
+    FlashlightComponent->SetVisibility(false);
 
     bUseControllerRotationPitch = false;
     bUseControllerRotationRoll = false;
@@ -62,6 +78,8 @@ void AEvaPlayerCharacter::PostInitializeComponents()
 void AEvaPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    BaseCameraRelativeLocation = FirstPersonCamera ? FirstPersonCamera->GetRelativeLocation() : FVector(0.0f, 0.0f, 64.0f);
+    BaseCameraRelativeRotation = FirstPersonCamera ? FirstPersonCamera->GetRelativeRotation() : FRotator::ZeroRotator;
     if (HealthComponent)
     {
         HealthComponent->OnDeath.AddDynamic(this, &AEvaPlayerCharacter::HandleDeath);
@@ -76,6 +94,46 @@ void AEvaPlayerCharacter::BeginPlay()
     }
     AddRuntimeInputMapping();
     SpawnStarterWeapon();
+    UpdateFlashlightVisibility();
+    if (GetWorld())
+    {
+        GetWorldTimerManager().SetTimer(BreathingTimer, this, &AEvaPlayerCharacter::PlayBreathingPulse,
+            2.15f, true, 1.25f);
+    }
+}
+
+void AEvaPlayerCharacter::Tick(const float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    UpdateFlashlightVisibility();
+    if (!FirstPersonCamera)
+    {
+        return;
+    }
+
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    const bool bGameplay = IsGameplayInputAllowed();
+    const bool bReduceShake = IConsoleManager::Get().FindConsoleVariable(TEXT("Eva.ReduceCameraShake")) &&
+        IConsoleManager::Get().FindConsoleVariable(TEXT("Eva.ReduceCameraShake"))->GetInt() != 0;
+    if (!bGameplay || Now >= CameraShakeEndTime || CameraShakeIntensity <= 0.0f || bReduceShake)
+    {
+        FirstPersonCamera->SetRelativeLocation(BaseCameraRelativeLocation);
+        FirstPersonCamera->SetRelativeRotation(BaseCameraRelativeRotation);
+        return;
+    }
+
+    const float Alpha = FMath::Clamp((CameraShakeEndTime - Now) / 0.45f, 0.0f, 1.0f);
+    const float Scale = CameraShakeIntensity * Alpha;
+    const FVector Offset(0.0f,
+        FMath::Sin(Now * 49.0f) * 1.8f * Scale,
+        FMath::Sin(Now * 67.0f) * 2.6f * Scale);
+    const FRotator RotationOffset(
+        FMath::Sin(Now * 43.0f) * 0.45f * Scale,
+        0.0f,
+        FMath::Sin(Now * 59.0f) * 0.85f * Scale);
+    FirstPersonCamera->SetRelativeLocation(BaseCameraRelativeLocation + Offset);
+    FirstPersonCamera->SetRelativeRotation(BaseCameraRelativeRotation + RotationOffset);
 }
 
 void AEvaPlayerCharacter::PawnClientRestart()
@@ -86,6 +144,10 @@ void AEvaPlayerCharacter::PawnClientRestart()
 
 void AEvaPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(BreathingTimer);
+    }
     if (const APlayerController* PlayerController = Cast<APlayerController>(GetController()))
     {
         if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
@@ -134,6 +196,11 @@ void AEvaPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
         if (ReloadAction)
         {
             EnhancedInput->BindAction(ReloadAction, ETriggerEvent::Started, this, &AEvaPlayerCharacter::ReloadWeapon);
+        }
+        if (FlashlightAction)
+        {
+            EnhancedInput->BindAction(FlashlightAction, ETriggerEvent::Started, this,
+                &AEvaPlayerCharacter::ToggleFlashlightInput);
         }
 #if !UE_BUILD_SHIPPING
         if (DebugIncreaseAnalysisAction)
@@ -206,6 +273,11 @@ float AEvaPlayerCharacter::TakeDamage(const float DamageAmount, const FDamageEve
         TelemetryComponent->RecordDamageTaken(DamageAmount, LastDamageCause);
     }
     UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 146.8f, 0.12f, 0.42f);
+    TriggerDamageFeedback(DamageAmount);
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->TriggerPlayerDamageEffect(DamageAmount);
+    }
     return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 }
 
@@ -233,10 +305,110 @@ void AEvaPlayerCharacter::ResetForCheckpoint(const FTransform& CheckpointTransfo
     }
     SetActorEnableCollision(true);
     LastDamageCause = TEXT("Unknown");
+    ResetHorrorFeedback();
     if (CurrentWeapon)
     {
         CurrentWeapon->ResetForRespawn();
     }
+}
+
+void AEvaPlayerCharacter::TriggerCameraShakeFeedback(const float Intensity, const float Duration)
+{
+    if (!GetWorld() || !IsGameplayInputAllowed())
+    {
+        return;
+    }
+
+    const float ClampedIntensity = FMath::Clamp(Intensity, 0.0f, 1.0f);
+    const float ClampedDuration = FMath::Clamp(Duration, 0.05f, 1.6f);
+    CameraShakeIntensity = FMath::Max(CameraShakeIntensity, ClampedIntensity);
+    CameraShakeEndTime = FMath::Max(CameraShakeEndTime, GetWorld()->GetTimeSeconds() + ClampedDuration);
+}
+
+void AEvaPlayerCharacter::TriggerDamageFeedback(const float DamageAmount)
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    LastDamageFeedbackTime = GetWorld()->GetTimeSeconds();
+    LastDamageFeedbackScale = FMath::Clamp(DamageAmount / 35.0f, 0.2f, 1.0f);
+    TriggerCameraShakeFeedback(0.22f + LastDamageFeedbackScale * 0.32f, 0.25f + LastDamageFeedbackScale * 0.18f);
+}
+
+float AEvaPlayerCharacter::GetDamageFeedbackIntensity() const
+{
+    if (!GetWorld())
+    {
+        return 0.0f;
+    }
+
+    const float Age = GetWorld()->GetTimeSeconds() - LastDamageFeedbackTime;
+    if (Age < 0.0f || Age > DamageFeedbackDuration)
+    {
+        return 0.0f;
+    }
+
+    return FMath::Clamp(1.0f - Age / DamageFeedbackDuration, 0.0f, 1.0f) * LastDamageFeedbackScale;
+}
+
+float AEvaPlayerCharacter::GetLowHealthVignetteIntensity() const
+{
+    const float HealthPercent = HealthComponent ? HealthComponent->GetHealthPercent() : 1.0f;
+    return FMath::Clamp((0.55f - HealthPercent) / 0.55f, 0.0f, 1.0f);
+}
+
+void AEvaPlayerCharacter::SetFlashlightEnabled(const bool bEnabled)
+{
+    bFlashlightEnabled = bEnabled;
+    UpdateFlashlightVisibility();
+}
+
+void AEvaPlayerCharacter::ToggleFlashlight()
+{
+    SetFlashlightEnabled(!bFlashlightEnabled);
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, bFlashlightEnabled ? 620.0f : 240.0f, 0.045f, 0.22f);
+}
+
+void AEvaPlayerCharacter::UpdateFlashlightVisibility()
+{
+    if (!FlashlightComponent)
+    {
+        return;
+    }
+
+    FlashlightComponent->SetVisibility(bFlashlightEnabled && IsGameplayInputAllowed(), true);
+}
+
+void AEvaPlayerCharacter::ResetHorrorFeedback()
+{
+    LastDamageFeedbackTime = -1000.0f;
+    LastDamageFeedbackScale = 0.0f;
+    CameraShakeEndTime = -1000.0f;
+    CameraShakeIntensity = 0.0f;
+    bIsSprinting = false;
+    bFlashlightEnabled = true;
+    if (FirstPersonCamera)
+    {
+        FirstPersonCamera->SetRelativeLocation(BaseCameraRelativeLocation);
+        FirstPersonCamera->SetRelativeRotation(BaseCameraRelativeRotation);
+    }
+    UpdateFlashlightVisibility();
+}
+
+void AEvaPlayerCharacter::PlayBreathingPulse()
+{
+    if (!IsGameplayInputAllowed() || IsDead())
+    {
+        return;
+    }
+
+    const float LowHealth = GetLowHealthVignetteIntensity();
+    const bool bUrgentBreathing = LowHealth > 0.35f || bIsSprinting;
+    const float Frequency = bUrgentBreathing ? FMath::Lerp(92.0f, 138.0f, LowHealth) : 72.0f;
+    const float Volume = bUrgentBreathing ? FMath::Lerp(0.08f, 0.20f, FMath::Max(LowHealth, bIsSprinting ? 0.45f : 0.0f)) : 0.035f;
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, Frequency, bUrgentBreathing ? 0.18f : 0.11f, Volume);
 }
 
 void AEvaPlayerCharacter::BuildRuntimeInputMapping()
@@ -253,6 +425,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     SprintAction = NewObject<UInputAction>(this, TEXT("IA_Sprint"));
     FireAction = NewObject<UInputAction>(this, TEXT("IA_Fire"));
     ReloadAction = NewObject<UInputAction>(this, TEXT("IA_Reload"));
+    FlashlightAction = NewObject<UInputAction>(this, TEXT("IA_Flashlight"));
 #if !UE_BUILD_SHIPPING
     DebugIncreaseAnalysisAction = NewObject<UInputAction>(this, TEXT("IA_Debug_EVAAnalysis"));
     DebugForceHunterAction = NewObject<UInputAction>(this, TEXT("IA_Debug_Hunter"));
@@ -270,6 +443,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     SprintAction->ValueType = EInputActionValueType::Boolean;
     FireAction->ValueType = EInputActionValueType::Boolean;
     ReloadAction->ValueType = EInputActionValueType::Boolean;
+    FlashlightAction->ValueType = EInputActionValueType::Boolean;
 #if !UE_BUILD_SHIPPING
     DebugIncreaseAnalysisAction->ValueType = EInputActionValueType::Boolean;
     DebugForceHunterAction->ValueType = EInputActionValueType::Boolean;
@@ -306,6 +480,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     RuntimeMappingContext->MapKey(SprintAction, EKeys::LeftShift);
     RuntimeMappingContext->MapKey(FireAction, EKeys::LeftMouseButton);
     RuntimeMappingContext->MapKey(ReloadAction, EKeys::R);
+    RuntimeMappingContext->MapKey(FlashlightAction, EKeys::F);
 #if !UE_BUILD_SHIPPING
     RuntimeMappingContext->MapKey(DebugIncreaseAnalysisAction, EKeys::F1);
     RuntimeMappingContext->MapKey(DebugForceHunterAction, EKeys::F2);
@@ -367,6 +542,7 @@ void AEvaPlayerCharacter::StartSprint()
 {
     if (IsGameplayInputAllowed())
     {
+        bIsSprinting = true;
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
         {
             MovementComponent->MaxWalkSpeed = SprintSpeed;
@@ -376,6 +552,7 @@ void AEvaPlayerCharacter::StartSprint()
 
 void AEvaPlayerCharacter::StopSprint()
 {
+    bIsSprinting = false;
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
         MovementComponent->MaxWalkSpeed = WalkSpeed;
@@ -408,6 +585,14 @@ void AEvaPlayerCharacter::ReloadWeapon()
     if (IsGameplayInputAllowed() && CurrentWeapon)
     {
         CurrentWeapon->StartReload();
+    }
+}
+
+void AEvaPlayerCharacter::ToggleFlashlightInput()
+{
+    if (IsGameplayInputAllowed())
+    {
+        ToggleFlashlight();
     }
 }
 

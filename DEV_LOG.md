@@ -1,5 +1,87 @@
 # Development Log
 
+## 2026-07-14 - Cycle 017: Horror Immersion Pass 1
+
+Branch: `feature/horror-immersion-pass1`
+
+### Scope
+
+- Merged the previously completed `feature/visual-audio-pass1` branch into `main` first, then created this feature branch from updated `main`.
+- Added horror presentation only: blackout, emergency flicker, flashlight, fog, ambient pulses, camera/damage overlays, door/zone cues, HUNTER arrival cue, and ADAM encounter cues.
+- No intentional changes were made to AI decision logic, NavMesh/path following, spawn rules, Stage Clear rules, player death flow, Boss HUD behavior, or enemy HP bar behavior.
+
+### Implemented
+
+- Runtime horror effects in `AEvaPrototypeGameMode`:
+  - Gameplay-only blackout with automatic light restore.
+  - Emergency light flicker with `Eva.ReduceFlashing`.
+  - Lightweight runtime fog for the graybox arena.
+  - HUNTER arrival warning/effect.
+  - ADAM entrance, charge, roar, and Phase 2 warnings/effects.
+  - Ambient pulse timer that is started/stopped with game flow transitions.
+  - `Eva.DebugBlackout [seconds]` console command for quick testing while gameplay is active.
+- Player feedback:
+  - Prototype flashlight toggled with `F`.
+  - Damage flash / low-health vignette intensity values for HUD.
+  - Optional prototype camera shake controlled by `Eva.ReduceCameraShake`.
+  - Breathing pulse placeholder while sprinting or low on HP.
+- HUD presentation:
+  - Gameplay-only blackout overlay, pulse vignette, damage flash, and centered horror warning text.
+  - Overlay is suppressed outside Playing state so Title / Pause / Game Over / Stage Clear remain protected.
+- Facility progression hooks:
+  - First-time zone transitions can trigger door cue / short blackout.
+  - ADAM encounter start triggers the entrance effect without changing encounter progression.
+- Tests:
+  - Added blackout game-flow guard coverage.
+  - Added player feedback clamp coverage.
+- README:
+  - Added `F`, `Eva.DebugBlackout`, `Eva.ReduceFlashing`, and `Eva.ReduceCameraShake` to the debug/control list.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.h`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `README.md`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 25 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+- `git diff --check`: run after documentation update before commit.
+
+### Not verified by Codex
+
+- PIE viewport confirmation of blackout timing, flicker comfort, flashlight readability, fog density, damage vignette feel, ambient audibility, and ADAM/HUNTER cue readability.
+- Audible balance, because smoke test used `-NoSound`.
+
+### Known risks / follow-up
+
+- Flicker and camera shake are deliberately prototype-level; use `Eva.ReduceFlashing 1` and `Eva.ReduceCameraShake 1` if the default effect feels too intense.
+- Runtime fog and overlay values should be tuned by actual PIE viewing because NullRHI cannot validate mood/readability.
+- UE startup logs contain engine/internal automation “error test” lines, but the `AdaptiveHorror` test session completed with exit code 0.
+
+### Next recommended task
+
+- In PIE on `feature/horror-immersion-pass1`, verify the horror effects only: blackout, emergency flicker, flashlight, fog, damage feedback, HUNTER arrival cue, ADAM charge/roar/Phase2 cue readability, and that existing game flow still behaves normally.
+
 ## 2026-07-14 - Cycle 016: Visual / Audio Pass 1
 
 Branch: `feature/visual-audio-pass1`

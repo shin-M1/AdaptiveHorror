@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "TimerManager.h"
 #include "EvaPlayerCharacter.generated.h"
 
 class AEvaWeaponBase;
@@ -12,6 +13,7 @@ class UEvaPlayerTelemetryComponent;
 class UInputAction;
 class UInputMappingContext;
 class UAIPerceptionStimuliSourceComponent;
+class USpotLightComponent;
 
 UCLASS(Blueprintable)
 class ADAPTIVEHORROR_API AEvaPlayerCharacter : public ACharacter
@@ -20,6 +22,7 @@ class ADAPTIVEHORROR_API AEvaPlayerCharacter : public ACharacter
 
 public:
     AEvaPlayerCharacter();
+    virtual void Tick(float DeltaSeconds) override;
 
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
         class AController* EventInstigator, AActor* DamageCauser) override;
@@ -51,6 +54,27 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Player")
     void ResetForCheckpoint(const FTransform& CheckpointTransform);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerCameraShakeFeedback(float Intensity = 0.35f, float Duration = 0.35f);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
+    void TriggerDamageFeedback(float DamageAmount);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    float GetDamageFeedbackIntensity() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Horror")
+    float GetLowHealthVignetteIntensity() const;
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Light")
+    void SetFlashlightEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Light")
+    void ToggleFlashlight();
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Light")
+    bool IsFlashlightEnabled() const { return bFlashlightEnabled; }
+
 protected:
     virtual void PostInitializeComponents() override;
     virtual void BeginPlay() override;
@@ -68,7 +92,11 @@ protected:
     void StopJump();
     void FireWeapon();
     void ReloadWeapon();
+    void ToggleFlashlightInput();
     void SpawnStarterWeapon();
+    void UpdateFlashlightVisibility();
+    void ResetHorrorFeedback();
+    void PlayBreathingPulse();
     void DebugIncreaseEvaAnalysis();
     void DebugForceHunterSpawn();
     void DebugForceZombieWave();
@@ -86,6 +114,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Player")
     TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Light")
+    TObjectPtr<USpotLightComponent> FlashlightComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Player")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -114,6 +145,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Weapon")
     TObjectPtr<AEvaWeaponBase> CurrentWeapon;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Light")
+    bool bFlashlightEnabled = true;
+
 private:
     UPROPERTY(Transient)
     TObjectPtr<UInputMappingContext> RuntimeMappingContext;
@@ -135,6 +169,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UInputAction> ReloadAction;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UInputAction> FlashlightAction;
 
     UPROPERTY(Transient)
     TObjectPtr<UInputAction> DebugIncreaseAnalysisAction;
@@ -161,4 +198,13 @@ private:
     TObjectPtr<UInputAction> DebugNavigationVisualizationAction;
 
     FName LastDamageCause = TEXT("Unknown");
+    bool bIsSprinting = false;
+    FVector BaseCameraRelativeLocation = FVector::ZeroVector;
+    FRotator BaseCameraRelativeRotation = FRotator::ZeroRotator;
+    float CameraShakeEndTime = -1000.0f;
+    float CameraShakeIntensity = 0.0f;
+    float LastDamageFeedbackTime = -1000.0f;
+    float DamageFeedbackDuration = 0.75f;
+    float LastDamageFeedbackScale = 0.0f;
+    FTimerHandle BreathingTimer;
 };

@@ -5,6 +5,8 @@
 #include "EvaHUD.generated.h"
 
 class UEvaBossHUDWidget;
+class AEvaPlayerCharacter;
+class AEvaPrototypeGameMode;
 
 UCLASS(Blueprintable)
 class ADAPTIVEHORROR_API AEvaHUD : public AHUD
@@ -22,6 +24,7 @@ protected:
 private:
     void EnsureBossHUDWidget();
     void UpdateBossHUD();
+    void DrawHorrorOverlay(const AEvaPlayerCharacter* Player, const AEvaPrototypeGameMode* GameMode);
 
     UPROPERTY()
     TObjectPtr<UEvaBossHUDWidget> BossHUDWidget;

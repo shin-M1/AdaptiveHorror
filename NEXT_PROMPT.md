@@ -1,5 +1,87 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 017 Horror Immersion Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/horror-immersion-pass1`.
+
+Do not merge this branch into `main` until the user visually confirms the horror presentation pass in PIE.
+
+### Current verified state
+
+- `feature/visual-audio-pass1` was merged into `main` before this branch was created.
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 25 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- PIE visual/audio verification is still required; Codex did not visually inspect the viewport or hear audio.
+
+### Most recent implementation
+
+- Horror effects:
+  - Gameplay-only blackout with light restore.
+  - Emergency light flicker with `Eva.ReduceFlashing`.
+  - Runtime fog for the graybox facility.
+  - Door/zone cue and short blackout on selected first-time zone entries.
+  - HUNTER arrival cue.
+  - ADAM entrance, charge, roar, and Phase 2 cues.
+- Player presentation:
+  - `F` toggles a prototype flashlight.
+  - Damage flash, low-health vignette, breathing pulse, and optional camera shake.
+  - `Eva.ReduceCameraShake` reduces prototype shake.
+- HUD:
+  - Gameplay-only blackout/pulse/damage overlay and centered horror warning text.
+  - Title / Pause / Game Over / Stage Clear are kept clear of horror overlays.
+- Debug / comfort:
+  - `Eva.DebugBlackout [seconds]`
+  - `Eva.ReduceFlashing 1`
+  - `Eva.ReduceCameraShake 1`
+- Tests:
+  - Blackout flow guard.
+  - Player feedback clamp test.
+
+### Next highest-priority task
+
+Run PIE and verify the horror-immersion pass only. Do not add new AI, enemies, weapons, maps, or rules. Do not rebalance gameplay unless a regression is directly caused by this branch.
+
+PIE checklist:
+
+1. Confirm Title / New Game / Pause / Game Over / Stage Clear still work.
+2. Confirm blackout triggers only during gameplay, restores lights, and does not remain stuck.
+3. Confirm `Eva.DebugBlackout 2` works during gameplay and is ignored outside gameplay.
+4. Confirm emergency flicker reads as alarm lighting and `Eva.ReduceFlashing 1` makes it calmer.
+5. Confirm flashlight toggle with `F` works and does not break input.
+6. Confirm fog improves mood without hiding objectives/enemies too much.
+7. Confirm damage flash/vignette/camera shake are readable but not excessive.
+8. Confirm HUNTER arrival warning/effect appears.
+9. Confirm ADAM entrance / charge / roar / Phase 2 cues are distinguishable.
+10. Confirm existing zombie chase, HUNTER, ADAM, Stage Clear, Game Over, and debug keys still work.
+
+If a problem is found:
+
+- Fix only the presentation regression.
+- Do not change NavMesh, path following, spawn rules, game flow, boss logic, or balance unless the horror presentation change directly caused the problem.
+
+### Important files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.h`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that the horror pass improves atmosphere without AI/gameflow regression.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 016 Visual / Audio Pass 1
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
