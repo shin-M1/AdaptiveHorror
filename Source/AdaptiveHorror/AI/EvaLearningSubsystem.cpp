@@ -150,6 +150,15 @@ void UEvaLearningSubsystem::DebugAddAnalysis(const float Amount)
 #endif
 }
 
+void UEvaLearningSubsystem::ResetLearning()
+{
+    AggregateTelemetry = FEvaTelemetrySnapshot();
+    LearningSpeedMultiplier = 1.0f;
+    ObservationMass = 0.0f;
+    HunterState = EEvaHunterState::Dormant;
+    HunterTier = 0;
+}
+
 float UEvaLearningSubsystem::GetEvaAnalysisRate() const
 {
     return FMath::Clamp(ObservationMass, 0.0f, 100.0f);

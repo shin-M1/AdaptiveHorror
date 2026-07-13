@@ -371,3 +371,41 @@ Manual PIE checks still required:
 4. Confirm no GAME OVER / checkpoint respawn starts after Stage Clear.
 5. Confirm look input remains available while movement/shooting are disabled.
 6. Confirm Boss HUD and enemy overhead HP bars hide after Stage Clear.
+
+## Cycle 014 execution result - core UI flow
+
+Date: 2026-07-14
+
+Commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" `
+  -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+Results:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Tests run: 21.
+  - Success: 21.
+  - Failures: 0.
+  - Latest automation log: `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke: exit code 0.
+  - `EvaPrototypeGameMode` loaded.
+  - Game flow transitioned `Loading -> Title`.
+- `git diff --check`: no whitespace errors; CRLF conversion warnings only.
+
+Notes:
+
+- UE5.8 commandlet launch still prints SDK validation warnings for non-Win64 platforms such as LinuxArm64 and VisionOS. Win64 is valid and the final build/test/runtime commands returned exit code 0.
+- PIE viewport confirmation is still required for visual menu layout, cursor/input modes, audible procedural UI tones, and the complete Title -> New Game -> Pause -> Game Over -> Stage Clear -> Title loop.

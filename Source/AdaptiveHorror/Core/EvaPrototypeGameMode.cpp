@@ -213,6 +213,7 @@ void AEvaPrototypeGameMode::BeginPlay()
         return;
     }
 
+    SetGameFlowState(EEvaGameFlowState::Title);
     RuntimeCubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
     LogRuntimeClassBindings();
     if (bBuildRuntimeArena)
@@ -228,7 +229,6 @@ void AEvaPrototypeGameMode::BeginPlay()
     else
     {
         bRuntimeNavigationReady = true;
-        StartCombatSpawningAfterNavigationReady();
     }
 }
 
@@ -240,30 +240,210 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
         return;
     }
 
-    if (bGameOver || !DeadPlayer || !GetWorld())
+    if (bGameOver || !DeadPlayer || !GetWorld() || GameFlowState != EEvaGameFlowState::Playing)
     {
-        LogPlayerDeathRequest(bGameOver ? TEXT("RejectedBecauseAlreadyGameOver") : TEXT("RejectedInvalidRequest"),
+        LogPlayerDeathRequest(bGameOver ? TEXT("RejectedBecauseAlreadyGameOver") : TEXT("RejectedInvalidRequestOrFlow"),
             DeadPlayer, false);
         return;
     }
 
     LogPlayerDeathRequest(TEXT("DeathRequest"), DeadPlayer, false);
+    SetGameFlowState(EEvaGameFlowState::PlayerDead);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
+    ClearStageClearTimers();
+    CleanupCombatActorsForFlowReset();
     if (APlayerController* PlayerController = Cast<APlayerController>(DeadPlayer->GetController()))
     {
+        PlayerController->ResetIgnoreMoveInput();
+        PlayerController->ResetIgnoreLookInput();
         PlayerController->SetIgnoreMoveInput(true);
         PlayerController->SetIgnoreLookInput(true);
+        if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(PlayerController))
+        {
+            EvaController->ShowGameOverMenu();
+        }
     }
-    ShowDebugStatusMessage(TEXT("GAME OVER - restoring last checkpoint..."), RespawnDelay);
+    ShowDebugStatusMessage(TEXT("GAME OVER - choose retry or return to title."), 6.0f);
     GetWorldTimerManager().ClearTimer(RespawnTimer);
-    GetWorldTimerManager().SetTimer(RespawnTimer, this, &AEvaPrototypeGameMode::RespawnPlayer, RespawnDelay, false);
-    LogPlayerDeathRequest(TEXT("RespawnTimerCreated"), DeadPlayer, true);
+    LogPlayerDeathRequest(TEXT("GameOverMenuCreated"), DeadPlayer, false);
 }
 
 void AEvaPrototypeGameMode::ActivateCheckpoint(const FTransform& CheckpointTransform)
 {
     LastCheckpointTransform = CheckpointTransform;
+}
+
+void AEvaPrototypeGameMode::EnterTitleMode()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    UGameplayStatics::SetGamePaused(GetWorld(), false);
+    UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+    ClearStageClearTimers();
+    CleanupCombatActorsForFlowReset();
+    bGameOver = false;
+    bStageClear = false;
+    PlayerAwaitingRespawn = nullptr;
+    bInitialZombieSpawned = false;
+    LastCheckpointTransform = FTransform(FRotator::ZeroRotator, FVector(-5650.0f, 0.0f, 160.0f));
+    if (CurrentDirector)
+    {
+        CurrentDirector->ResetForNewGame();
+    }
+
+    EnsurePrototypePlayer();
+    if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+    {
+        PlayerController->ResetIgnoreMoveInput();
+        PlayerController->ResetIgnoreLookInput();
+        PlayerController->SetIgnoreMoveInput(true);
+        PlayerController->SetIgnoreLookInput(true);
+        if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(PlayerController))
+        {
+            EvaController->ShowTitleMenu();
+        }
+    }
+
+    SetGameFlowState(EEvaGameFlowState::Title);
+}
+
+void AEvaPrototypeGameMode::StartNewGameFlow()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    UGameplayStatics::SetGamePaused(GetWorld(), false);
+    UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+    ClearStageClearTimers();
+    CleanupCombatActorsForFlowReset();
+
+    bGameOver = false;
+    bStageClear = false;
+    PlayerAwaitingRespawn = nullptr;
+    TotalZombieKills = 0;
+    HunterDefeatCount = 0;
+    HunterTierToSpawn = 1;
+    CurrentHunter = nullptr;
+    bInitialZombieSpawned = false;
+    FallbackMovementCount = 0;
+    StuckEnemyCount = 0;
+    LastSpawnResult = TEXT("New Game: no enemy spawn attempted yet.");
+    LastSpawnLocation = FVector::ZeroVector;
+    LastCheckpointTransform = FTransform(FRotator::ZeroRotator, FVector(-5650.0f, 0.0f, 160.0f));
+
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->ResetLearning();
+        }
+    }
+
+    if (CurrentDirector)
+    {
+        CurrentDirector->ResetForNewGame();
+    }
+
+    EnsurePrototypePlayer();
+    AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr);
+    if (Player)
+    {
+        Player->ResetForCheckpoint(LastCheckpointTransform);
+        if (UEvaPlayerTelemetryComponent* Telemetry = Player->GetTelemetryComponent())
+        {
+            Telemetry->ResetTelemetry();
+        }
+    }
+
+    if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
+    {
+        EvaController->CloseMenusForGameplay();
+        EvaController->ApplyGameplayInputMode();
+        EvaController->SaveAndApplySettings();
+    }
+
+    SetGameFlowState(EEvaGameFlowState::Playing);
+    StartCombatSpawningAfterNavigationReady();
+    ShowDebugStatusMessage(TEXT("NEW GAME - survive the research facility."), 4.0f);
+}
+
+void AEvaPrototypeGameMode::PauseGameFlow()
+{
+    if (!GetWorld() || GameFlowState != EEvaGameFlowState::Playing)
+    {
+        return;
+    }
+
+    SetGameFlowState(EEvaGameFlowState::Paused);
+    UGameplayStatics::SetGamePaused(GetWorld(), true);
+    if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
+    {
+        EvaController->ShowPauseMenu();
+    }
+}
+
+void AEvaPrototypeGameMode::ResumeGameFlow()
+{
+    if (!GetWorld() || GameFlowState != EEvaGameFlowState::Paused)
+    {
+        return;
+    }
+
+    UGameplayStatics::SetGamePaused(GetWorld(), false);
+    SetGameFlowState(EEvaGameFlowState::Playing);
+    if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
+    {
+        EvaController->CloseMenusForGameplay();
+        EvaController->ApplyGameplayInputMode();
+    }
+}
+
+void AEvaPrototypeGameMode::RetryFromCheckpointFlow()
+{
+    if (!GetWorld() || GameFlowState == EEvaGameFlowState::Title)
+    {
+        return;
+    }
+
+    UGameplayStatics::SetGamePaused(GetWorld(), false);
+    ClearStageClearTimers();
+    CleanupCombatActorsForFlowReset();
+    bGameOver = false;
+    bStageClear = false;
+    bInitialZombieSpawned = false;
+
+    AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr);
+    if (Player)
+    {
+        PlayerAwaitingRespawn = Player;
+    }
+    if (PlayerAwaitingRespawn)
+    {
+        RespawnPlayer();
+    }
+    else
+    {
+        SetGameFlowState(EEvaGameFlowState::Playing);
+    }
+    if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
+    {
+        EvaController->CloseMenusForGameplay();
+        EvaController->ApplyGameplayInputMode();
+    }
+    StartCombatSpawningAfterNavigationReady();
+}
+
+void AEvaPrototypeGameMode::ReturnToTitleFlow()
+{
+    EnterTitleMode();
 }
 
 void AEvaPrototypeGameMode::NotifyEnemyKilled(AEvaZombieCharacter* DeadEnemy)
@@ -325,6 +505,7 @@ void AEvaPrototypeGameMode::HandleStageClear()
         return;
     }
 
+    SetGameFlowState(EEvaGameFlowState::StageCleared);
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
@@ -338,6 +519,11 @@ void AEvaPrototypeGameMode::HandleStageClear()
     }
     LogStageClearState(TEXT("Begin"), ClearedEnemyAI, true);
     ShowDebugStatusMessage(TEXT("STAGE CLEAR - ADAM defeated."), 8.0f);
+    if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(
+        GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr))
+    {
+        EvaController->ShowStageClearMenu();
+    }
 }
 
 void AEvaPrototypeGameMode::RespawnPlayer()
@@ -366,6 +552,7 @@ void AEvaPrototypeGameMode::RespawnPlayer()
         PlayerController->SetControlRotation(LastCheckpointTransform.Rotator());
     }
     bGameOver = false;
+    SetGameFlowState(EEvaGameFlowState::Playing);
     PlayerAwaitingRespawn = nullptr;
     ShowDebugStatusMessage(TEXT("Checkpoint restored. Enemy aggro reset."), 3.0f);
 }
@@ -506,6 +693,7 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
     {
         if (UPointLightComponent* PointLightComponent = Cast<UPointLightComponent>(Light->GetLightComponent()))
         {
+            PointLightComponent->SetMobility(EComponentMobility::Movable);
             PointLightComponent->SetIntensity(25000.0f);
             PointLightComponent->SetAttenuationRadius(11000.0f);
         }
@@ -604,7 +792,8 @@ void AEvaPrototypeGameMode::LogRuntimeClassBindings() const
 
 void AEvaPrototypeGameMode::StartCombatSpawningAfterNavigationReady()
 {
-    if (!GetWorld() || !bRuntimeNavigationReady || bRuntimeNavigationFailed)
+    if (!GetWorld() || !bRuntimeNavigationReady || bRuntimeNavigationFailed ||
+        GameFlowState != EEvaGameFlowState::Playing)
     {
         return;
     }
@@ -1694,6 +1883,38 @@ void AEvaPrototypeGameMode::ClearStageClearTimers()
     GetWorldTimerManager().ClearTimer(HunterReinsertTimer);
 }
 
+void AEvaPrototypeGameMode::CleanupCombatActorsForFlowReset()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    for (TActorIterator<AEvaZombieCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaZombieCharacter* Enemy = *It;
+        if (Enemy)
+        {
+            Enemy->Destroy();
+        }
+    }
+    CurrentHunter = nullptr;
+}
+
+void AEvaPrototypeGameMode::SetGameFlowState(const EEvaGameFlowState NewState)
+{
+    if (GameFlowState == NewState)
+    {
+        return;
+    }
+
+    const EEvaGameFlowState OldState = GameFlowState;
+    GameFlowState = NewState;
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[GameFlow] %s -> %s"),
+        *UEnum::GetValueAsString(OldState),
+        *UEnum::GetValueAsString(GameFlowState));
+}
+
 void AEvaPrototypeGameMode::LogStageClearState(const FString& Context, const int32 ClearedEnemyAI,
     const bool bClearedTimers) const
 {
@@ -2014,6 +2235,7 @@ void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
 {
 #if !UE_BUILD_SHIPPING
     bNavigationDebugVisible = !bNavigationDebugVisible;
+    bDebugHUDVisible = !bDebugHUDVisible;
 
     if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
     {
@@ -2023,7 +2245,8 @@ void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
     }
 
     LogNavigationStatus(TEXT("DebugToggleNavigationVisualization"));
-    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9/N: Navigation visualization %s"),
+    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9/N: Debug HUD %s / Navigation visualization %s"),
+        bDebugHUDVisible ? TEXT("ON") : TEXT("OFF"),
         bNavigationDebugVisible ? TEXT("ON") : TEXT("OFF")), 4.0f);
 #endif
 }

@@ -39,6 +39,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Input")
     void SetInvertMouseY(bool bNewInvertMouseY) { bInvertMouseY = bNewInvertMouseY; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Input")
+    float GetMouseSensitivity() const { return MouseSensitivity; }
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Input")
+    void SetMouseSensitivity(float NewMouseSensitivity);
+
     UFUNCTION(BlueprintPure, Category = "EVA|Player")
     bool IsDead() const;
 
@@ -72,6 +78,8 @@ protected:
     void DebugPrintTelemetrySnapshot();
     void DebugToggleNavigationVisualization();
     bool IsStageClearActive() const;
+    bool IsGameplayInputAllowed() const;
+    bool IsLookInputAllowed() const;
 
     UFUNCTION()
     void HandleDeath(AActor* DeadActor);
@@ -96,6 +104,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Input")
     bool bInvertMouseY = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Input", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+    float MouseSensitivity = 1.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Weapon")
     TSubclassOf<AEvaWeaponBase> StarterWeaponClass;

@@ -31,6 +31,15 @@ void AEvaHUD::DrawHUD()
 
     UpdateBossHUD();
 
+    UWorld* World = GetWorld();
+    const AEvaPrototypeGameMode* GameMode = World ? World->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    if (GameMode &&
+        (GameMode->GetGameFlowState() == EEvaGameFlowState::Title ||
+            GameMode->GetGameFlowState() == EEvaGameFlowState::Loading))
+    {
+        return;
+    }
+
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(PlayerOwner->GetPawn());
     if (!Player)
     {
@@ -67,7 +76,6 @@ void AEvaHUD::DrawHUD()
     EEvaAdaptationDirective AdaptationDirective = EEvaAdaptationDirective::None;
     EEvaEvolutionType NextEvolution = EEvaEvolutionType::None;
     int32 HunterTier = 0;
-    UWorld* World = GetWorld();
     if (const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr)
     {
         if (const UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
@@ -134,19 +142,18 @@ void AEvaHUD::DrawHUD()
     DrawStat(FString::Printf(TEXT("HP: %.0f / %.0f"), Health->GetCurrentHealth(), Health->GetMaxHealth()));
     DrawStat(FString::Printf(TEXT("AMMO: %d / %d%s"), Weapon ? Weapon->GetAmmoInMagazine() : 0,
         Weapon ? Weapon->GetReserveAmmo() : 0, Weapon && Weapon->IsReloading() ? TEXT("  RELOADING") : TEXT("")));
-    DrawStat(FString::Printf(TEXT("KILLS: %d"), Stats.KillCount));
-    DrawStat(FString::Printf(TEXT("ACCURACY: %.1f%%"), Telemetry->GetAccuracy() * 100.0f));
-    DrawStat(FString::Printf(TEXT("HEADSHOTS: %.1f%%"), Telemetry->GetHeadshotRate() * 100.0f));
-    DrawStat(FString::Printf(TEXT("STYLE: %s"), *StyleText));
     DrawStat(FString::Printf(TEXT("EVA ANALYSIS: %.0f%%  x%.1f"), AnalysisRate, LearningMultiplier));
     DrawStat(FString::Printf(TEXT("EVA STAGE: %s"), *StageToString(AnalysisStage)));
-    DrawStat(FString::Printf(TEXT("EVA ADAPT: %s"), *DirectiveToString(AdaptationDirective)));
-    DrawStat(FString::Printf(TEXT("NEXT EVOLUTION: %s"), *EvolutionToString(NextEvolution)));
     DrawStat(FString::Printf(TEXT("HUNTER: %s  TIER %d"), *HunterStateToString(HunterState), HunterTier));
 
-    const AEvaPrototypeGameMode* GameMode = World ? World->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
-    if (GameMode)
+    if (GameMode && GameMode->IsDebugHUDVisible())
     {
+        DrawStat(FString::Printf(TEXT("KILLS: %d"), Stats.KillCount));
+        DrawStat(FString::Printf(TEXT("ACCURACY: %.1f%%"), Telemetry->GetAccuracy() * 100.0f));
+        DrawStat(FString::Printf(TEXT("HEADSHOTS: %.1f%%"), Telemetry->GetHeadshotRate() * 100.0f));
+        DrawStat(FString::Printf(TEXT("STYLE: %s"), *StyleText));
+        DrawStat(FString::Printf(TEXT("EVA ADAPT: %s"), *DirectiveToString(AdaptationDirective)));
+        DrawStat(FString::Printf(TEXT("NEXT EVOLUTION: %s"), *EvolutionToString(NextEvolution)));
         DrawStat(FString::Printf(TEXT("ACTIVE ZOMBIES: %d  HUNTERS: %d  ADAM: %d"),
             GameMode->GetActiveZombieCount(), GameMode->GetActiveHunterCount(), GameMode->GetActiveAdamCount()));
         DrawStat(FString::Printf(TEXT("SPAWN: %s"), *GameMode->GetLastSpawnResult()));
@@ -162,19 +169,16 @@ void AEvaHUD::DrawHUD()
     {
         DrawStat(FString::Printf(TEXT("ZONE: %s"), *Director->GetCurrentZoneName()));
         DrawStat(FString::Printf(TEXT("OBJECTIVE: %s"), *Director->GetObjectiveText()));
-        DrawStat(FString::Printf(TEXT("EVA LOGS: %d / 5"), Director->GetCollectedStoryLogCount()));
+        if (GameMode && GameMode->IsDebugHUDVisible())
+        {
+            DrawStat(FString::Printf(TEXT("EVA LOGS: %d / 5"), Director->GetCollectedStoryLogCount()));
+        }
     }
 
     const float CenterX = Canvas->ClipX * 0.5f;
     const float CenterY = Canvas->ClipY * 0.5f;
     DrawLine(CenterX - 8.0f, CenterY, CenterX + 8.0f, CenterY, FLinearColor::White, 1.5f);
     DrawLine(CenterX, CenterY - 8.0f, CenterX, CenterY + 8.0f, FLinearColor::White, 1.5f);
-
-    if (GameMode && GameMode->IsGameOver())
-    {
-        DrawText(TEXT("GAME OVER"), FLinearColor::Red, CenterX - 120.0f, CenterY - 40.0f, nullptr, 2.0f);
-        DrawText(TEXT("Restoring last checkpoint..."), FLinearColor::White, CenterX - 150.0f, CenterY + 15.0f);
-    }
 
     if (GameMode && GameMode->ShouldDisplayDebugStatusMessage())
     {
@@ -189,23 +193,6 @@ void AEvaHUD::DrawHUD()
         DrawText(FString::Printf(TEXT("EVA LOG: %s"), *Director->GetLastStoryLogTitle()),
             FLinearColor(0.4f, 0.9f, 1.0f), LogX, LogY, nullptr, 1.2f);
         DrawText(Director->GetLastStoryLogBody(), FLinearColor::White, LogX, LogY + 30.0f, nullptr, 0.95f);
-    }
-
-    if (GameMode && GameMode->IsStageClear())
-    {
-        const float ResultX = CenterX - 260.0f;
-        const float ResultY = CenterY - 150.0f;
-        DrawText(TEXT("STAGE CLEAR"), FLinearColor(0.3f, 1.0f, 0.45f), ResultX, ResultY, nullptr, 2.0f);
-        DrawText(FString::Printf(TEXT("Kills: %d"), Stats.KillCount), FLinearColor::White, ResultX, ResultY + 55.0f);
-        DrawText(FString::Printf(TEXT("Accuracy: %.1f%%"), Telemetry->GetAccuracy() * 100.0f),
-            FLinearColor::White, ResultX, ResultY + 80.0f);
-        DrawText(FString::Printf(TEXT("Headshot Rate: %.1f%%"), Telemetry->GetHeadshotRate() * 100.0f),
-            FLinearColor::White, ResultX, ResultY + 105.0f);
-        DrawText(FString::Printf(TEXT("EVA Analysis: %.0f%%"), AnalysisRate), FLinearColor::White, ResultX, ResultY + 130.0f);
-        DrawText(FString::Printf(TEXT("Hunter Defeats: %d"), GameMode->GetHunterDefeatCount()),
-            FLinearColor::White, ResultX, ResultY + 155.0f);
-        DrawText(FString::Printf(TEXT("Combat Style: %s"), *StyleText), FLinearColor::White, ResultX, ResultY + 180.0f);
-        DrawText(TEXT("TODO: Return to title / demo menu."), FLinearColor::Yellow, ResultX, ResultY + 215.0f);
     }
 }
 

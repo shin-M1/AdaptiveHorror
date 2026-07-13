@@ -51,6 +51,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Debug")
     void DebugAddAnalysis(float Amount);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Learning")
+    void ResetLearning();
+
     UFUNCTION(BlueprintPure, Category = "EVA|Learning")
     float GetLearningSpeedMultiplier() const { return LearningSpeedMultiplier; }
 

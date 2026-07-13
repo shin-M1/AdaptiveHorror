@@ -308,6 +308,24 @@ void AEvaResearchFacilityDirector::CompleteStage()
     }
 }
 
+void AEvaResearchFacilityDirector::ResetForNewGame()
+{
+    CurrentZone = EEvaFacilityZone::EntryLobby;
+    TriggeredZones.Reset();
+    TriggeredZones.Add(CurrentZone);
+    bEvaLogAcquired = false;
+    bEvolutionUnlocked = false;
+    bHunterEventTriggered = false;
+    bAdamEncounterActive = false;
+    bStageClear = false;
+    ActiveAdam = nullptr;
+    CollectedStoryLogs.Reset();
+    LastStoryLogTitle.Empty();
+    LastStoryLogBody.Empty();
+    LastStoryLogTime = -1000.0f;
+    SetObjectiveForZone(CurrentZone);
+}
+
 FString AEvaResearchFacilityDirector::GetCurrentZoneName() const
 {
     switch (CurrentZone)

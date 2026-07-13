@@ -84,6 +84,11 @@ void UEvaPlayerTelemetryComponent::RecordDamageTaken(const float DamageAmount, c
     }
 }
 
+void UEvaPlayerTelemetryComponent::ResetTelemetry()
+{
+    Telemetry = FEvaTelemetrySnapshot();
+}
+
 float UEvaPlayerTelemetryComponent::GetHeadshotRate() const
 {
     return Telemetry.HitCount > 0 ? static_cast<float>(Telemetry.HeadshotCount) / Telemetry.HitCount : 0.0f;

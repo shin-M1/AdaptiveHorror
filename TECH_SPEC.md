@@ -588,3 +588,138 @@ The HUD displays active zombie/hunter/ADAM counts, last spawn result, last spawn
 ### Movement Fallback
 
 NavMesh movement remains primary. Direct movement fallback is short-term only, includes nearby enemy separation, and aborts when a forward world-static trace is blocked.
+
+## Cycle 014 Core UI Flow Specification
+
+### Game flow state
+
+The prototype uses `EEvaGameFlowState`:
+
+- `Title`
+- `Playing`
+- `Paused`
+- `PlayerDead`
+- `StageCleared`
+- `Loading`
+
+`AEvaPrototypeGameMode` owns the authoritative flow state for the current runtime session.
+
+Key helpers:
+
+- `EnterTitleMode()`
+- `StartNewGameFlow()`
+- `PauseGameFlow()`
+- `ResumeGameFlow()`
+- `RetryFromCheckpointFlow()`
+- `ReturnToTitleFlow()`
+- `IsGameplayActive()`
+- `CanPlayerTakeDamage()`
+
+Combat spawning is gated so it starts only in `Playing`.
+
+### Widget structure
+
+Menu widgets are implemented in C++ in `EvaMenuWidgets`.
+
+- `UEvaTitleMenuWidget`
+- `UEvaPauseMenuWidget`
+- `UEvaGameOverWidget`
+- `UEvaStageClearWidget`
+- `UEvaSettingsWidget`
+
+`AEvaPlayerController` owns widget references as `UPROPERTY` pointers and centralizes:
+
+- widget creation/removal,
+- menu input mode,
+- gameplay input mode,
+- mouse cursor visibility,
+- settings load/save/apply,
+- UI event tones.
+
+Widgets call controller methods rather than directly mutating GameMode state.
+
+### Input and pause behavior
+
+- `Esc` is bound in `AEvaPlayerController::SetupInputComponent()`.
+- `Esc` toggles `PauseGameFlow()` / `ResumeGameFlow()` only from `Playing` or `Paused`.
+- Menus use `FInputModeGameAndUI` and visible cursor.
+- Gameplay uses `FInputModeGameOnly` and hidden cursor.
+- Player movement/fire/reload/jump check `AEvaPrototypeGameMode::IsGameplayActive()`.
+- Player damage checks `AEvaPrototypeGameMode::CanPlayerTakeDamage()`.
+
+### New Game reset responsibilities
+
+`StartNewGameFlow()` resets:
+
+- Game Over / Stage Clear flags.
+- combat timers.
+- active combat actors.
+- HUNTER tier/count/current pointer.
+- player checkpoint transform and player HP/ammo via checkpoint reset.
+- player telemetry.
+- EVA learning subsystem.
+- research facility director state.
+- spawn/debug counters relevant to the session.
+
+### HUD split
+
+`AEvaHUD` now treats normal HUD and debug HUD separately.
+
+Normal HUD:
+
+- HP.
+- Ammo.
+- EVA analysis/stage.
+- HUNTER state.
+- objective/zone.
+- crosshair.
+- Adam Boss HUD during Adam encounter.
+
+Debug HUD:
+
+- kills/accuracy/headshot rate/combat style.
+- adaptation/evolution recommendation.
+- active enemy counts.
+- spawn result/location.
+- NavMesh/debug/fallback/stuck counters.
+- EVA log count.
+
+Debug HUD is toggled with `F9` or `N`. `F8` remains intentionally unbound because PIE uses it for Eject.
+
+### Settings save
+
+`UEvaSettingsSaveGame` stores prototype settings in slot `EvaPrototypeSettings`.
+
+Applied now:
+
+- Mouse sensitivity.
+- Invert Mouse Y.
+- Master/SFX volume multiplier for procedural UI tones.
+
+Stored for future application:
+
+- BGM volume.
+- Fullscreen/windowed.
+- Resolution.
+- Graphics quality.
+
+### Audio foundation
+
+No external sound assets are required for Cycle 014.
+
+`AEvaPlayerController::PlayTone()` creates short procedural `USoundWaveProcedural` UI tones for:
+
+- button click,
+- title/menu event,
+- pause,
+- game over,
+- stage clear.
+
+Gameplay, enemy, HUNTER, Adam, ambience, and BGM sound events remain TODO and should be implemented with replaceable assets/components later.
+
+### Verification status
+
+- Development Editor / Win64 build: succeeded.
+- Automation RunTests `AdaptiveHorror`: 21 succeeded, 0 failed.
+- Runtime smoke: succeeded; flow reached `Title`.
+- PIE visual/audio confirmation is still required.
