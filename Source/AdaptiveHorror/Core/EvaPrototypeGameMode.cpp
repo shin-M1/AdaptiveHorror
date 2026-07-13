@@ -19,6 +19,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/SkyLight.h"
 #include "Engine/PointLight.h"
 #include "Engine/StaticMesh.h"
@@ -66,6 +67,18 @@ namespace
     FString BoolText(const bool bValue)
     {
         return bValue ? TEXT("true") : TEXT("false");
+    }
+
+    FString NetModeToText(const ENetMode NetMode)
+    {
+        switch (NetMode)
+        {
+        case NM_Standalone: return TEXT("Standalone");
+        case NM_DedicatedServer: return TEXT("DedicatedServer");
+        case NM_ListenServer: return TEXT("ListenServer");
+        case NM_Client: return TEXT("Client");
+        default: return TEXT("Unknown");
+        }
     }
 
     FString SpawnCollisionHandlingToText(const ESpawnActorCollisionHandlingMethod Method)
@@ -295,7 +308,10 @@ void AEvaPrototypeGameMode::EnterTitleMode()
         CurrentDirector->ResetForNewGame();
     }
 
+    SetGameFlowState(EEvaGameFlowState::Title);
     EnsurePrototypePlayer();
+    bool bTitleWidgetVisible = false;
+    bool bTitleWidgetRequired = false;
     if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
     {
         PlayerController->ResetIgnoreMoveInput();
@@ -304,11 +320,18 @@ void AEvaPrototypeGameMode::EnterTitleMode()
         PlayerController->SetIgnoreLookInput(true);
         if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(PlayerController))
         {
-            EvaController->ShowTitleMenu();
+            bTitleWidgetRequired = EvaController->IsLocalController();
+            bTitleWidgetVisible = EvaController->ShowTitleMenu();
         }
     }
 
-    SetGameFlowState(EEvaGameFlowState::Title);
+    if (bTitleWidgetRequired && !bTitleWidgetVisible)
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[TitleUI] FailureFallback=StartNewGameFlow Reason=Title widget was not visible after EnterTitleMode."));
+        ShowDebugStatusMessage(TEXT("TITLE UI ERROR: Falling back to playable mode."), 6.0f);
+        StartNewGameFlow();
+    }
 }
 
 void AEvaPrototypeGameMode::StartNewGameFlow()
@@ -370,6 +393,15 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Playing);
+    APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+    APawn* PossessedPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[Player] Context=StartNewGameFlow PossessedPawn=%s PossessedPawnName=%s Controller=%s CharacterMovementEnabled=%s"),
+        PossessedPawn ? *PossessedPawn->GetClass()->GetName() : TEXT("None"),
+        PossessedPawn ? *PossessedPawn->GetName() : TEXT("None"),
+        PlayerController ? *PlayerController->GetClass()->GetName() : TEXT("None"),
+        Player && Player->GetCharacterMovement() && Player->GetCharacterMovement()->MovementMode != MOVE_None ?
+            TEXT("true") : TEXT("false"));
     StartCombatSpawningAfterNavigationReady();
     ShowDebugStatusMessage(TEXT("NEW GAME - survive the research facility."), 4.0f);
 }
@@ -1903,16 +1935,32 @@ void AEvaPrototypeGameMode::CleanupCombatActorsForFlowReset()
 
 void AEvaPrototypeGameMode::SetGameFlowState(const EEvaGameFlowState NewState)
 {
-    if (GameFlowState == NewState)
+    const EEvaGameFlowState OldState = GameFlowState;
+    if (GameFlowState != NewState)
     {
-        return;
+        GameFlowState = NewState;
     }
 
-    const EEvaGameFlowState OldState = GameFlowState;
-    GameFlowState = NewState;
-    UE_LOG(LogAdaptiveHorror, Log, TEXT("[GameFlow] %s -> %s"),
+    UWorld* World = GetWorld();
+    const APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+    const AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(PlayerController);
+    const APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+    const ULocalPlayer* LocalPlayer = EvaController ? EvaController->GetLocalPlayer() : nullptr;
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[GameFlow] PreviousState=%s CurrentState=%s WorldName=%s NetMode=%s GameModeClass=%s PlayerControllerClass=%s PlayerControllerValid=%s LocalController=%s LocalPlayerValid=%s Pawn=%s PossessedPawn=%s Unchanged=%s"),
         *UEnum::GetValueAsString(OldState),
-        *UEnum::GetValueAsString(GameFlowState));
+        *UEnum::GetValueAsString(GameFlowState),
+        World ? *World->GetName() : TEXT("None"),
+        World ? *NetModeToText(World->GetNetMode()) : TEXT("NoWorld"),
+        *GetClass()->GetName(),
+        PlayerControllerClass ? *PlayerControllerClass->GetName() : TEXT("None"),
+        PlayerController ? TEXT("true") : TEXT("false"),
+        PlayerController && PlayerController->IsLocalController() ? TEXT("true") : TEXT("false"),
+        LocalPlayer ? TEXT("true") : TEXT("false"),
+        Pawn ? *Pawn->GetClass()->GetName() : TEXT("None"),
+        Pawn ? *Pawn->GetName() : TEXT("None"),
+        OldState == NewState ? TEXT("true") : TEXT("false"));
 }
 
 void AEvaPrototypeGameMode::LogStageClearState(const FString& Context, const int32 ClearedEnemyAI,

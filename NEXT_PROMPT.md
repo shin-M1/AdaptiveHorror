@@ -1,5 +1,112 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 015 Title widget display / PIE input flow
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 21 tests succeeded, 0 failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke log confirms Title UI is now actually created and added to the viewport:
+  - `CurrentState=EEvaGameFlowState::Title`
+  - `TitleWidgetClassValid=true`
+  - `CreateWidgetResult=true`
+  - `RootWidgetValid=true`
+  - `AddToViewportAttempted=true`
+  - `IsInViewport=true`
+  - `Visibility=ESlateVisibility::Visible`
+  - `RenderOpacity=1.00`
+  - `NativeConstructCalled=true`
+  - `FocusAssigned=true`
+  - `InputMode=GameAndUI`
+  - `ShowMouseCursor=true`
+  - `IgnoreMoveInput=true`
+  - `IgnoreLookInput=true`
+- PIE visual verification is still required; Codex did not visually inspect the viewport.
+
+### Most recent fix
+
+Fixed the bug where PIE entered Title state with cursor visible but no title text/buttons appeared, leaving the player unable to click NEW GAME or control the pawn.
+
+Root cause:
+
+- C++ menu widgets were creating `WidgetTree->RootWidget` in `NativeConstruct()`.
+- For native C++ `UUserWidget` classes, this can be too late because Slate rebuild has already happened.
+- Result: flow/input entered Title, but the actual displayed widget could be empty.
+
+Fix:
+
+- `UEvaMenuWidgetBase::RebuildWidget()` now builds the native WidgetTree before Slate rebuild completes.
+- Title/Pause/GameOver/StageClear/Settings menus now build content through `BuildMenuContent()`.
+- Primary menu buttons get initial focus.
+- Title/Settings input explicitly blocks gameplay input.
+- Added rich diagnostics:
+  - `[GameFlow]`
+  - `[TitleUI]`
+  - `[InputState]`
+  - `[Player]`
+- Added a Development fallback: if a local PlayerController exists and Title UI still fails to become visible, the game logs an error and falls back to `StartNewGameFlow()` so PIE is not trapped in an unusable state.
+
+### Next highest-priority task
+
+Run PIE and verify the title screen visually.
+
+PIE checklist:
+
+1. Press Play.
+2. Confirm title text/buttons are visible:
+   - `ADAPTIVE HORROR`
+   - `NEW GAME`
+   - `CONTINUE - Not Available`
+   - `SETTINGS`
+   - `EXIT`
+3. Confirm the log contains `[TitleUI] ... IsInViewport=true ... FailureReason=None`.
+4. Click `NEW GAME`.
+5. Confirm log contains `[GameFlow] ... CurrentState=EEvaGameFlowState::Playing`.
+6. Confirm log contains `[InputState] ... InputMode=GameOnly ShowMouseCursor=false IgnoreMoveInput=false IgnoreLookInput=false`.
+7. Confirm log contains `[Player] Context=StartNewGameFlow PossessedPawn=EvaPlayerCharacter`.
+8. Confirm WASD, mouse look, shooting, and Esc Pause all work after NEW GAME.
+
+If Title is still invisible:
+
+- Search for `[TitleUI]`.
+- Check:
+  - `TitleWidgetClassValid`
+  - `CreateWidgetResult`
+  - `RootWidgetValid`
+  - `AddToViewportAttempted`
+  - `IsInViewport`
+  - `Visibility`
+  - `RenderOpacity`
+  - `NativeConstructCalled`
+  - `FocusAssigned`
+  - `LocalPlayerValid`
+  - `GameViewportClientValid`
+  - `FailureReason`
+- Fix only the failing field.
+- Do not add new UI features until Title -> NEW GAME is confirmed.
+
+### Important files
+
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.h`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+
+### Completion condition for next pass
+
+- User confirms in PIE that Title UI is visible and NEW GAME restores gameplay input.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Logs and docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 014 Core game UI flow
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

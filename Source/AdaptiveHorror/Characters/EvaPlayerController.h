@@ -20,7 +20,7 @@ class ADAPTIVEHORROR_API AEvaPlayerController : public APlayerController
 
 public:
     UFUNCTION(BlueprintCallable, Category = "EVA|UI")
-    void ShowTitleMenu();
+    bool ShowTitleMenu();
 
     UFUNCTION(BlueprintCallable, Category = "EVA|UI")
     void ShowPauseMenu();
@@ -60,6 +60,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Input")
     void ApplyMenuInputMode(bool bPauseGameInput = true);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|UI")
+    bool IsTitleMenuVisibleForDebug() const;
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Settings")
     void SaveAndApplySettings();
@@ -119,6 +122,9 @@ private:
     void RemoveWidget(UUserWidget* Widget);
     void LoadSettings();
     void ApplySettingsToPlayer() const;
+    void LogInputState(const FString& Context) const;
+    void LogTitleUIState(const FString& Context, bool bCreateWidgetAttempted, bool bAddToViewportAttempted,
+        bool bFocusAssigned, const FString& FailureReason) const;
     void PlayTone(float Frequency, float Duration, float VolumeScale) const;
     void PlayUIClick() const;
     void PlayUIEvent(float Frequency, float Duration, float VolumeScale) const;
@@ -140,6 +146,8 @@ private:
 
     UPROPERTY()
     TObjectPtr<UEvaSettingsSaveGame> SettingsSave;
+
+    FString LastAppliedInputMode = TEXT("Unset");
 
     static const FString SettingsSlotName;
     static constexpr int32 SettingsUserIndex = 0;

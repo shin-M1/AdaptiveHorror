@@ -1428,3 +1428,101 @@ Run a real PIE pass focused only on UI flow:
 4. Kill the player -> Game Over -> Retry.
 5. Press F4, defeat Adam -> Stage Clear -> Return to Title.
 6. Start a second New Game and confirm no old Stage Clear / Adam / HUNTER state remains.
+
+## 2026-07-14 - Cycle 015 Title widget display / PIE input flow fix
+
+### Problem
+
+User PIE verification showed:
+
+- Gameplay field appeared.
+- Mouse cursor appeared.
+- No title text/buttons were visible.
+- Esc, mouse look, WASD, and shooting did not work.
+- Log only showed `Loading -> Title`; there were no widget/input diagnostics.
+
+Most likely state was:
+
+`Loading -> Title -> menu input lock -> title widget not rendered -> NEW GAME unreachable`.
+
+### Root cause
+
+The C++ menu widgets built their `WidgetTree->RootWidget` inside `NativeConstruct()`. For C++-only `UUserWidget` classes this can happen after the Slate widget has already been rebuilt, causing the viewport to contain an empty/null widget even though the flow state and mouse cursor look correct.
+
+### Fix
+
+- Moved native menu tree creation into `UEvaMenuWidgetBase::RebuildWidget()`.
+- Added `UEvaMenuWidgetBase` debug helpers:
+  - `HasNativeMenuRoot()`
+  - `WasNativeConstructCalled()`
+  - `AssignInitialFocus()`
+- Assigned initial focus to the primary button on Title / Pause / Game Over / Stage Clear menus.
+- Changed Title and Settings input mode to block gameplay input explicitly.
+- Added detailed logs:
+  - `[GameFlow]` now includes previous/current state, world name, net mode, GameMode class, PlayerController validity/class, LocalController, LocalPlayer, Pawn, PossessedPawn, and unchanged state.
+  - `[TitleUI]` logs widget class, class validity, CreateWidget attempt/result, widget name, root validity, AddToViewport attempt, IsInViewport, visibility, render opacity, z-order, NativeConstruct, focus, LocalPlayer, viewport client, and failure reason.
+  - `[InputState]` logs mode, cursor, ignore move/look, pause, time dilation, controller, pawn, local controller, and LocalPlayer.
+  - `[Player]` logs possessed pawn and movement status after New Game.
+- Added Development fallback:
+  - if a local PlayerController exists and Title UI still fails to become visible, log an error and fall back to `StartNewGameFlow()` instead of trapping PIE in an unusable Title state.
+  - Controller-less automation worlds remain in Title and do not trigger the fallback.
+
+### Changed files
+
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.h`
+- `Source/AdaptiveHorror/UI/EvaMenuWidgets.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Build / test verification
+
+- Command:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+- Results:
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: 21 tests succeeded, 0 failures.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Result: exit code 0.
+  - Log confirms:
+    - `CurrentState=EEvaGameFlowState::Title`
+    - `TitleWidgetClassValid=true`
+    - `CreateWidgetResult=true`
+    - `RootWidgetValid=true`
+    - `AddToViewportAttempted=true`
+    - `IsInViewport=true`
+    - `Visibility=ESlateVisibility::Visible`
+    - `NativeConstructCalled=true`
+    - `FocusAssigned=true`
+    - `InputMode=GameAndUI`
+    - `ShowMouseCursor=true`
+    - `IgnoreMoveInput=true`
+    - `IgnoreLookInput=true`
+- `git diff --check`:
+  - passed with CRLF conversion warnings only.
+
+### PIE/manual verification status
+
+- Not visually confirmed by Codex:
+  - Title text and buttons are visible in PIE viewport.
+  - NEW GAME can be clicked and transitions to Playing.
+  - After NEW GAME, cursor hides and movement/look/shooting return.
+  - Esc works after Playing starts.
+
+### Next manual PIE pass
+
+1. Start PIE.
+2. Confirm `[TitleUI] ... IsInViewport=true ... FocusAssigned=true ... FailureReason=None`.
+3. Confirm title text/buttons are visible.
+4. Click `NEW GAME`.
+5. Confirm `[GameFlow] ... Title ... Playing`.
+6. Confirm `[InputState] ... InputMode=GameOnly ShowMouseCursor=false IgnoreMoveInput=false IgnoreLookInput=false`.
+7. Confirm `[Player] ... PossessedPawn=EvaPlayerCharacter`.
+8. Verify movement, look, shooting, and Esc Pause.

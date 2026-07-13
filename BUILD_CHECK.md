@@ -409,3 +409,53 @@ Notes:
 
 - UE5.8 commandlet launch still prints SDK validation warnings for non-Win64 platforms such as LinuxArm64 and VisionOS. Win64 is valid and the final build/test/runtime commands returned exit code 0.
 - PIE viewport confirmation is still required for visual menu layout, cursor/input modes, audible procedural UI tones, and the complete Title -> New Game -> Pause -> Game Over -> Stage Clear -> Title loop.
+
+## Cycle 015 execution result - title widget display / PIE input flow
+
+Date: 2026-07-14
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" `
+  -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+Results:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Tests run: 21.
+  - Success: 21.
+  - Failures: 0.
+  - Latest automation log: `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke: exit code 0.
+- Runtime log confirmed Title UI creation path:
+  - `CurrentState=EEvaGameFlowState::Title`
+  - `TitleWidgetClassValid=true`
+  - `CreateWidgetResult=true`
+  - `RootWidgetValid=true`
+  - `AddToViewportAttempted=true`
+  - `IsInViewport=true`
+  - `Visibility=ESlateVisibility::Visible`
+  - `RenderOpacity=1.00`
+  - `NativeConstructCalled=true`
+  - `FocusAssigned=true`
+  - `InputMode=GameAndUI`
+  - `ShowMouseCursor=true`
+  - `IgnoreMoveInput=true`
+  - `IgnoreLookInput=true`
+
+Notes:
+
+- UE5.8 commandlets still emit non-Win64 SDK validation warnings; Win64 remains valid and the command exits with code 0.
+- PIE viewport visual confirmation is still required for the actual title screen and NEW GAME click path.

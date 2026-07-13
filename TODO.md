@@ -515,3 +515,36 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] Implement real BGM/SFX assets or structured sound components for gameplay/enemy/boss events.
 - [ ] Apply fullscreen/window mode, resolution, and graphics quality settings for real.
 - [ ] Add confirmation dialog for Return to Title / Exit Game if needed.
+
+## Cycle 015 Title widget display / PIE input flow fix
+
+- [x] Investigate PIE lock state where Title flow starts but no Title buttons are visible.
+- [x] Move C++ menu root creation from `NativeConstruct()` to `RebuildWidget()`.
+- [x] Add native menu root / NativeConstruct / initial focus debug helpers.
+- [x] Assign focus to primary menu buttons.
+- [x] Add `[TitleUI]` logs for class validity, CreateWidget, AddToViewport, IsInViewport, visibility, opacity, root validity, NativeConstruct, focus, LocalPlayer, viewport client, and failure reason.
+- [x] Add detailed `[GameFlow]` logs with world/net/controller/local player/pawn details.
+- [x] Add `[InputState]` logs for input mode, cursor, ignore move/look, pause, and time dilation.
+- [x] Add `[Player]` log after New Game possession/input recovery.
+- [x] Make Title/Settings menu input explicitly block gameplay input.
+- [x] Add Development fallback from failed local Title UI display to playable mode.
+- [x] Keep controller-less automation Title tests from triggering fallback.
+- [x] Live Codingなし Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror`: 21 tests succeeded.
+- [x] Runtime smoke succeeded.
+- [x] Runtime log confirmed Title Widget creation and viewport attachment:
+  - `TitleWidgetClassValid=true`
+  - `CreateWidgetResult=true`
+  - `RootWidgetValid=true`
+  - `IsInViewport=true`
+  - `Visibility=Visible`
+  - `FocusAssigned=true`
+  - `InputMode=GameAndUI`
+  - `ShowMouseCursor=true`
+  - `IgnoreMoveInput=true`
+  - `IgnoreLookInput=true`
+- [ ] PIE: confirm title text/buttons are visible.
+- [ ] PIE: click NEW GAME and confirm `Title -> Playing`.
+- [ ] PIE: after NEW GAME confirm cursor hidden, GameOnly input, IgnoreMove=false, IgnoreLook=false.
+- [ ] PIE: confirm possessed pawn is `EvaPlayerCharacter`.
+- [ ] PIE: confirm WASD, mouse look, shooting, and Esc Pause work after NEW GAME.

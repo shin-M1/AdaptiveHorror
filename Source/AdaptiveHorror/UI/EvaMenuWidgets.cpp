@@ -1,4 +1,5 @@
 #include "UI/EvaMenuWidgets.h"
+#include "AdaptiveHorror.h"
 #include "Characters/EvaPlayerController.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -10,6 +11,59 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/CoreStyle.h"
+
+TSharedRef<SWidget> UEvaMenuWidgetBase::RebuildWidget()
+{
+    bNativeConstructCalled = false;
+    InitialFocusButton = nullptr;
+
+    if (WidgetTree)
+    {
+        UVerticalBox* RootBox = BuildMenuRoot(GetMenuTitleText(), GetMenuSubtitleText());
+        if (RootBox)
+        {
+            BuildMenuContent(RootBox);
+        }
+    }
+
+    return Super::RebuildWidget();
+}
+
+void UEvaMenuWidgetBase::NativeConstruct()
+{
+    Super::NativeConstruct();
+    bNativeConstructCalled = true;
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[TitleUI] NativeConstructCalled Widget=%s RootWidgetValid=%s Visibility=%s RenderOpacity=%.2f"),
+        *GetName(),
+        HasNativeMenuRoot() ? TEXT("true") : TEXT("false"),
+        *UEnum::GetValueAsString(GetVisibility()),
+        GetRenderOpacity());
+}
+
+bool UEvaMenuWidgetBase::HasNativeMenuRoot() const
+{
+    return WidgetTree && WidgetTree->RootWidget != nullptr;
+}
+
+void UEvaMenuWidgetBase::SetInitialFocusButton(UButton* Button)
+{
+    InitialFocusButton = Button;
+}
+
+bool UEvaMenuWidgetBase::AssignInitialFocus()
+{
+    APlayerController* OwningController = GetOwningPlayer();
+    if (!OwningController || !InitialFocusButton)
+    {
+        return false;
+    }
+
+    InitialFocusButton->SetUserFocus(OwningController);
+    InitialFocusButton->SetKeyboardFocus();
+    return true;
+}
 
 UVerticalBox* UEvaMenuWidgetBase::BuildMenuRoot(const FText& Title, const FText& Subtitle)
 {
@@ -86,12 +140,18 @@ AEvaPlayerController* UEvaMenuWidgetBase::GetEvaPlayerController() const
     return Cast<AEvaPlayerController>(GetOwningPlayer());
 }
 
-void UEvaTitleMenuWidget::NativeConstruct()
+FText UEvaTitleMenuWidget::GetMenuTitleText() const
 {
-    Super::NativeConstruct();
+    return FText::FromString(TEXT("ADAPTIVE HORROR"));
+}
 
-    UVerticalBox* RootBox = BuildMenuRoot(FText::FromString(TEXT("ADAPTIVE HORROR")),
-        FText::FromString(TEXT("EVA observes. The facility adapts.")));
+FText UEvaTitleMenuWidget::GetMenuSubtitleText() const
+{
+    return FText::FromString(TEXT("EVA observes. The facility adapts."));
+}
+
+void UEvaTitleMenuWidget::BuildMenuContent(UVerticalBox* RootBox)
+{
     if (!RootBox)
     {
         return;
@@ -99,6 +159,7 @@ void UEvaTitleMenuWidget::NativeConstruct()
 
     if (UButton* NewGameButton = AddMenuButton(RootBox, FText::FromString(TEXT("NEW GAME"))))
     {
+        SetInitialFocusButton(NewGameButton);
         NewGameButton->OnClicked.AddDynamic(this, &UEvaTitleMenuWidget::HandleNewGameClicked);
     }
     AddMenuButton(RootBox, FText::FromString(TEXT("CONTINUE  -  Not Available")), false);
@@ -136,12 +197,18 @@ void UEvaTitleMenuWidget::HandleExitClicked()
     }
 }
 
-void UEvaPauseMenuWidget::NativeConstruct()
+FText UEvaPauseMenuWidget::GetMenuTitleText() const
 {
-    Super::NativeConstruct();
+    return FText::FromString(TEXT("PAUSED"));
+}
 
-    UVerticalBox* RootBox = BuildMenuRoot(FText::FromString(TEXT("PAUSED")),
-        FText::FromString(TEXT("The experiment waits.")));
+FText UEvaPauseMenuWidget::GetMenuSubtitleText() const
+{
+    return FText::FromString(TEXT("The experiment waits."));
+}
+
+void UEvaPauseMenuWidget::BuildMenuContent(UVerticalBox* RootBox)
+{
     if (!RootBox)
     {
         return;
@@ -149,6 +216,7 @@ void UEvaPauseMenuWidget::NativeConstruct()
 
     if (UButton* ResumeButton = AddMenuButton(RootBox, FText::FromString(TEXT("RESUME"))))
     {
+        SetInitialFocusButton(ResumeButton);
         ResumeButton->OnClicked.AddDynamic(this, &UEvaPauseMenuWidget::HandleResumeClicked);
     }
     if (UButton* RestartButton = AddMenuButton(RootBox, FText::FromString(TEXT("RESTART FROM CHECKPOINT"))))
@@ -209,12 +277,18 @@ void UEvaPauseMenuWidget::HandleExitClicked()
     }
 }
 
-void UEvaGameOverWidget::NativeConstruct()
+FText UEvaGameOverWidget::GetMenuTitleText() const
 {
-    Super::NativeConstruct();
+    return FText::FromString(TEXT("GAME OVER"));
+}
 
-    UVerticalBox* RootBox = BuildMenuRoot(FText::FromString(TEXT("GAME OVER")),
-        FText::FromString(TEXT("EVA logs another failed survival branch.")));
+FText UEvaGameOverWidget::GetMenuSubtitleText() const
+{
+    return FText::FromString(TEXT("EVA logs another failed survival branch."));
+}
+
+void UEvaGameOverWidget::BuildMenuContent(UVerticalBox* RootBox)
+{
     if (!RootBox)
     {
         return;
@@ -224,6 +298,7 @@ void UEvaGameOverWidget::NativeConstruct()
         14.0f, FLinearColor(0.95f, 0.62f, 0.62f, 1.0f));
     if (UButton* RetryButton = AddMenuButton(RootBox, FText::FromString(TEXT("RETRY FROM CHECKPOINT"))))
     {
+        SetInitialFocusButton(RetryButton);
         RetryButton->OnClicked.AddDynamic(this, &UEvaGameOverWidget::HandleRetryClicked);
     }
     if (UButton* RestartButton = AddMenuButton(RootBox, FText::FromString(TEXT("RESTART"))))
@@ -260,12 +335,18 @@ void UEvaGameOverWidget::HandleReturnToTitleClicked()
     }
 }
 
-void UEvaStageClearWidget::NativeConstruct()
+FText UEvaStageClearWidget::GetMenuTitleText() const
 {
-    Super::NativeConstruct();
+    return FText::FromString(TEXT("MISSION COMPLETE"));
+}
 
-    UVerticalBox* RootBox = BuildMenuRoot(FText::FromString(TEXT("MISSION COMPLETE")),
-        FText::FromString(TEXT("Research Facility Demo - ADAM defeated.")));
+FText UEvaStageClearWidget::GetMenuSubtitleText() const
+{
+    return FText::FromString(TEXT("Research Facility Demo - ADAM defeated."));
+}
+
+void UEvaStageClearWidget::BuildMenuContent(UVerticalBox* RootBox)
+{
     if (!RootBox)
     {
         return;
@@ -275,6 +356,7 @@ void UEvaStageClearWidget::NativeConstruct()
         14.0f, FLinearColor(0.58f, 1.0f, 0.68f, 1.0f));
     if (UButton* RetryButton = AddMenuButton(RootBox, FText::FromString(TEXT("RETRY"))))
     {
+        SetInitialFocusButton(RetryButton);
         RetryButton->OnClicked.AddDynamic(this, &UEvaStageClearWidget::HandleRetryClicked);
     }
     if (UButton* TitleButton = AddMenuButton(RootBox, FText::FromString(TEXT("RETURN TO TITLE"))))
@@ -311,12 +393,18 @@ void UEvaStageClearWidget::HandleExitClicked()
     }
 }
 
-void UEvaSettingsWidget::NativeConstruct()
+FText UEvaSettingsWidget::GetMenuTitleText() const
 {
-    Super::NativeConstruct();
+    return FText::FromString(TEXT("SETTINGS"));
+}
 
-    UVerticalBox* RootBox = BuildMenuRoot(FText::FromString(TEXT("SETTINGS")),
-        FText::FromString(TEXT("Prototype settings are saved locally.")));
+FText UEvaSettingsWidget::GetMenuSubtitleText() const
+{
+    return FText::FromString(TEXT("Prototype settings are saved locally."));
+}
+
+void UEvaSettingsWidget::BuildMenuContent(UVerticalBox* RootBox)
+{
     if (!RootBox)
     {
         return;

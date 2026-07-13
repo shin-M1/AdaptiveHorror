@@ -3,6 +3,7 @@
 #include "Characters/EvaPlayerCharacter.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Core/EvaSettingsSaveGame.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerInput.h"
 #include "InputCoreTypes.h"
@@ -54,21 +55,67 @@ void AEvaPlayerController::HandleEscapePressed()
     }
 }
 
-void AEvaPlayerController::ShowTitleMenu()
+bool AEvaPlayerController::ShowTitleMenu()
 {
     CloseAllMenus();
+    bool bCreateWidgetAttempted = false;
+    bool bAddToViewportAttempted = false;
+    bool bFocusAssigned = false;
+    FString FailureReason = TEXT("None");
+
     TSubclassOf<UEvaTitleMenuWidget> WidgetClass = TitleMenuWidgetClass;
     if (!WidgetClass.Get())
     {
         WidgetClass = UEvaTitleMenuWidget::StaticClass();
     }
-    TitleMenuWidget = CreateWidget<UEvaTitleMenuWidget>(this, WidgetClass);
+
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    if (!IsLocalController())
+    {
+        FailureReason = TEXT("PlayerController is not local.");
+    }
+    else if (!LocalPlayer)
+    {
+        FailureReason = TEXT("LocalPlayer is null.");
+    }
+    else if (!LocalPlayer->ViewportClient)
+    {
+        FailureReason = TEXT("LocalPlayer ViewportClient is null.");
+    }
+    else if (!WidgetClass.Get())
+    {
+        FailureReason = TEXT("TitleWidgetClass is null.");
+    }
+    else
+    {
+        bCreateWidgetAttempted = true;
+        TitleMenuWidget = CreateWidget<UEvaTitleMenuWidget>(this, WidgetClass);
+        if (!TitleMenuWidget)
+        {
+            FailureReason = TEXT("CreateWidget returned null.");
+        }
+    }
+
     if (TitleMenuWidget)
     {
+        TitleMenuWidget->SetVisibility(ESlateVisibility::Visible);
+        TitleMenuWidget->SetRenderOpacity(1.0f);
+        bAddToViewportAttempted = true;
         TitleMenuWidget->AddToViewport(100);
+        bFocusAssigned = TitleMenuWidget->AssignInitialFocus();
+        if (!TitleMenuWidget->IsInViewport())
+        {
+            FailureReason = TEXT("AddToViewport completed but IsInViewport is false.");
+        }
     }
-    ApplyMenuInputMode(false);
+
+    ApplyMenuInputMode(true);
+    LogTitleUIState(TEXT("ShowTitleMenu"), bCreateWidgetAttempted, bAddToViewportAttempted, bFocusAssigned,
+        FailureReason);
+    LogInputState(TEXT("ShowTitleMenu"));
     PlayUIEvent(146.8f, 0.18f, 0.30f);
+
+    return TitleMenuWidget && TitleMenuWidget->IsInViewport();
 }
 
 void AEvaPlayerController::ShowPauseMenu()
@@ -89,6 +136,11 @@ void AEvaPlayerController::ShowPauseMenu()
         }
     }
     ApplyMenuInputMode(true);
+    if (PauseMenuWidget)
+    {
+        PauseMenuWidget->AssignInitialFocus();
+    }
+    LogInputState(TEXT("ShowPauseMenu"));
     PlayUIEvent(220.0f, 0.10f, 0.45f);
 }
 
@@ -106,6 +158,11 @@ void AEvaPlayerController::ShowGameOverMenu()
         GameOverWidget->AddToViewport(120);
     }
     ApplyMenuInputMode(true);
+    if (GameOverWidget)
+    {
+        GameOverWidget->AssignInitialFocus();
+    }
+    LogInputState(TEXT("ShowGameOverMenu"));
     PlayUIEvent(82.4f, 0.35f, 0.80f);
 }
 
@@ -123,6 +180,11 @@ void AEvaPlayerController::ShowStageClearMenu()
         StageClearWidget->AddToViewport(120);
     }
     ApplyMenuInputMode(true);
+    if (StageClearWidget)
+    {
+        StageClearWidget->AssignInitialFocus();
+    }
+    LogInputState(TEXT("ShowStageClearMenu"));
     PlayUIEvent(523.25f, 0.35f, 0.85f);
 }
 
@@ -189,7 +251,7 @@ void AEvaPlayerController::OpenSettingsMenu(const EEvaSettingsReturnTarget Retur
         SettingsWidget->SetReturnTarget(ReturnTarget);
         SettingsWidget->AddToViewport(130);
     }
-    ApplyMenuInputMode(ReturnTarget == EEvaSettingsReturnTarget::Pause);
+    ApplyMenuInputMode(true);
 }
 
 void AEvaPlayerController::ReturnFromSettingsMenu(const EEvaSettingsReturnTarget ReturnTarget)
@@ -211,9 +273,11 @@ void AEvaPlayerController::ApplyGameplayInputMode()
 {
     FInputModeGameOnly InputMode;
     SetInputMode(InputMode);
+    LastAppliedInputMode = TEXT("GameOnly");
     bShowMouseCursor = false;
     ResetIgnoreMoveInput();
     ResetIgnoreLookInput();
+    LogInputState(TEXT("ApplyGameplayInputMode"));
 }
 
 void AEvaPlayerController::CloseMenusForGameplay()
@@ -226,9 +290,68 @@ void AEvaPlayerController::ApplyMenuInputMode(const bool bPauseGameInput)
     FInputModeGameAndUI InputMode;
     InputMode.SetHideCursorDuringCapture(false);
     SetInputMode(InputMode);
+    LastAppliedInputMode = TEXT("GameAndUI");
     bShowMouseCursor = true;
     SetIgnoreMoveInput(bPauseGameInput);
     SetIgnoreLookInput(bPauseGameInput);
+    LogInputState(bPauseGameInput ? TEXT("ApplyMenuInputMode_BlockGameplay") : TEXT("ApplyMenuInputMode_AllowGameplay"));
+}
+
+bool AEvaPlayerController::IsTitleMenuVisibleForDebug() const
+{
+    return TitleMenuWidget && TitleMenuWidget->IsInViewport() &&
+        TitleMenuWidget->GetVisibility() == ESlateVisibility::Visible;
+}
+
+void AEvaPlayerController::LogInputState(const FString& Context) const
+{
+    const UWorld* World = GetWorld();
+    const APawn* PossessedPawn = GetPawn();
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[InputState] Context=%s InputMode=%s ShowMouseCursor=%s IgnoreMoveInput=%s IgnoreLookInput=%s IsPaused=%s GlobalTimeDilation=%.2f PlayerController=%s PossessedPawn=%s LocalController=%s LocalPlayerValid=%s"),
+        *Context,
+        *LastAppliedInputMode,
+        bShowMouseCursor ? TEXT("true") : TEXT("false"),
+        IsMoveInputIgnored() ? TEXT("true") : TEXT("false"),
+        IsLookInputIgnored() ? TEXT("true") : TEXT("false"),
+        World && UGameplayStatics::IsGamePaused(World) ? TEXT("true") : TEXT("false"),
+        World ? UGameplayStatics::GetGlobalTimeDilation(World) : 1.0f,
+        *GetClass()->GetName(),
+        PossessedPawn ? *PossessedPawn->GetClass()->GetName() : TEXT("None"),
+        IsLocalController() ? TEXT("true") : TEXT("false"),
+        GetLocalPlayer() ? TEXT("true") : TEXT("false"));
+}
+
+void AEvaPlayerController::LogTitleUIState(const FString& Context, const bool bCreateWidgetAttempted,
+    const bool bAddToViewportAttempted, const bool bFocusAssigned, const FString& FailureReason) const
+{
+    TSubclassOf<UEvaTitleMenuWidget> WidgetClass = TitleMenuWidgetClass;
+    if (!WidgetClass.Get())
+    {
+        WidgetClass = UEvaTitleMenuWidget::StaticClass();
+    }
+
+    const ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    const bool bViewportClientValid = LocalPlayer && LocalPlayer->ViewportClient;
+    UE_LOG(LogAdaptiveHorror, Warning,
+        TEXT("[TitleUI] Context=%s TitleWidgetClass=%s TitleWidgetClassValid=%s CreateWidgetAttempted=%s CreateWidgetResult=%s WidgetInstanceName=%s RootWidgetValid=%s AddToViewportAttempted=%s IsInViewport=%s Visibility=%s RenderOpacity=%.2f ZOrder=100 NativeConstructCalled=%s FocusAssigned=%s LocalController=%s LocalPlayerValid=%s GameViewportClientValid=%s FailureReason=%s"),
+        *Context,
+        WidgetClass.Get() ? *WidgetClass->GetName() : TEXT("None"),
+        WidgetClass.Get() ? TEXT("true") : TEXT("false"),
+        bCreateWidgetAttempted ? TEXT("true") : TEXT("false"),
+        TitleMenuWidget ? TEXT("true") : TEXT("false"),
+        TitleMenuWidget ? *TitleMenuWidget->GetName() : TEXT("None"),
+        TitleMenuWidget && TitleMenuWidget->HasNativeMenuRoot() ? TEXT("true") : TEXT("false"),
+        bAddToViewportAttempted ? TEXT("true") : TEXT("false"),
+        TitleMenuWidget && TitleMenuWidget->IsInViewport() ? TEXT("true") : TEXT("false"),
+        TitleMenuWidget ? *UEnum::GetValueAsString(TitleMenuWidget->GetVisibility()) : TEXT("None"),
+        TitleMenuWidget ? TitleMenuWidget->GetRenderOpacity() : 0.0f,
+        TitleMenuWidget && TitleMenuWidget->WasNativeConstructCalled() ? TEXT("true") : TEXT("false"),
+        bFocusAssigned ? TEXT("true") : TEXT("false"),
+        IsLocalController() ? TEXT("true") : TEXT("false"),
+        LocalPlayer ? TEXT("true") : TEXT("false"),
+        bViewportClientValid ? TEXT("true") : TEXT("false"),
+        FailureReason.IsEmpty() ? TEXT("None") : *FailureReason);
 }
 
 void AEvaPlayerController::CloseAllMenus()
