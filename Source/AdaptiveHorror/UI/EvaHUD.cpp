@@ -57,6 +57,7 @@ void AEvaHUD::DrawHUD()
     }
 
     const FEvaTelemetrySnapshot Stats = Telemetry->GetTelemetry();
+    DrawHorrorOverlay(Player, GameMode);
 
     FString StyleText = TEXT("Unknown");
     switch (Telemetry->ClassifyCombatStyle())
@@ -265,4 +266,59 @@ void AEvaHUD::UpdateBossHUD()
         AdamController ? AdamController->GetLastAdamEvent() : TEXT("None"),
         Adam->IsDebugBossEnabled());
     BossHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void AEvaHUD::DrawHorrorOverlay(const AEvaPlayerCharacter* Player, const AEvaPrototypeGameMode* GameMode)
+{
+    if (!Canvas || !Player)
+    {
+        return;
+    }
+    if (GameMode && GameMode->GetGameFlowState() != EEvaGameFlowState::Playing)
+    {
+        return;
+    }
+
+    const float W = Canvas->ClipX;
+    const float H = Canvas->ClipY;
+    const float Damage = Player->GetDamageFeedbackIntensity();
+    const float LowHealth = Player->GetLowHealthVignetteIntensity();
+    const float Blackout = GameMode ? GameMode->GetBlackoutOverlayIntensity() : 0.0f;
+    const float Pulse = GameMode ? GameMode->GetHorrorPulseIntensity() : 0.0f;
+
+    if (Blackout > 0.0f)
+    {
+        DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, Blackout), 0.0f, 0.0f, W, H);
+    }
+
+    const float VignetteAlpha = FMath::Clamp(0.08f + LowHealth * 0.26f + Damage * 0.16f + Pulse * 0.08f,
+        0.0f, 0.48f);
+    if (VignetteAlpha > 0.01f)
+    {
+        const float EdgeX = W * 0.16f;
+        const float EdgeY = H * 0.16f;
+        const FLinearColor EdgeColor(0.0f, 0.0f, 0.0f, VignetteAlpha);
+        DrawRect(EdgeColor, 0.0f, 0.0f, W, EdgeY);
+        DrawRect(EdgeColor, 0.0f, H - EdgeY, W, EdgeY);
+        DrawRect(EdgeColor, 0.0f, 0.0f, EdgeX, H);
+        DrawRect(EdgeColor, W - EdgeX, 0.0f, EdgeX, H);
+    }
+
+    if (Damage > 0.01f)
+    {
+        const float RedAlpha = FMath::Clamp(0.10f + Damage * 0.24f, 0.0f, 0.34f);
+        DrawRect(FLinearColor(0.75f, 0.02f, 0.0f, RedAlpha), 0.0f, 0.0f, W, H);
+    }
+
+    if (Pulse > 0.01f)
+    {
+        const float PulseAlpha = FMath::Clamp(Pulse * 0.12f, 0.0f, 0.16f);
+        DrawRect(FLinearColor(1.0f, 0.04f, 0.02f, PulseAlpha), 0.0f, 0.0f, W, H);
+    }
+
+    if (GameMode && GameMode->ShouldDisplayHorrorWarning())
+    {
+        DrawText(GameMode->GetHorrorWarningText(), FLinearColor(1.0f, 0.12f, 0.08f),
+            W * 0.5f - 260.0f, H * 0.22f, nullptr, 1.35f);
+    }
 }

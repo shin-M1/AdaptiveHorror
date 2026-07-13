@@ -115,11 +115,19 @@ void AEvaAdamBossCharacter::PlayPrototypeAttackFeedback()
 void AEvaAdamBossCharacter::PlayAdamChargeFeedback()
 {
     StartPrototypeVisualAction(FName(TEXT("Charge")), 0.72f, 49.0f, 0.76f);
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->TriggerAdamChargeEffect(this);
+    }
 }
 
 void AEvaAdamBossCharacter::PlayAdamRoarFeedback()
 {
     StartPrototypeVisualAction(FName(TEXT("Roar")), 1.05f, 36.0f, 0.82f);
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->TriggerAdamRoarEffect(this);
+    }
 }
 
 bool AEvaAdamBossCharacter::ShouldEnterPhaseTwo(const float CurrentHealth, const float MaxHealth) const
@@ -182,6 +190,10 @@ void AEvaAdamBossCharacter::EnterPhaseTwo()
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor::Red, 82.0f);
     SetOverheadHealthBarEnabled(false);
     LogPrototypeDebugLabelState(TEXT("AdamPhaseTwoLabel"));
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->TriggerAdamPhaseTwoEffect(this);
+    }
 
 #if !UE_BUILD_SHIPPING
     if (GEngine)

@@ -503,3 +503,38 @@ Notes:
 - Runtime smoke used `-NoSound`, so audible gameplay sound verification is still manual PIE work.
 - Codex did not perform PIE viewport visual confirmation.
 - UE5.8 commandlet still prints SDK validation warnings for non-Win64 platforms such as LinuxArm64 and VisionOS. Win64 is valid and build/test/runtime commands returned exit code 0.
+## Cycle 017 results - Horror Immersion Pass 1
+
+Date: 2026-07-14
+
+Branch: `feature/horror-immersion-pass1`
+
+Commands run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.13-21.51.52.log`
+- Project tests completed: 25 successes.
+- Final automation line: `**** TEST COMPLETE. EXIT CODE: 0 ****`
+
+Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+Result: exit code 0.
+
+Notes:
+
+- PIE visual/audio confirmation was not performed by Codex and remains pending.
+- Runtime smoke overwrites the current `AdaptiveHorror.log`, so the automation result is preserved in the backup log listed above.
+- UE startup logs include engine/internal automation “error test” messages before project tests run. The `AdaptiveHorror` test session itself completed successfully with exit code 0.

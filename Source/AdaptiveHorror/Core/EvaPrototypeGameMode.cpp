@@ -12,6 +12,7 @@
 #include "Components/BrushComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -20,6 +21,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
+#include "Engine/ExponentialHeightFog.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/SkyLight.h"
 #include "Engine/PointLight.h"
@@ -31,6 +33,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationData.h"
 #include "NavigationSystem.h"
@@ -69,6 +72,16 @@ namespace
     {
         return bValue ? TEXT("true") : TEXT("false");
     }
+
+    TAutoConsoleVariable<int32> CVarEvaReduceFlashing(
+        TEXT("Eva.ReduceFlashing"),
+        0,
+        TEXT("Set to 1 to reduce emergency-light flicker intensity for comfort."));
+
+    TAutoConsoleVariable<int32> CVarEvaReduceCameraShake(
+        TEXT("Eva.ReduceCameraShake"),
+        0,
+        TEXT("Set to 1 to reduce prototype horror camera shake."));
 
     FString NetModeToText(const ENetMode NetMode)
     {
@@ -210,6 +223,27 @@ namespace
     }
 }
 
+static FAutoConsoleCommandWithWorldAndArgs CCmdEvaDebugBlackout(
+    TEXT("Eva.DebugBlackout"),
+    TEXT("Triggers a short prototype blackout horror effect. Optional first argument is duration seconds."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateStatic([](const TArray<FString>& Args, UWorld* World)
+    {
+        if (!World)
+        {
+            return;
+        }
+
+        float Duration = 3.5f;
+        if (Args.Num() > 0)
+        {
+            Duration = FCString::Atof(*Args[0]);
+        }
+        if (AEvaPrototypeGameMode* GameMode = World->GetAuthGameMode<AEvaPrototypeGameMode>())
+        {
+            GameMode->TriggerBlackout(Duration, true);
+        }
+    }));
+
 AEvaPrototypeGameMode::AEvaPrototypeGameMode()
 {
     DefaultPawnClass = AEvaPlayerCharacter::StaticClass();
@@ -246,6 +280,12 @@ void AEvaPrototypeGameMode::BeginPlay()
     }
 }
 
+void AEvaPrototypeGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    StopHorrorRuntimeEffects(true);
+    Super::EndPlay(EndPlayReason);
+}
+
 void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
 {
     if (bStageClear)
@@ -265,6 +305,7 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
     SetGameFlowState(EEvaGameFlowState::PlayerDead);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
+    StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     CleanupCombatActorsForFlowReset();
     if (APlayerController* PlayerController = Cast<APlayerController>(DeadPlayer->GetController()))
@@ -297,6 +338,7 @@ void AEvaPrototypeGameMode::EnterTitleMode()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+    StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     CleanupCombatActorsForFlowReset();
     bGameOver = false;
@@ -344,6 +386,7 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+    StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     CleanupCombatActorsForFlowReset();
 
@@ -394,6 +437,7 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Playing);
+    BeginHorrorRuntimeEffects();
     APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
     APawn* PossessedPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
     UE_LOG(LogAdaptiveHorror, Warning,
@@ -447,6 +491,7 @@ void AEvaPrototypeGameMode::RetryFromCheckpointFlow()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     ClearStageClearTimers();
+    StopHorrorRuntimeEffects(true);
     CleanupCombatActorsForFlowReset();
     bGameOver = false;
     bStageClear = false;
@@ -466,6 +511,7 @@ void AEvaPrototypeGameMode::RetryFromCheckpointFlow()
     {
         SetGameFlowState(EEvaGameFlowState::Playing);
     }
+    BeginHorrorRuntimeEffects();
     if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
         EvaController->CloseMenusForGameplay();
@@ -542,6 +588,7 @@ void AEvaPrototypeGameMode::HandleStageClear()
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
+    StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     const int32 ClearedEnemyAI = StopAllEnemyCombatForStageClear();
     if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
@@ -587,6 +634,7 @@ void AEvaPrototypeGameMode::RespawnPlayer()
     bGameOver = false;
     SetGameFlowState(EEvaGameFlowState::Playing);
     PlayerAwaitingRespawn = nullptr;
+    BeginHorrorRuntimeEffects();
     ShowDebugStatusMessage(TEXT("Checkpoint restored. Enemy aggro reset."), 3.0f);
 }
 
@@ -710,6 +758,8 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             LightComponent->SetMobility(EComponentMobility::Movable);
             LightComponent->SetIntensity(1.35f);
             LightComponent->SetLightColor(FLinearColor(0.55f, 0.68f, 0.92f));
+            RuntimeDirectionalLightComponent = LightComponent;
+            RuntimeDirectionalLightBaseIntensity = 1.35f;
         }
     }
 
@@ -720,6 +770,8 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             SkyLightComponent->SetMobility(EComponentMobility::Movable);
             SkyLightComponent->SetIntensity(0.28f);
             SkyLightComponent->RecaptureSky();
+            RuntimeSkyLightComponent = SkyLightComponent;
+            RuntimeSkyLightBaseIntensity = 0.28f;
         }
     }
 
@@ -731,9 +783,13 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             PointLightComponent->SetIntensity(4200.0f);
             PointLightComponent->SetAttenuationRadius(6200.0f);
             PointLightComponent->SetLightColor(FLinearColor(0.38f, 0.55f, 0.78f));
+            RuntimeMainPointLightComponent = PointLightComponent;
+            RuntimeMainPointLightBaseIntensity = 4200.0f;
         }
     }
 
+    RuntimeEmergencyLightComponents.Reset();
+    RuntimeEmergencyLightBaseIntensities.Reset();
     for (int32 ZoneIndex = 0; ZoneIndex < UE_ARRAY_COUNT(ZoneCenters); ++ZoneIndex)
     {
         const FVector EmergencyLightLocation(ZoneCenters[ZoneIndex].X, ZoneCenters[ZoneIndex].Y + 585.0f, 285.0f);
@@ -747,10 +803,13 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
                 PointLightComponent->SetLightColor(ZoneIndex == 5 ?
                     FLinearColor(1.0f, 0.12f, 0.04f) :
                     FLinearColor(0.85f, 0.08f, 0.04f));
+                RuntimeEmergencyLightComponents.Add(PointLightComponent);
+                RuntimeEmergencyLightBaseIntensities.Add(1800.0f);
             }
         }
     }
 
+    SpawnRuntimeFog();
     UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 41.2f, 1.6f, 0.12f);
 
     LogNavigationStatus(TEXT("AfterRuntimeArenaGeometry"));
@@ -1854,6 +1913,7 @@ void AEvaPrototypeGameMode::SpawnHunter()
     }
     ShowDebugStatusMessage(FString::Printf(TEXT("WARNING: HUNTER Tier %d deployed. EVA analysis at full speed."),
         HunterTierToSpawn), 5.0f);
+    TriggerHunterArrivalEffect(Hunter->GetActorLocation());
 }
 
 void AEvaPrototypeGameMode::ResetEnemyTargets()
@@ -2042,6 +2102,346 @@ void AEvaPrototypeGameMode::LogPlayerDeathRequest(const FString& Context, const 
 bool AEvaPrototypeGameMode::IsRespawnScheduledForDebug() const
 {
     return GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(RespawnTimer);
+}
+
+bool AEvaPrototypeGameMode::CanRunHorrorEffect(const bool bAllowDuringPaused) const
+{
+    if (!GetWorld() || bGameOver || bStageClear)
+    {
+        return false;
+    }
+
+    return GameFlowState == EEvaGameFlowState::Playing ||
+        (bAllowDuringPaused && GameFlowState == EEvaGameFlowState::Paused);
+}
+
+void AEvaPrototypeGameMode::BeginHorrorRuntimeEffects()
+{
+    if (!GetWorld() || !CanRunHorrorEffect(false))
+    {
+        return;
+    }
+
+    if (!GetWorldTimerManager().IsTimerActive(EmergencyLightFlickerTimer))
+    {
+        const float FlickerInterval = CVarEvaReduceFlashing.GetValueOnGameThread() != 0 ? 0.32f : 0.16f;
+        GetWorldTimerManager().SetTimer(EmergencyLightFlickerTimer, this,
+            &AEvaPrototypeGameMode::UpdateEmergencyLightFlicker, FlickerInterval, true);
+    }
+    if (!GetWorldTimerManager().IsTimerActive(AmbientPulseTimer))
+    {
+        GetWorldTimerManager().SetTimer(AmbientPulseTimer, this,
+            &AEvaPrototypeGameMode::PlayAmbientPulse, 7.5f, true, 2.0f);
+    }
+}
+
+void AEvaPrototypeGameMode::StopHorrorRuntimeEffects(const bool bRestoreLighting)
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(EmergencyLightFlickerTimer);
+        World->GetTimerManager().ClearTimer(BlackoutTimer);
+        World->GetTimerManager().ClearTimer(AmbientPulseTimer);
+    }
+
+    bBlackoutActive = false;
+    BlackoutEndTime = -1000.0f;
+    HorrorPulseEndTime = -1000.0f;
+    LastHorrorWarningText.Empty();
+    LastAdamEntranceEffectActor.Reset();
+    if (bRestoreLighting)
+    {
+        RestoreHorrorLighting();
+    }
+}
+
+void AEvaPrototypeGameMode::RestoreHorrorLighting()
+{
+    if (RuntimeDirectionalLightComponent)
+    {
+        RuntimeDirectionalLightComponent->SetIntensity(RuntimeDirectionalLightBaseIntensity);
+    }
+    if (RuntimeSkyLightComponent)
+    {
+        RuntimeSkyLightComponent->SetIntensity(RuntimeSkyLightBaseIntensity);
+    }
+    if (RuntimeMainPointLightComponent)
+    {
+        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity);
+    }
+
+    for (int32 Index = 0; Index < RuntimeEmergencyLightComponents.Num(); ++Index)
+    {
+        if (UPointLightComponent* LightComponent = RuntimeEmergencyLightComponents[Index])
+        {
+            const float BaseIntensity = RuntimeEmergencyLightBaseIntensities.IsValidIndex(Index) ?
+                RuntimeEmergencyLightBaseIntensities[Index] : 1800.0f;
+            LightComponent->SetIntensity(BaseIntensity);
+        }
+    }
+}
+
+void AEvaPrototypeGameMode::TriggerBlackout(const float Duration, const bool bForce)
+{
+    if (!CanRunHorrorEffect(false))
+    {
+        return;
+    }
+    if (bBlackoutActive && !bForce)
+    {
+        return;
+    }
+
+    bBlackoutActive = true;
+    const float ClampedDuration = FMath::Clamp(Duration, 0.4f, 8.0f);
+    BlackoutEndTime = GetWorld()->GetTimeSeconds() + ClampedDuration;
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, BlackoutEndTime);
+
+    if (RuntimeDirectionalLightComponent)
+    {
+        RuntimeDirectionalLightComponent->SetIntensity(RuntimeDirectionalLightBaseIntensity * 0.12f);
+    }
+    if (RuntimeSkyLightComponent)
+    {
+        RuntimeSkyLightComponent->SetIntensity(RuntimeSkyLightBaseIntensity * 0.18f);
+    }
+    if (RuntimeMainPointLightComponent)
+    {
+        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity * 0.10f);
+    }
+
+    SetHorrorWarning(TEXT("FACILITY POWER DROP"), FMath::Min(ClampedDuration, 3.0f));
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 38.0f, 0.9f, 0.30f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.65f, 0.55f);
+    }
+
+    GetWorldTimerManager().ClearTimer(BlackoutTimer);
+    GetWorldTimerManager().SetTimer(BlackoutTimer, this, &AEvaPrototypeGameMode::EndBlackout,
+        ClampedDuration, false);
+    BeginHorrorRuntimeEffects();
+}
+
+void AEvaPrototypeGameMode::EndBlackout()
+{
+    bBlackoutActive = false;
+    BlackoutEndTime = -1000.0f;
+    RestoreHorrorLighting();
+    if (CanRunHorrorEffect(false))
+    {
+        UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 196.0f, 0.16f, 0.18f);
+        BeginHorrorRuntimeEffects();
+    }
+}
+
+void AEvaPrototypeGameMode::UpdateEmergencyLightFlicker()
+{
+    if (!CanRunHorrorEffect(true))
+    {
+        return;
+    }
+
+    const bool bReduceFlashing = CVarEvaReduceFlashing.GetValueOnGameThread() != 0;
+    for (int32 Index = 0; Index < RuntimeEmergencyLightComponents.Num(); ++Index)
+    {
+        UPointLightComponent* LightComponent = RuntimeEmergencyLightComponents[Index];
+        if (!LightComponent)
+        {
+            continue;
+        }
+
+        const float BaseIntensity = RuntimeEmergencyLightBaseIntensities.IsValidIndex(Index) ?
+            RuntimeEmergencyLightBaseIntensities[Index] : 1800.0f;
+        const float BlackoutMultiplier = bBlackoutActive ? 1.65f : 1.0f;
+        const float ComfortMultiplier = bReduceFlashing ? 0.82f : FMath::FRandRange(0.48f, 1.22f);
+        const bool bDropout = !bReduceFlashing && FMath::FRand() < (bBlackoutActive ? 0.22f : 0.06f);
+        LightComponent->SetIntensity(bDropout ? BaseIntensity * 0.18f : BaseIntensity * BlackoutMultiplier * ComfortMultiplier);
+    }
+}
+
+void AEvaPrototypeGameMode::PlayAmbientPulse()
+{
+    if (!CanRunHorrorEffect(false))
+    {
+        return;
+    }
+
+    const float Frequency = CurrentDirector && CurrentDirector->IsAdamEncounterActive() ?
+        FMath::FRandRange(31.0f, 46.0f) : FMath::FRandRange(48.0f, 76.0f);
+    const float Volume = CurrentDirector && CurrentDirector->IsAdamEncounterActive() ? 0.24f : 0.12f;
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, Frequency, FMath::FRandRange(0.45f, 1.25f), Volume);
+}
+
+void AEvaPrototypeGameMode::SetHorrorWarning(const FString& Message, const float Duration)
+{
+    LastHorrorWarningText = Message;
+    HorrorWarningDuration = FMath::Max(0.1f, Duration);
+    LastHorrorWarningTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+}
+
+bool AEvaPrototypeGameMode::ShouldDisplayHorrorWarning() const
+{
+    return GetWorld() && !LastHorrorWarningText.IsEmpty() &&
+        GetWorld()->GetTimeSeconds() - LastHorrorWarningTime <= HorrorWarningDuration;
+}
+
+float AEvaPrototypeGameMode::GetBlackoutOverlayIntensity() const
+{
+    if (!bBlackoutActive || !GetWorld())
+    {
+        return 0.0f;
+    }
+
+    const float FadeOut = FMath::Clamp((BlackoutEndTime - GetWorld()->GetTimeSeconds()) / 0.65f, 0.0f, 1.0f);
+    return 0.58f * FadeOut;
+}
+
+float AEvaPrototypeGameMode::GetHorrorPulseIntensity() const
+{
+    if (!GetWorld())
+    {
+        return 0.0f;
+    }
+
+    return FMath::Clamp((HorrorPulseEndTime - GetWorld()->GetTimeSeconds()) / 1.2f, 0.0f, 1.0f);
+}
+
+void AEvaPrototypeGameMode::TriggerHunterArrivalEffect(const FVector& ArrivalLocation)
+{
+    if (!CanRunHorrorEffect(false))
+    {
+        return;
+    }
+
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 1.8f);
+    SetHorrorWarning(TEXT("EVA SIGNAL: HUNTER UNIT DEPLOYED"), 2.2f);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, ArrivalLocation, 52.0f, 0.45f, 0.70f);
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 104.0f, 0.24f, 0.42f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.45f, 0.35f);
+    }
+}
+
+void AEvaPrototypeGameMode::TriggerAdamEntranceEffect(AEvaAdamBossCharacter* Adam)
+{
+    if (!CanRunHorrorEffect(false) || !Adam || LastAdamEntranceEffectActor.Get() == Adam)
+    {
+        return;
+    }
+
+    LastAdamEntranceEffectActor = Adam;
+    SetHorrorWarning(TEXT("ADAM HAS ENTERED THE FACILITY"), 3.0f);
+    TriggerBlackout(1.6f, true);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Adam->GetActorLocation(), 29.0f, 1.25f, 0.82f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.85f, 0.75f);
+    }
+}
+
+void AEvaPrototypeGameMode::TriggerAdamChargeEffect(AEvaAdamBossCharacter* Adam)
+{
+    if (!CanRunHorrorEffect(false) || !Adam)
+    {
+        return;
+    }
+
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 0.9f);
+    SetHorrorWarning(TEXT("ADAM: CHARGE"), 0.85f);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Adam->GetActorLocation(), 41.0f, 0.34f, 0.74f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.55f, 0.32f);
+    }
+}
+
+void AEvaPrototypeGameMode::TriggerAdamRoarEffect(AEvaAdamBossCharacter* Adam)
+{
+    if (!CanRunHorrorEffect(false) || !Adam)
+    {
+        return;
+    }
+
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 1.4f);
+    SetHorrorWarning(TEXT("ADAM: ROAR / SUMMON"), 1.25f);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Adam->GetActorLocation(), 34.0f, 0.85f, 0.86f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.70f, 0.62f);
+    }
+}
+
+void AEvaPrototypeGameMode::TriggerAdamPhaseTwoEffect(AEvaAdamBossCharacter* Adam)
+{
+    if (!CanRunHorrorEffect(false) || !Adam)
+    {
+        return;
+    }
+
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 2.4f);
+    SetHorrorWarning(TEXT("ADAM PHASE 2: BIOLOGICAL LIMITS REMOVED"), 3.2f);
+    TriggerBlackout(1.15f, true);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Adam->GetActorLocation(), 58.0f, 1.05f, 0.88f);
+}
+
+void AEvaPrototypeGameMode::TriggerDoorEffect(const FVector& Location, const FString& DoorLabel)
+{
+    if (!CanRunHorrorEffect(false))
+    {
+        return;
+    }
+
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 0.65f);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Location, 120.0f, 0.18f, 0.38f);
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, Location, 72.0f, 0.24f, 0.24f);
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[HorrorFX] DoorEffect Label=%s Location=%s"),
+        *DoorLabel, *Location.ToCompactString());
+}
+
+void AEvaPrototypeGameMode::TriggerPlayerDamageEffect(const float DamageAmount)
+{
+    if (!CanRunHorrorEffect(false))
+    {
+        return;
+    }
+
+    const float DamageScale = FMath::Clamp(DamageAmount / 35.0f, 0.15f, 1.0f);
+    HorrorPulseEndTime = FMath::Max(HorrorPulseEndTime, GetWorld()->GetTimeSeconds() + 0.45f + DamageScale * 0.45f);
+    if (AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(
+        GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr))
+    {
+        Player->TriggerCameraShakeFeedback(0.25f + DamageScale * 0.35f, 0.24f + DamageScale * 0.18f);
+    }
+}
+
+void AEvaPrototypeGameMode::SpawnRuntimeFog()
+{
+    if (!GetWorld() || RuntimeFogComponent)
+    {
+        return;
+    }
+
+    if (AExponentialHeightFog* FogActor = GetWorld()->SpawnActor<AExponentialHeightFog>(
+        FVector(0.0f, 0.0f, 45.0f), FRotator::ZeroRotator))
+    {
+        RuntimeFogComponent = FogActor->GetComponent();
+        if (RuntimeFogComponent)
+        {
+            RuntimeFogComponent->SetMobility(EComponentMobility::Movable);
+            RuntimeFogComponent->SetFogDensity(0.018f);
+            RuntimeFogComponent->SetFogHeightFalloff(0.22f);
+            RuntimeFogComponent->SetFogInscatteringColor(FLinearColor(0.09f, 0.12f, 0.16f));
+            RuntimeFogComponent->SetStartDistance(120.0f);
+            RuntimeFogComponent->SetFogMaxOpacity(0.42f);
+        }
+    }
 }
 
 int32 AEvaPrototypeGameMode::CleanupAdamArenaDebugEnemies(const FVector& ArenaLocation, const float Radius)

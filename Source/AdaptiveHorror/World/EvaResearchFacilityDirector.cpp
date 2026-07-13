@@ -10,6 +10,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/PlayerController.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Pickups/EvaAmmoPickup.h"
@@ -51,11 +52,22 @@ void AEvaResearchFacilityDirector::NotifyZoneEntered(const EEvaFacilityZone NewZ
 
     CurrentZone = NewZone;
     SetObjectiveForZone(NewZone);
+    const bool bFirstVisit = !TriggeredZones.Contains(NewZone);
     if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {
         GameMode->ShowDebugStatusMessage(FString::Printf(TEXT("Objective updated: %s"), *CurrentObjective), 4.0f);
+        if (bFirstVisit && NewZone != EEvaFacilityZone::EntryLobby)
+        {
+            const APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+            const APawn* PlayerPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+            GameMode->TriggerDoorEffect(PlayerPawn ? PlayerPawn->GetActorLocation() : GetActorLocation(), GetCurrentZoneName());
+            if (NewZone == EEvaFacilityZone::ObservationLab || NewZone == EEvaFacilityZone::DataCoreRoom)
+            {
+                GameMode->TriggerBlackout(NewZone == EEvaFacilityZone::DataCoreRoom ? 2.6f : 1.8f, false);
+            }
+        }
     }
-    if (!TriggeredZones.Contains(NewZone))
+    if (bFirstVisit)
     {
         TriggeredZones.Add(NewZone);
         SpawnZoneEncounter(NewZone);
@@ -139,6 +151,10 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
         {
             ActiveAdam->AlertToPlayer(PlayerController->GetPawn());
         }
+        if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
+        {
+            GameMode->TriggerAdamEntranceEffect(ActiveAdam);
+        }
         LogAdamEncounterState(TEXT("StartAdamEncounterExistingAdam"), false, ActiveAdam);
         return;
     }
@@ -188,6 +204,10 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
     if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
     {
         ActiveAdam->AlertToPlayer(PlayerController->GetPawn());
+    }
+    if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
+    {
+        GameMode->TriggerAdamEntranceEffect(ActiveAdam);
     }
     LogAdamEncounterState(TEXT("StartAdamEncounterSpawned"), bSpawnAttempted, ActiveAdam);
 }
