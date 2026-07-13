@@ -96,6 +96,7 @@ bool AEvaAdamBossAIController::TryChargeAttack()
 
     LastChargeTime = Now;
     SetAdamDebugState(TEXT("Charge"), TEXT("Charge started"));
+    Adam->PlayAdamChargeFeedback();
     MoveToLocationOrDirect(TargetActor->GetActorLocation(), 60.0f);
     UGameplayStatics::ApplyDamage(TargetActor, Adam->GetChargeDamage(), this, Adam, UDamageType::StaticClass());
     return true;
@@ -127,6 +128,7 @@ bool AEvaAdamBossAIController::TryRoarSummon()
     LastRoarTime = Now;
     const int32 SummonCount = Adam->IsPhaseTwo() ? 3 : 2;
     SetAdamDebugState(TEXT("Roar / Summon"), TEXT("Roar started / Summon started"), SummonCount);
+    Adam->PlayAdamRoarFeedback();
     Adam->SpawnRoarMinions(SummonCount, bSummonEvolved);
     return true;
 }

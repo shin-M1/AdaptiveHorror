@@ -459,3 +459,47 @@ Notes:
 
 - UE5.8 commandlets still emit non-Win64 SDK validation warnings; Win64 remains valid and the command exits with code 0.
 - PIE viewport visual confirmation is still required for the actual title screen and NEW GAME click path.
+# BUILD_CHECK — UE5 Build Verification
+
+## Cycle 016 execution result - visual / audio pass 1
+
+Date: 2026-07-14
+
+Branch: `feature/visual-audio-pass1`
+
+Commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" `
+  -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+Results:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- First build pass caught one UHT macro issue:
+  - Child override `AEvaAdamBossCharacter::PlayPrototypeAttackFeedback()` repeated `UFUNCTION`.
+  - Removed the child macro and rebuilt successfully.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Tests run: 23.
+  - Success: 23.
+  - Failures: 0.
+  - Latest automation log: `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke: exit code 0.
+  - `EvaPrototypeGameMode` loaded.
+  - Game flow transitioned to Title and Title UI initialized.
+
+Notes:
+
+- Runtime smoke used `-NoSound`, so audible gameplay sound verification is still manual PIE work.
+- Codex did not perform PIE viewport visual confirmation.
+- UE5.8 commandlet still prints SDK validation warnings for non-Win64 platforms such as LinuxArm64 and VisionOS. Win64 is valid and build/test/runtime commands returned exit code 0.

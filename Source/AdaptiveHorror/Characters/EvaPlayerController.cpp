@@ -1,5 +1,6 @@
 #include "Characters/EvaPlayerController.h"
 #include "AdaptiveHorror.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Core/EvaSettingsSaveGame.h"
@@ -9,7 +10,6 @@
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
-#include "Sound/SoundWaveProcedural.h"
 #include "UI/EvaMenuWidgets.h"
 #include "Blueprint/UserWidget.h"
 
@@ -479,39 +479,8 @@ bool AEvaPlayerController::IsMouseYInvertedSetting() const
 
 void AEvaPlayerController::PlayTone(const float Frequency, const float Duration, const float VolumeScale) const
 {
-    if (!GetWorld() || Frequency <= 0.0f || Duration <= 0.0f)
-    {
-        return;
-    }
-
-    constexpr int32 SampleRate = 22050;
-    constexpr int32 NumChannels = 1;
-    const int32 SampleCount = FMath::Max(1, FMath::RoundToInt(SampleRate * Duration));
-    TArray<int16> Samples;
-    Samples.SetNumZeroed(SampleCount);
-
     const float Volume = FMath::Clamp(GetMasterVolumeSetting() * GetSFXVolumeSetting() * VolumeScale, 0.0f, 1.0f);
-    for (int32 Index = 0; Index < SampleCount; ++Index)
-    {
-        const float T = static_cast<float>(Index) / static_cast<float>(SampleRate);
-        const float Envelope = 1.0f - (static_cast<float>(Index) / static_cast<float>(SampleCount));
-        const float Wave = FMath::Sin(2.0f * PI * Frequency * T) * Envelope * Volume;
-        Samples[Index] = static_cast<int16>(FMath::Clamp(Wave, -1.0f, 1.0f) * 32767.0f);
-    }
-
-    USoundWaveProcedural* Sound = NewObject<USoundWaveProcedural>(GetTransientPackage());
-    if (!Sound)
-    {
-        return;
-    }
-
-    Sound->SetSampleRate(SampleRate);
-    Sound->NumChannels = NumChannels;
-    Sound->Duration = Duration;
-    Sound->SoundGroup = SOUNDGROUP_UI;
-    Sound->bLooping = false;
-    Sound->QueueAudio(reinterpret_cast<uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
-    UGameplayStatics::PlaySound2D(GetWorld(), Sound, 1.0f);
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, Frequency, Duration, Volume);
 }
 
 void AEvaPlayerController::PlayUIClick() const

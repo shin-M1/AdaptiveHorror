@@ -419,6 +419,10 @@ void AEvaZombieAIController::TryAttackTarget()
 
     LastAttackTime = Now;
     UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, this, GetPawn(), UDamageType::StaticClass());
+    if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
+    {
+        Zombie->PlayPrototypeAttackFeedback();
+    }
 }
 
 bool AEvaZombieAIController::TryHandleLearningAdaptation()

@@ -1,5 +1,6 @@
 #include "Characters/EvaPlayerCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/EvaHealthComponent.h"
@@ -204,6 +205,7 @@ float AEvaPlayerCharacter::TakeDamage(const float DamageAmount, const FDamageEve
     {
         TelemetryComponent->RecordDamageTaken(DamageAmount, LastDamageCause);
     }
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 146.8f, 0.12f, 0.42f);
     return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 }
 
@@ -449,6 +451,7 @@ void AEvaPlayerCharacter::HandleDeath(AActor* DeadActor)
     {
         TelemetryComponent->RecordDeathCause(LastDamageCause);
     }
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 65.4f, 0.45f, 0.72f);
 
     if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {

@@ -53,6 +53,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void SetDebugHealthNumbersVisible(bool bVisible);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    virtual void PlayPrototypeAttackFeedback();
+
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UStaticMeshComponent* GetBodyVisualComponent() const { return BodyVisual; }
 
@@ -69,6 +72,9 @@ protected:
     void HandleDeath(AActor* DeadActor);
 
     virtual void OnDefeated();
+    void StartPrototypeVisualAction(FName ActionName, float Duration, float Frequency, float VolumeScale);
+    void UpdatePrototypeVisualAnimation(float DeltaSeconds);
+    void ApplyPrototypeVisualColor(const FLinearColor& Color);
     void SetPrototypeDebugLabel(const FString& Label, const FColor& Color, float WorldSize = 42.0f);
     void UpdatePrototypeDebugLabelFacing();
     void UpdatePrototypeHealthBar();
@@ -91,6 +97,18 @@ protected:
     TObjectPtr<UStaticMeshComponent> RightArmVisual;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> LeftLegVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> RightLegVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> LeftShoulderVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UStaticMeshComponent> RightShoulderVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> TypeLabel;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
@@ -110,6 +128,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     bool bDebugHealthNumbersVisible = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
+    bool bEnablePrototypeAnimation = true;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Combat")
     TObjectPtr<UBoxComponent> TorsoHitbox;
@@ -145,6 +166,10 @@ protected:
     float CurrentAttackDamage = 10.0f;
 
     TWeakObjectPtr<AController> LastDamageInstigator;
+
+    float PrototypeVisualAnimTime = 0.0f;
+    float PrototypeVisualActionEndTime = -1000.0f;
+    FName PrototypeVisualAction = NAME_None;
 
     bool bDefeatHandled = false;
 };

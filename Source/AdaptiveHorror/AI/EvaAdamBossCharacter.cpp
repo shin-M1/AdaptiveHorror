@@ -1,6 +1,7 @@
 #include "AI/EvaAdamBossCharacter.h"
 #include "AI/EvaAdamBossAIController.h"
 #include "AI/EvaLearningSubsystem.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/EvaHealthComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
@@ -67,9 +68,31 @@ void AEvaAdamBossCharacter::BeginPlay()
         RightArmVisual->SetRelativeLocation(FVector(0.0f, 86.0f, 48.0f));
         RightArmVisual->SetRelativeScale3D(FVector(0.34f, 0.30f, 1.38f));
     }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetRelativeLocation(FVector(0.0f, -36.0f, -84.0f));
+        LeftLegVisual->SetRelativeScale3D(FVector(0.32f, 0.30f, 1.14f));
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetRelativeLocation(FVector(0.0f, 36.0f, -84.0f));
+        RightLegVisual->SetRelativeScale3D(FVector(0.32f, 0.30f, 1.14f));
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetRelativeLocation(FVector(0.0f, -94.0f, 90.0f));
+        LeftShoulderVisual->SetRelativeScale3D(FVector(0.62f, 0.34f, 0.40f));
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetRelativeLocation(FVector(0.0f, 94.0f, 90.0f));
+        RightShoulderVisual->SetRelativeScale3D(FVector(0.62f, 0.34f, 0.40f));
+    }
+    ApplyPrototypeVisualColor(FLinearColor(0.95f, 0.28f, 0.05f, 1.0f));
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor(255, 128, 0), 78.0f);
     SetOverheadHealthBarEnabled(false);
     LogPrototypeDebugLabelState(TEXT("AdamBeginPlayFinal"));
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 41.2f, 1.4f, 0.36f);
     if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
     {
         MovementComponent->MaxWalkSpeed = AdamMovementSpeed;
@@ -82,6 +105,21 @@ void AEvaAdamBossCharacter::BeginPlay()
     {
         ApplyEvolutionToController();
     }
+}
+
+void AEvaAdamBossCharacter::PlayPrototypeAttackFeedback()
+{
+    StartPrototypeVisualAction(FName(TEXT("Attack")), 0.45f, 73.0f, 0.68f);
+}
+
+void AEvaAdamBossCharacter::PlayAdamChargeFeedback()
+{
+    StartPrototypeVisualAction(FName(TEXT("Charge")), 0.72f, 49.0f, 0.76f);
+}
+
+void AEvaAdamBossCharacter::PlayAdamRoarFeedback()
+{
+    StartPrototypeVisualAction(FName(TEXT("Roar")), 1.05f, 36.0f, 0.82f);
 }
 
 bool AEvaAdamBossCharacter::ShouldEnterPhaseTwo(const float CurrentHealth, const float MaxHealth) const
@@ -122,6 +160,25 @@ void AEvaAdamBossCharacter::EnterPhaseTwo()
         RightArmVisual->SetRelativeLocation(FVector(0.0f, 96.0f, 44.0f));
         RightArmVisual->SetRelativeScale3D(FVector(0.40f, 0.34f, 1.55f));
     }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetRelativeScale3D(FVector(0.36f, 0.34f, 1.22f));
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetRelativeScale3D(FVector(0.36f, 0.34f, 1.22f));
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetRelativeLocation(FVector(0.0f, -104.0f, 96.0f));
+        LeftShoulderVisual->SetRelativeScale3D(FVector(0.72f, 0.40f, 0.48f));
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetRelativeLocation(FVector(0.0f, 104.0f, 96.0f));
+        RightShoulderVisual->SetRelativeScale3D(FVector(0.72f, 0.40f, 0.48f));
+    }
+    ApplyPrototypeVisualColor(FLinearColor(1.0f, 0.06f, 0.02f, 1.0f));
     SetPrototypeDebugLabel(TEXT("ADAM"), FColor::Red, 82.0f);
     SetOverheadHealthBarEnabled(false);
     LogPrototypeDebugLabelState(TEXT("AdamPhaseTwoLabel"));
@@ -205,6 +262,8 @@ void AEvaAdamBossCharacter::HandleAdamHealthChanged(const float CurrentHealth, c
 
 void AEvaAdamBossCharacter::OnDefeated()
 {
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 32.0f, 1.10f, 0.90f);
+
     bool bNotifiedDirector = false;
     TArray<AActor*> Directors;
     if (GetWorld())

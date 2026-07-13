@@ -1,4 +1,5 @@
 #include "Weapons/EvaWeaponBase.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
@@ -90,6 +91,7 @@ bool AEvaWeaponBase::StartReload()
     }
 
     bReloading = true;
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 330.0f, 0.18f, 0.28f);
     GetWorldTimerManager().SetTimer(ReloadTimer, this, &AEvaWeaponBase::FinishReload, ReloadDuration, false);
     return true;
 }
@@ -122,4 +124,5 @@ void AEvaWeaponBase::FinishReload()
     AmmoInMagazine += Loaded;
     ReserveAmmo -= Loaded;
     bReloading = false;
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 520.0f, 0.08f, 0.25f);
 }

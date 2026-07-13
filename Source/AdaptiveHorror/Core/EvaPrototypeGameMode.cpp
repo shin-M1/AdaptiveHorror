@@ -5,6 +5,7 @@
 #include "AI/EvaLearningSubsystem.h"
 #include "AI/EvaZombieAIController.h"
 #include "AI/EvaZombieCharacter.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Characters/EvaPlayerController.h"
 #include "Components/BoxComponent.h"
@@ -707,7 +708,8 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             Cast<UDirectionalLightComponent>(DirectionalLight->GetLightComponent()))
         {
             LightComponent->SetMobility(EComponentMobility::Movable);
-            LightComponent->SetIntensity(4.5f);
+            LightComponent->SetIntensity(1.35f);
+            LightComponent->SetLightColor(FLinearColor(0.55f, 0.68f, 0.92f));
         }
     }
 
@@ -716,7 +718,7 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         if (USkyLightComponent* SkyLightComponent = SkyLight->GetLightComponent())
         {
             SkyLightComponent->SetMobility(EComponentMobility::Movable);
-            SkyLightComponent->SetIntensity(1.4f);
+            SkyLightComponent->SetIntensity(0.28f);
             SkyLightComponent->RecaptureSky();
         }
     }
@@ -726,10 +728,30 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         if (UPointLightComponent* PointLightComponent = Cast<UPointLightComponent>(Light->GetLightComponent()))
         {
             PointLightComponent->SetMobility(EComponentMobility::Movable);
-            PointLightComponent->SetIntensity(25000.0f);
-            PointLightComponent->SetAttenuationRadius(11000.0f);
+            PointLightComponent->SetIntensity(4200.0f);
+            PointLightComponent->SetAttenuationRadius(6200.0f);
+            PointLightComponent->SetLightColor(FLinearColor(0.38f, 0.55f, 0.78f));
         }
     }
+
+    for (int32 ZoneIndex = 0; ZoneIndex < UE_ARRAY_COUNT(ZoneCenters); ++ZoneIndex)
+    {
+        const FVector EmergencyLightLocation(ZoneCenters[ZoneIndex].X, ZoneCenters[ZoneIndex].Y + 585.0f, 285.0f);
+        if (APointLight* EmergencyLight = GetWorld()->SpawnActor<APointLight>(EmergencyLightLocation, FRotator::ZeroRotator))
+        {
+            if (UPointLightComponent* PointLightComponent = Cast<UPointLightComponent>(EmergencyLight->GetLightComponent()))
+            {
+                PointLightComponent->SetMobility(EComponentMobility::Movable);
+                PointLightComponent->SetIntensity(1800.0f);
+                PointLightComponent->SetAttenuationRadius(780.0f);
+                PointLightComponent->SetLightColor(ZoneIndex == 5 ?
+                    FLinearColor(1.0f, 0.12f, 0.04f) :
+                    FLinearColor(0.85f, 0.08f, 0.04f));
+            }
+        }
+    }
+
+    UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 41.2f, 1.6f, 0.12f);
 
     LogNavigationStatus(TEXT("AfterRuntimeArenaGeometry"));
 }

@@ -1,6 +1,7 @@
 #include "AI/EvaHunterCharacter.h"
 #include "AI/EvaHunterAIController.h"
 #include "AI/EvaLearningSubsystem.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Components/EvaHealthComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
 #include "Engine/Engine.h"
@@ -50,8 +51,30 @@ void AEvaHunterCharacter::BeginPlay()
         RightArmVisual->SetRelativeLocation(FVector(0.0f, 58.0f, 44.0f));
         RightArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 1.05f));
     }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetRelativeLocation(FVector(0.0f, -22.0f, -58.0f));
+        LeftLegVisual->SetRelativeScale3D(FVector(0.16f, 0.14f, 0.86f));
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetRelativeLocation(FVector(0.0f, 22.0f, -58.0f));
+        RightLegVisual->SetRelativeScale3D(FVector(0.16f, 0.14f, 0.86f));
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetRelativeLocation(FVector(0.0f, -62.0f, 78.0f));
+        LeftShoulderVisual->SetRelativeScale3D(FVector(0.34f, 0.18f, 0.26f));
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetRelativeLocation(FVector(0.0f, 62.0f, 78.0f));
+        RightShoulderVisual->SetRelativeScale3D(FVector(0.34f, 0.18f, 0.26f));
+    }
+    ApplyPrototypeVisualColor(FLinearColor(0.02f, 0.02f, 0.025f, 1.0f));
     SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d"), HunterTier), FColor::Red, 54.0f);
     LogPrototypeDebugLabelState(TEXT("HunterBeginPlayFinal"));
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 55.0f, 0.55f, 0.58f);
 
     if (UGameInstance* GameInstance = GetGameInstance())
     {

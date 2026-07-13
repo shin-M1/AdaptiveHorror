@@ -1,5 +1,83 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 016 Visual / Audio Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/visual-audio-pass1`.
+
+Do not merge this branch into `main` until the user visually confirms the pass in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 23 tests succeeded, 0 failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime log confirms `EvaPrototypeGameMode` loaded and Title state/UI initialized.
+- PIE visual/audio verification is still required; Codex did not visually inspect the viewport or hear audio.
+
+### Most recent implementation
+
+- Enemy visual pass:
+  - Added leg and shoulder primitive mesh parts.
+  - Zombie / FAST / ARMORED / LONG ARM / COMPOSITE / HUNTER / ADAM now have clearer silhouettes.
+  - Material tint is attempted through dynamic material parameters, but shape differences do not depend on tint.
+- Simple animation pass:
+  - Idle/walk component rotation.
+  - Attack feedback for regular enemies.
+  - ADAM Attack / Charge / Roar have distinct temporary poses.
+- Audio pass:
+  - Added `UEvaAudioFunctionLibrary` for procedural placeholder tones.
+  - UI tones now share that helper.
+  - Added temporary tones for gun, reload, player damage/death, enemy attack/death, HUNTER spawn, ADAM cues, and facility ambience.
+- Lighting pass:
+  - Darker movable base lighting.
+  - Red emergency point lights per facility zone.
+  - Runtime graybox geometry mobility was not changed to avoid NavMesh/gameplay risk.
+
+### Next highest-priority task
+
+Run PIE and verify visuals/audio only. Do not rebalance AI or gameplay unless a regression is directly caused by this visual/audio branch.
+
+PIE checklist:
+
+1. Confirm title screen still appears and NEW GAME starts gameplay.
+2. Confirm Zombie / FAST / ARMORED / LONG ARM / COMPOSITE / HUNTER / ADAM are visually distinguishable.
+3. Confirm enemies visibly walk and attack.
+4. Confirm ADAM Attack / Charge / Roar can be recognized visually.
+5. Confirm gun, reload, damage, enemy attack, HUNTER spawn, ADAM cues, Stage Clear, Game Over, and UI tones are audible.
+6. Confirm lighting is darker with emergency/alarm tone.
+7. Confirm no unwanted `Lighting needs to be rebuilt` warning appears.
+8. Confirm existing zombie chase, HUNTER, ADAM, Stage Clear, Game Over, and debug keys still work.
+
+If a problem is found:
+
+- Fix only the visual/audio regression.
+- Do not change NavMesh, path following, game flow, boss logic, or balance unless the visual/audio change directly caused the issue.
+
+### Important files
+
+- `Source/AdaptiveHorror/Audio/EvaAudioFunctionLibrary.h`
+- `Source/AdaptiveHorror/Audio/EvaAudioFunctionLibrary.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Weapons/EvaWeaponBase.cpp`
+- `Source/AdaptiveHorror/Weapons/EvaHitscanWeapon.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that the game looks/sounds more game-like without AI/gameflow regression.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 015 Title widget display / PIE input flow
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

@@ -1,5 +1,82 @@
 # Development Log
 
+## 2026-07-14 - Cycle 016: Visual / Audio Pass 1
+
+Branch: `feature/visual-audio-pass1`
+
+### Scope
+
+- Stable `main` preservation pass. Created feature branch and did not merge to `main`.
+- No AI decision, NavMesh, Stage Clear, Game Flow, Player Death, or boss progression logic was intentionally changed.
+- Two AI controller files were touched only to fire cosmetic visual/audio feedback after already-existing attack / charge / roar events.
+
+### Implemented
+
+- Enemy prototype silhouettes:
+  - Added leg and shoulder mesh parts to the shared enemy visual body.
+  - Zombie / FAST / ARMORED / LONG ARM / COMPOSITE now differ by body width, limb length, shoulder mass, leg proportions, label, and attempted material tint.
+  - HUNTER uses a darker, taller silhouette.
+  - ADAM uses larger body, shoulder, limb proportions and Phase 2 visual scaling.
+- Simple procedural animation:
+  - Idle / walk are represented by subtle body/head sway and limb swing.
+  - Attack feedback makes enemies lean and swing arms.
+  - ADAM Attack / Charge / Roar now use distinct temporary poses and tones.
+- Prototype audio foundation:
+  - Added `UEvaAudioFunctionLibrary` for replaceable procedural tone playback.
+  - Existing UI tones now use the shared audio helper.
+  - Added temporary tones for gun fire, reload start/end, player damage/death, enemy attack/death, HUNTER spawn, ADAM spawn cue, ADAM attack/charge/roar/death, and facility boot ambience.
+  - Runtime smoke was executed with `-NoSound`; audible confirmation remains PIE/manual.
+- Lighting pass:
+  - Reduced global brightness.
+  - Kept runtime graybox floor/cover mobility untouched to avoid destabilizing runtime NavMesh.
+  - Movable lights now provide darker blue base lighting plus red emergency lights per facility zone.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Audio/EvaAudioFunctionLibrary.h`
+- `Source/AdaptiveHorror/Audio/EvaAudioFunctionLibrary.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaAdamBossCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerController.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Weapons/EvaWeaponBase.cpp`
+- `Source/AdaptiveHorror/Weapons/EvaHitscanWeapon.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - First pass failed on UHT because child override `AEvaAdamBossCharacter::PlayPrototypeAttackFeedback()` incorrectly repeated `UFUNCTION`; removed child macro and rebuilt.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest log confirmed 23 successful tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Runtime log confirms `EvaPrototypeGameMode` loaded and Title state/UI initialized.
+- PIE visual/audio confirmation: not performed by Codex; remains unconfirmed.
+
+### Known risks / follow-up
+
+- Procedural material tint depends on Engine basic shape material parameters; silhouettes remain differentiated even if tint is not visible.
+- Lighting warning must be rechecked in actual PIE viewport. Geometry mobility was not changed because previous runtime NavMesh stability depends on static runtime graybox pieces.
+- Audible balance is unverified because smoke test intentionally used `-NoSound`.
+
+### Next recommended task
+
+- Open PIE on branch `feature/visual-audio-pass1` and visually/audibly verify enemy silhouettes, simple walk/attack animation, ADAM charge/roar readability, emergency lighting, and temporary tones.
+
 ## 2026-07-12 - Cycle 009: 障害物回避リカバリ / 敵識別表示 / 全Automation導線
 
 ### 実装・修正内容

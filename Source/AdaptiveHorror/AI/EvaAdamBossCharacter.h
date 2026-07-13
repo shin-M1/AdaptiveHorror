@@ -42,6 +42,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Adam")
     int32 GetTotalSummonCount() const { return TotalSummonCount; }
 
+    virtual void PlayPrototypeAttackFeedback() override;
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adam")
+    void PlayAdamChargeFeedback();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adam")
+    void PlayAdamRoarFeedback();
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Adam")
     float AdamHP = 2500.0f;
 

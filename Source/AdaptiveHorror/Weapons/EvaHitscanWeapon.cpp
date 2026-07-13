@@ -1,5 +1,6 @@
 #include "Weapons/EvaHitscanWeapon.h"
 #include "AI/EvaZombieCharacter.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Components/EvaHealthComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
@@ -52,6 +53,7 @@ bool AEvaHitscanWeapon::PerformFire()
     }
 
     UAISense_Hearing::ReportNoiseEvent(GetWorld(), ViewLocation, 1.0f, InstigatorPawn, 1000.0f, TEXT("Weapon.Fire"));
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, ViewLocation, 880.0f, 0.045f, 0.48f);
 
     AActor* HitActor = Hit.GetActor();
     if (!bHit || !HitActor || !HitActor->FindComponentByClass<UEvaHealthComponent>())

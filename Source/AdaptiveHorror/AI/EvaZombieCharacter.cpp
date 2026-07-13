@@ -1,6 +1,7 @@
 #include "AI/EvaZombieCharacter.h"
 #include "AdaptiveHorror.h"
 #include "AI/EvaZombieAIController.h"
+#include "Audio/EvaAudioFunctionLibrary.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -19,6 +20,7 @@
 #include "Engine/Engine.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
 #if !UE_BUILD_SHIPPING
@@ -27,6 +29,29 @@ static TAutoConsoleVariable<int32> CVarEvaDebugEnemyHealthNumbers(
     0,
     TEXT("Shows CurrentHP / MaxHP under normal enemy overhead HP bars when set to 1."));
 #endif
+
+namespace
+{
+const FName EvaVisualActionAttack(TEXT("Attack"));
+const FName EvaVisualActionCharge(TEXT("Charge"));
+const FName EvaVisualActionRoar(TEXT("Roar"));
+
+void ApplyColorToComponent(UStaticMeshComponent* Component, const FLinearColor& Color)
+{
+    if (!Component)
+    {
+        return;
+    }
+
+    UMaterialInstanceDynamic* DynamicMaterial = Component->CreateAndSetMaterialInstanceDynamic(0);
+    if (DynamicMaterial)
+    {
+        DynamicMaterial->SetVectorParameterValue(TEXT("Color"), Color);
+        DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Color);
+        DynamicMaterial->SetVectorParameterValue(TEXT("Tint"), Color);
+    }
+}
+}
 
 AEvaZombieCharacter::AEvaZombieCharacter()
 {
@@ -63,6 +88,30 @@ AEvaZombieCharacter::AEvaZombieCharacter()
     RightArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     RightArmVisual->SetRelativeLocation(FVector(0.0f, 42.0f, 46.0f));
     RightArmVisual->SetRelativeScale3D(FVector(0.16f, 0.16f, 0.58f));
+
+    LeftLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftLegVisual"));
+    LeftLegVisual->SetupAttachment(GetCapsuleComponent());
+    LeftLegVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftLegVisual->SetRelativeLocation(FVector(0.0f, -18.0f, -52.0f));
+    LeftLegVisual->SetRelativeScale3D(FVector(0.16f, 0.16f, 0.68f));
+
+    RightLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightLegVisual"));
+    RightLegVisual->SetupAttachment(GetCapsuleComponent());
+    RightLegVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightLegVisual->SetRelativeLocation(FVector(0.0f, 18.0f, -52.0f));
+    RightLegVisual->SetRelativeScale3D(FVector(0.16f, 0.16f, 0.68f));
+
+    LeftShoulderVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftShoulderVisual"));
+    LeftShoulderVisual->SetupAttachment(GetCapsuleComponent());
+    LeftShoulderVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftShoulderVisual->SetRelativeLocation(FVector(0.0f, -45.0f, 72.0f));
+    LeftShoulderVisual->SetRelativeScale3D(FVector(0.22f, 0.18f, 0.18f));
+
+    RightShoulderVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightShoulderVisual"));
+    RightShoulderVisual->SetupAttachment(GetCapsuleComponent());
+    RightShoulderVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightShoulderVisual->SetRelativeLocation(FVector(0.0f, 45.0f, 72.0f));
+    RightShoulderVisual->SetRelativeScale3D(FVector(0.22f, 0.18f, 0.18f));
 
     TypeLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("TypeLabel"));
     TypeLabel->SetupAttachment(GetCapsuleComponent());
@@ -116,6 +165,10 @@ AEvaZombieCharacter::AEvaZombieCharacter()
         BodyVisual->SetStaticMesh(CubeMesh.Object);
         LeftArmVisual->SetStaticMesh(CubeMesh.Object);
         RightArmVisual->SetStaticMesh(CubeMesh.Object);
+        LeftLegVisual->SetStaticMesh(CubeMesh.Object);
+        RightLegVisual->SetStaticMesh(CubeMesh.Object);
+        LeftShoulderVisual->SetStaticMesh(CubeMesh.Object);
+        RightShoulderVisual->SetStaticMesh(CubeMesh.Object);
     }
     if (SphereMesh.Succeeded())
     {
@@ -148,6 +201,7 @@ AEvaZombieCharacter::AEvaZombieCharacter()
 void AEvaZombieCharacter::Tick(const float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    UpdatePrototypeVisualAnimation(DeltaSeconds);
     UpdatePrototypeDebugLabelFacing();
 }
 
@@ -219,8 +273,15 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     FVector ArmScale(0.16f, 0.16f, 0.58f);
     FVector LeftArmLocation(0.0f, -42.0f, 46.0f);
     FVector RightArmLocation(0.0f, 42.0f, 46.0f);
+    FVector LegScale(0.16f, 0.16f, 0.68f);
+    FVector LeftLegLocation(0.0f, -18.0f, -52.0f);
+    FVector RightLegLocation(0.0f, 18.0f, -52.0f);
+    FVector ShoulderScale(0.22f, 0.18f, 0.18f);
+    FVector LeftShoulderLocation(0.0f, -45.0f, 72.0f);
+    FVector RightShoulderLocation(0.0f, 45.0f, 72.0f);
     FString DebugLabel(TEXT("ZOMBIE"));
     FColor DebugLabelColor = FColor::Green;
+    FLinearColor VisualColor(0.18f, 0.65f, 0.22f, 1.0f);
 
     const bool bFast = NewEvolutionType == EEvaEvolutionType::Fast || NewEvolutionType == EEvaEvolutionType::Composite;
     const bool bArmored = NewEvolutionType == EEvaEvolutionType::Armored || NewEvolutionType == EEvaEvolutionType::Composite;
@@ -234,8 +295,15 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
         ArmScale = FVector(0.12f, 0.12f, 0.70f);
         LeftArmLocation = FVector(0.0f, -36.0f, 48.0f);
         RightArmLocation = FVector(0.0f, 36.0f, 48.0f);
+        LegScale = FVector(0.12f, 0.12f, 0.92f);
+        LeftLegLocation = FVector(0.0f, -14.0f, -62.0f);
+        RightLegLocation = FVector(0.0f, 14.0f, -62.0f);
+        ShoulderScale = FVector(0.18f, 0.12f, 0.14f);
+        LeftShoulderLocation = FVector(0.0f, -34.0f, 78.0f);
+        RightShoulderLocation = FVector(0.0f, 34.0f, 78.0f);
         DebugLabel = TEXT("FAST");
         DebugLabelColor = FColor::Cyan;
+        VisualColor = FLinearColor(0.08f, 0.75f, 0.95f, 1.0f);
     }
     if (bArmored)
     {
@@ -246,8 +314,15 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
         ArmScale = FVector(FMath::Max(ArmScale.X, 0.28f), FMath::Max(ArmScale.Y, 0.24f), FMath::Max(ArmScale.Z, 0.72f));
         LeftArmLocation = FVector(0.0f, -58.0f, 46.0f);
         RightArmLocation = FVector(0.0f, 58.0f, 46.0f);
+        LegScale = FVector(FMath::Max(LegScale.X, 0.26f), FMath::Max(LegScale.Y, 0.22f), FMath::Max(LegScale.Z, 0.78f));
+        LeftLegLocation = FVector(0.0f, -24.0f, -54.0f);
+        RightLegLocation = FVector(0.0f, 24.0f, -54.0f);
+        ShoulderScale = FVector(0.48f, 0.30f, 0.32f);
+        LeftShoulderLocation = FVector(0.0f, -66.0f, 78.0f);
+        RightShoulderLocation = FVector(0.0f, 66.0f, 78.0f);
         DebugLabel = TEXT("ARMORED");
         DebugLabelColor = FColor::Yellow;
+        VisualColor = FLinearColor(0.95f, 0.82f, 0.22f, 1.0f);
     }
     if (bLongArm)
     {
@@ -257,14 +332,19 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
         ArmScale = FVector(FMath::Max(ArmScale.X, 0.18f), FMath::Max(ArmScale.Y, 0.18f), 1.24f);
         LeftArmLocation = FVector(0.0f, -56.0f, 34.0f);
         RightArmLocation = FVector(0.0f, 56.0f, 34.0f);
+        ShoulderScale = FVector(FMath::Max(ShoulderScale.X, 0.28f), FMath::Max(ShoulderScale.Y, 0.20f), FMath::Max(ShoulderScale.Z, 0.22f));
+        LeftShoulderLocation = FVector(0.0f, -58.0f, 74.0f);
+        RightShoulderLocation = FVector(0.0f, 58.0f, 74.0f);
         DebugLabel = TEXT("LONG ARM");
         DebugLabelColor = FColor(170, 90, 255);
+        VisualColor = FLinearColor(0.55f, 0.22f, 0.95f, 1.0f);
     }
     if (NewEvolutionType == EEvaEvolutionType::Composite)
     {
         Tags.AddUnique(TEXT("EvolvedComposite"));
         DebugLabel = TEXT("COMPOSITE");
         DebugLabelColor = FColor::Magenta;
+        VisualColor = FLinearColor(1.0f, 0.12f, 0.82f, 1.0f);
     }
 
     if (HealthComponent)
@@ -289,6 +369,27 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
         RightArmVisual->SetRelativeLocation(RightArmLocation);
         RightArmVisual->SetRelativeScale3D(ArmScale);
     }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetRelativeLocation(LeftLegLocation);
+        LeftLegVisual->SetRelativeScale3D(LegScale);
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetRelativeLocation(RightLegLocation);
+        RightLegVisual->SetRelativeScale3D(LegScale);
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetRelativeLocation(LeftShoulderLocation);
+        LeftShoulderVisual->SetRelativeScale3D(ShoulderScale);
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetRelativeLocation(RightShoulderLocation);
+        RightShoulderVisual->SetRelativeScale3D(ShoulderScale);
+    }
+    ApplyPrototypeVisualColor(VisualColor);
     SetActorScale3D(FVector::OneVector);
     SetPrototypeDebugLabel(DebugLabel, DebugLabelColor);
     LogPrototypeDebugLabelState(TEXT("ConfigureEvolution"));
@@ -337,6 +438,129 @@ void AEvaZombieCharacter::SetDebugHealthNumbersVisible(const bool bVisible)
 {
     bDebugHealthNumbersVisible = bVisible;
     UpdatePrototypeHealthBar();
+}
+
+void AEvaZombieCharacter::PlayPrototypeAttackFeedback()
+{
+    StartPrototypeVisualAction(EvaVisualActionAttack, 0.34f, 196.0f, 0.42f);
+}
+
+void AEvaZombieCharacter::StartPrototypeVisualAction(const FName ActionName, const float Duration,
+    const float Frequency, const float VolumeScale)
+{
+    if (HealthComponent && HealthComponent->IsDead())
+    {
+        return;
+    }
+
+    PrototypeVisualAction = ActionName;
+    PrototypeVisualActionEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() + FMath::Max(0.05f, Duration) : -1000.0f;
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), Frequency, Duration, VolumeScale);
+}
+
+void AEvaZombieCharacter::UpdatePrototypeVisualAnimation(const float DeltaSeconds)
+{
+    if (!bEnablePrototypeAnimation)
+    {
+        return;
+    }
+
+    if (HealthComponent && HealthComponent->IsDead())
+    {
+        return;
+    }
+
+    PrototypeVisualAnimTime += DeltaSeconds;
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    const bool bActionActive = Now <= PrototypeVisualActionEndTime && PrototypeVisualAction != NAME_None;
+    if (!bActionActive)
+    {
+        PrototypeVisualAction = NAME_None;
+    }
+
+    const float MoveSpeed = GetVelocity().Size2D();
+    const bool bWalking = MoveSpeed > 12.0f;
+    const float WalkSpeedScale = bWalking ? 8.0f : 2.0f;
+    const float Swing = FMath::Sin(PrototypeVisualAnimTime * WalkSpeedScale);
+    const float Bob = FMath::Sin(PrototypeVisualAnimTime * WalkSpeedScale * 0.5f);
+    const float WalkAmount = bWalking ? 1.0f : 0.25f;
+
+    FRotator BodyRotation(0.0f, 0.0f, Swing * 3.0f * WalkAmount);
+    FRotator HeadRotation(0.0f, Swing * 3.5f * WalkAmount, 0.0f);
+    FRotator LeftArmRotation(Swing * 28.0f * WalkAmount, 0.0f, 0.0f);
+    FRotator RightArmRotation(-Swing * 28.0f * WalkAmount, 0.0f, 0.0f);
+    FRotator LeftLegRotation(-Swing * 24.0f * WalkAmount, 0.0f, 0.0f);
+    FRotator RightLegRotation(Swing * 24.0f * WalkAmount, 0.0f, 0.0f);
+    BodyRotation.Yaw = Bob * 1.5f * WalkAmount;
+
+    if (bActionActive && PrototypeVisualAction == EvaVisualActionAttack)
+    {
+        BodyRotation = FRotator(-8.0f, 0.0f, 0.0f);
+        HeadRotation = FRotator(-6.0f, 0.0f, 0.0f);
+        LeftArmRotation = FRotator(-72.0f, -18.0f, 0.0f);
+        RightArmRotation = FRotator(-72.0f, 18.0f, 0.0f);
+    }
+    else if (bActionActive && PrototypeVisualAction == EvaVisualActionCharge)
+    {
+        BodyRotation = FRotator(-16.0f, 0.0f, 0.0f);
+        HeadRotation = FRotator(-12.0f, 0.0f, 0.0f);
+        LeftArmRotation = FRotator(42.0f, -16.0f, 0.0f);
+        RightArmRotation = FRotator(42.0f, 16.0f, 0.0f);
+        LeftLegRotation = FRotator(-28.0f, 0.0f, 0.0f);
+        RightLegRotation = FRotator(28.0f, 0.0f, 0.0f);
+    }
+    else if (bActionActive && PrototypeVisualAction == EvaVisualActionRoar)
+    {
+        BodyRotation = FRotator(10.0f, 0.0f, Swing * 2.0f);
+        HeadRotation = FRotator(22.0f, 0.0f, 0.0f);
+        LeftArmRotation = FRotator(-118.0f, -42.0f, -18.0f);
+        RightArmRotation = FRotator(-118.0f, 42.0f, 18.0f);
+    }
+
+    if (BodyVisual)
+    {
+        BodyVisual->SetRelativeRotation(BodyRotation);
+    }
+    if (HeadVisual)
+    {
+        HeadVisual->SetRelativeRotation(HeadRotation);
+    }
+    if (LeftArmVisual)
+    {
+        LeftArmVisual->SetRelativeRotation(LeftArmRotation);
+    }
+    if (RightArmVisual)
+    {
+        RightArmVisual->SetRelativeRotation(RightArmRotation);
+    }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetRelativeRotation(LeftLegRotation);
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetRelativeRotation(RightLegRotation);
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, -Swing * 2.0f * WalkAmount));
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, Swing * 2.0f * WalkAmount));
+    }
+}
+
+void AEvaZombieCharacter::ApplyPrototypeVisualColor(const FLinearColor& Color)
+{
+    ApplyColorToComponent(BodyVisual, Color);
+    ApplyColorToComponent(HeadVisual, Color * 0.9f + FLinearColor::White * 0.1f);
+    ApplyColorToComponent(LeftArmVisual, Color * 0.85f);
+    ApplyColorToComponent(RightArmVisual, Color * 0.85f);
+    ApplyColorToComponent(LeftLegVisual, Color * 0.8f);
+    ApplyColorToComponent(RightLegVisual, Color * 0.8f);
+    ApplyColorToComponent(LeftShoulderVisual, Color * 1.15f);
+    ApplyColorToComponent(RightShoulderVisual, Color * 1.15f);
 }
 
 void AEvaZombieCharacter::EnsurePrototypeDebugLabelInitialized()
@@ -606,6 +830,7 @@ void AEvaZombieCharacter::OnDefeated()
     {
         GameMode->NotifyEnemyKilled(this);
     }
+    UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, GetActorLocation(), 98.0f, 0.24f, 0.34f);
 
     if (AAIController* ZombieController = Cast<AAIController>(GetController()))
     {
@@ -643,6 +868,22 @@ void AEvaZombieCharacter::OnDefeated()
     if (RightArmVisual)
     {
         RightArmVisual->SetVisibility(false, true);
+    }
+    if (LeftLegVisual)
+    {
+        LeftLegVisual->SetVisibility(false, true);
+    }
+    if (RightLegVisual)
+    {
+        RightLegVisual->SetVisibility(false, true);
+    }
+    if (LeftShoulderVisual)
+    {
+        LeftShoulderVisual->SetVisibility(false, true);
+    }
+    if (RightShoulderVisual)
+    {
+        RightShoulderVisual->SetVisibility(false, true);
     }
     if (TypeLabel)
     {

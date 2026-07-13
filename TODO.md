@@ -548,3 +548,28 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE: after NEW GAME confirm cursor hidden, GameOnly input, IgnoreMove=false, IgnoreLook=false.
 - [ ] PIE: confirm possessed pawn is `EvaPlayerCharacter`.
 - [ ] PIE: confirm WASD, mouse look, shooting, and Esc Pause work after NEW GAME.
+# TODO — Adaptive Horror FPS Demo
+
+## Cycle 016 Visual / Audio Pass 1
+
+- [x] Create `feature/visual-audio-pass1` from stable `main`.
+- [x] Improve enemy silhouettes using Engine standard primitive meshes only.
+- [x] Add visual body parts for legs and shoulders without changing capsules/nav agents.
+- [x] Add simple idle/walk/attack motion through component rotation.
+- [x] Make ADAM Attack / Charge / Roar visually distinct through temporary poses.
+- [x] Add shared procedural audio helper for replaceable prototype tones.
+- [x] Add temporary tones for UI reuse, gun, reload, damage, enemy attack/death, HUNTER spawn, ADAM cues, and facility ambience.
+- [x] Darken runtime facility lighting and add Movable emergency lights.
+- [x] Preserve runtime graybox geometry mobility to avoid NavMesh behavior changes.
+- [x] Development Editor / Win64 build without Live Coding succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 23 success, 0 failures.
+- [x] Runtime smoke succeeded: exit code 0.
+
+### Next manual PIE checks
+
+- [ ] Confirm Zombie / FAST / ARMORED / LONG ARM / COMPOSITE / HUNTER / ADAM silhouettes are distinguishable in viewport.
+- [ ] Confirm idle/walk/attack motion is visible without breaking combat.
+- [ ] Confirm ADAM Attack / Charge / Roar are visually distinguishable.
+- [ ] Confirm temporary UI/gameplay/enemy/boss tones are audible and not too loud.
+- [ ] Confirm emergency lighting is darker/readable and no unwanted “Lighting needs to be rebuilt” warning appears.
+- [ ] Confirm NavMesh / zombie chase / Stage Clear / Game Flow remain unchanged in PIE.
