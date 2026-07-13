@@ -51,6 +51,28 @@ enum class EEvaAdaptationDirective : uint8
 };
 
 UENUM(BlueprintType)
+enum class EEvaEnemyBehaviorRole : uint8
+{
+    Standard UMETA(DisplayName = "Standard"),
+    Flanker UMETA(DisplayName = "Flanker"),
+    Frontliner UMETA(DisplayName = "Frontliner"),
+    MidRangePressure UMETA(DisplayName = "Mid Range Pressure"),
+    Searcher UMETA(DisplayName = "Searcher"),
+    Ambusher UMETA(DisplayName = "Ambusher"),
+    CompositeAdaptive UMETA(DisplayName = "Composite Adaptive")
+};
+
+UENUM(BlueprintType)
+enum class EEvaHunterCounterType : uint8
+{
+    None UMETA(DisplayName = "None"),
+    AntiBerserker UMETA(DisplayName = "Anti Berserker"),
+    AntiRanger UMETA(DisplayName = "Anti Ranger"),
+    AntiGhost UMETA(DisplayName = "Anti Ghost"),
+    AntiExplorer UMETA(DisplayName = "Anti Explorer")
+};
+
+UENUM(BlueprintType)
 enum class EEvaFacilityZone : uint8
 {
     EntryLobby UMETA(DisplayName = "Entry Lobby"),
@@ -108,4 +130,100 @@ struct ADAPTIVEHORROR_API FEvaTelemetrySnapshot
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Telemetry")
     FName LastDamageSource = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Telemetry")
+    int32 SprintUseCount = 0;
+};
+
+USTRUCT(BlueprintType)
+struct ADAPTIVEHORROR_API FEvaPlayerAdaptationProfile
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float HeadshotRate = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float Accuracy = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float PreferredCombatDistance = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float CloseRangeRatio = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float LongRangeRatio = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float DamageTakenRate = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float SprintUsage = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float AggressionScore = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float StealthScore = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float ExplorationScore = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    FName MostUsedWeapon = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaCombatStyle CombatStyle = EEvaCombatStyle::Unknown;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float AnalysisPercent = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaAnalysisStage EvaStage = EEvaAnalysisStage::Learning;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    bool bValid = false;
+};
+
+USTRUCT(BlueprintType)
+struct ADAPTIVEHORROR_API FEvaEnemyAdaptationTuning
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaEvolutionType EvolutionType = EEvaEvolutionType::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaEnemyBehaviorRole BehaviorRole = EEvaEnemyBehaviorRole::Standard;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaHunterCounterType HunterCounterType = EEvaHunterCounterType::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    EEvaCombatStyle CounteredStyle = EEvaCombatStyle::Unknown;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float MoveSpeedMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float AttackCooldownMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float SidestepChance = 0.10f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float SearchDuration = 3.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float AttackRangeMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float HealthMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    float DamageMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Adaptation")
+    FString DebugSummary;
 };

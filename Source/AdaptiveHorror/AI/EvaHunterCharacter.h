@@ -18,6 +18,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Hunter")
     void InitializeHunterTier(int32 NewHunterTier);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Hunter")
+    void SetHunterCounterType(EEvaHunterCounterType NewCounterType);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Hunter")
+    EEvaHunterCounterType GetHunterCounterType() const { return HunterCounterType; }
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Hunter", meta = (ClampMin = "1.0"))
     float HunterHP = 250.0f;
 
@@ -39,6 +45,9 @@ protected:
 
 private:
     void DropAnalysisCore();
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Hunter")
+    EEvaHunterCounterType HunterCounterType = EEvaHunterCounterType::None;
 
     bool bHunterDefeated = false;
 };

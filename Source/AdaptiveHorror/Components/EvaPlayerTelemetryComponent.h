@@ -35,6 +35,9 @@ public:
     void RecordDamageTaken(float DamageAmount, FName DamageSource);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Telemetry")
+    void RecordSprintUsed();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Telemetry")
     void ResetTelemetry();
 
     UFUNCTION(BlueprintPure, Category = "EVA|Telemetry")

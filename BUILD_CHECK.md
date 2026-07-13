@@ -1,5 +1,39 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 018 execution result - Gameplay Pass 1
+
+Date: 2026-07-14
+
+Branch: `feature/gameplay-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Latest automation backup log confirmed 32 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+
+Notes:
+
+- The first build attempt failed with UE5.8/V7 warning-as-error `C4458` because local variables named `Character` hid `AController::Character`; the locals were renamed and the full build was re-run successfully.
+- Automation logs contain `[EVAProfile]` and `[HunterAdapt]` entries from Gameplay Pass 1 tests.
+- Title-mode runtime smoke does not enter live combat, so `[EnemyAdapt]` live movement/tuning logs still require PIE or a gameplay-directed runtime session.
+- PIE viewport confirmation was not performed by Codex and remains manual.
+
 ## Cycle 009 実行結果 — 全Automation導線更新後
 
 2026-07-12に、UE5.8環境で以下を実行しました。

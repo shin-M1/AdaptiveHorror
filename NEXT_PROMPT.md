@@ -1,5 +1,91 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 018 Gameplay Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms the adaptive gameplay pass in PIE.
+
+### Current verified state
+
+- Branch was created from latest `main`.
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 32 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- PIE visual/gameplay confirmation is still required; Codex did not visually inspect the viewport.
+
+### Most recent implementation
+
+- EVA adaptation profile:
+  - Aggregates weapon/combat telemetry into a bounded profile.
+  - Tracks headshot rate, accuracy, preferred distance, close/long range ratios, damage-taken tendency, sprint usage, stealth, exploration, dominant weapon, combat style, EVA analysis percent, and analysis stage.
+  - Updates only while gameplay is active; pauses/stops during pause, death, title, and Stage Clear.
+- Enemy behavior:
+  - Zombies apply safe adaptation tuning from the profile.
+  - Roles include Standard, Flanker, Frontliner, MidRangePressure, Searcher, Ambusher, and CompositeAdaptive.
+  - Existing path-following/repathing behavior was preserved.
+- Evolution:
+  - FAST / ARMORED / LONG ARM remain specific.
+  - COMPOSITE remains the 80% EVA analysis variant, but no longer stacks every advantage at full strength.
+- HUNTER:
+  - HUNTER locks a counter profile per deployment/reinsertion.
+  - HUNTER defeat stores the profile for later tiers.
+  - Labels can show counter tags such as `HUNTER T2 [ANTI-RANGER]`.
+- HUD:
+  - Normal HUD shows EVA stage, analysis, and combat style.
+  - Debug HUD (`F9` / `N`) shows adaptation profile, enemy tuning multipliers, and HUNTER counter type.
+- Tests:
+  - Added Gameplay Pass 1 tests for profile clamping, combat style selection, enemy tuning, COMPOSITE bounded behavior, HUNTER counter profile, and reset behavior.
+
+### Next highest-priority task
+
+Run PIE and verify the adaptive gameplay feel only. Do not add new enemies, weapons, maps, debug keys, or large UI changes. Do not rebalance until a specific observed problem is found.
+
+PIE checklist:
+
+1. Start New Game and confirm baseline title/menu/pause/game-over/stage-clear flow still works.
+2. Confirm normal zombies still chase, repath around obstacles, attack, take damage, and die.
+3. Use F1/F3/F7 and ordinary combat to raise EVA analysis and observe adaptation debug values.
+4. Confirm close-range/Berserker play causes enemies/HUNTER to counter by spacing, flanking, or pressure without breaking chase.
+5. Confirm long-range/Ranger play causes cover/side-pressure behavior without making enemies passive.
+6. Confirm Ghost/Searcher/Ambusher behavior is understandable when hide spots or escape routes are logged.
+7. Confirm COMPOSITE at 80% analysis is distinct but not unfair.
+8. Confirm HUNTER labels/counter behavior after spawn, defeat, and reinsertion.
+9. Confirm ADAM still starts, fights, dies, and Stage Clear still fires once.
+10. Confirm logs during active gameplay include `[EVAProfile]`, `[EnemyAdapt]`, and `[HunterAdapt]`.
+
+If a problem is found:
+
+- Fix only the observed Gameplay Pass 1 regression.
+- Preserve Runtime NavMesh, zombie path following, HUNTER reinsertion, ADAM, Stage Clear, player death, UI flow, visual/audio/horror pass behavior, HP bars, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.h`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that enemies feel adaptive without new progression blockers.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 017 Horror Immersion Pass 1
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

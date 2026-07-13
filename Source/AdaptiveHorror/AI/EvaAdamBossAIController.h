@@ -25,6 +25,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Adam Debug")
     int32 GetLastSummonCount() const { return LastSummonCount; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Adam Debug")
+    EEvaCombatStyle GetEncounterStartCombatStyle() const { return EncounterStartCombatStyle; }
+
 protected:
     virtual void TryAttackTarget() override;
     bool TryChargeAttack();
@@ -39,6 +42,8 @@ private:
     float LastRoarTime = -1000.0f;
     float CurrentTargetDistance = -1.0f;
     int32 LastSummonCount = 0;
+    bool bCapturedEncounterProfile = false;
+    EEvaCombatStyle EncounterStartCombatStyle = EEvaCombatStyle::Unknown;
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Adam Debug")
     FString CurrentAdamState = TEXT("Inactive");

@@ -1,5 +1,7 @@
 #include "AI/EvaLearningSubsystem.h"
+#include "AdaptiveHorror.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
 
 void UEvaLearningSubsystem::RecordShot(const FName WeaponName)
 {
@@ -56,6 +58,12 @@ void UEvaLearningSubsystem::RecordDamageTaken(const float DamageAmount, const FN
     AddObservationMass(1.5f);
 }
 
+void UEvaLearningSubsystem::RecordSprintUsed()
+{
+    ++AggregateTelemetry.SprintUseCount;
+    AddObservationMass(0.35f);
+}
+
 void UEvaLearningSubsystem::RecordHunterObservation(const EEvaCombatStyle ObservedStyle,
     const float DistanceToPlayer, const FName EscapeRouteId, const FName HideSpotId)
 {
@@ -100,6 +108,8 @@ void UEvaLearningSubsystem::RecordHunterTelemetrySnapshot(const FEvaTelemetrySna
         FMath::Max(AggregateTelemetry.PlayerDamageTakenTotal, ObservedTelemetry.PlayerDamageTakenTotal);
     AggregateTelemetry.DamageTakenSamples =
         FMath::Max(AggregateTelemetry.DamageTakenSamples, ObservedTelemetry.DamageTakenSamples);
+    AggregateTelemetry.SprintUseCount =
+        FMath::Max(AggregateTelemetry.SprintUseCount, ObservedTelemetry.SprintUseCount);
 
     if (ObservedTelemetry.CombatDistanceSamples > AggregateTelemetry.CombatDistanceSamples)
     {
@@ -157,6 +167,11 @@ void UEvaLearningSubsystem::ResetLearning()
     ObservationMass = 0.0f;
     HunterState = EEvaHunterState::Dormant;
     HunterTier = 0;
+    CachedAdaptationProfile = FEvaPlayerAdaptationProfile();
+    LastHunterDefeatedProfile = FEvaPlayerAdaptationProfile();
+    LastProfileUpdateTime = -1000.0f;
+    bProfileUpdatesEnabled = true;
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[EVAProfile] Reset"));
 }
 
 float UEvaLearningSubsystem::GetEvaAnalysisRate() const
@@ -193,27 +208,7 @@ FName UEvaLearningSubsystem::GetDominantWeapon() const
 
 EEvaCombatStyle UEvaLearningSubsystem::ClassifyAggregateCombatStyle() const
 {
-    if (!AggregateTelemetry.LastUsedHideSpot.IsNone())
-    {
-        return EEvaCombatStyle::Ghost;
-    }
-    if (!AggregateTelemetry.LastKnownEscapeRoute.IsNone())
-    {
-        return EEvaCombatStyle::Explorer;
-    }
-    if (AggregateTelemetry.CombatDistanceSamples <= 0)
-    {
-        return EEvaCombatStyle::Unknown;
-    }
-    if (GetDominantWeapon() == FName(TEXT("Shotgun")) || AggregateTelemetry.AverageCombatDistance < 500.0f)
-    {
-        return EEvaCombatStyle::Berserker;
-    }
-    if (AggregateTelemetry.AverageCombatDistance > 1500.0f)
-    {
-        return EEvaCombatStyle::Ranger;
-    }
-    return EEvaCombatStyle::Tactician;
+    return ClassifyAdaptationProfile(BuildProfileFromTelemetry());
 }
 
 EEvaAnalysisStage UEvaLearningSubsystem::GetAnalysisStage() const
@@ -272,6 +267,300 @@ EEvaEvolutionType UEvaLearningSubsystem::GetRecommendedEvolutionType() const
         return EEvaEvolutionType::Fast;
     }
     return EEvaEvolutionType::None;
+}
+
+FEvaPlayerAdaptationProfile UEvaLearningSubsystem::UpdateAdaptationProfile(const bool bForceUpdate)
+{
+    const UWorld* World = GetWorld();
+    const float Now = World ? World->GetTimeSeconds() : 0.0f;
+    if (!bForceUpdate && !bProfileUpdatesEnabled)
+    {
+        return CachedAdaptationProfile;
+    }
+    if (!bForceUpdate && CachedAdaptationProfile.bValid && Now - LastProfileUpdateTime < ProfileUpdateInterval)
+    {
+        return CachedAdaptationProfile;
+    }
+
+    const FEvaPlayerAdaptationProfile PreviousProfile = CachedAdaptationProfile;
+    CachedAdaptationProfile = BuildProfileFromTelemetry();
+    LastProfileUpdateTime = Now;
+
+    const bool bStyleChanged = PreviousProfile.CombatStyle != CachedAdaptationProfile.CombatStyle;
+    const bool bStageChanged = PreviousProfile.EvaStage != CachedAdaptationProfile.EvaStage;
+    const int32 PreviousAnalysisBucket = FMath::FloorToInt(PreviousProfile.AnalysisPercent / 10.0f);
+    const int32 NewAnalysisBucket = FMath::FloorToInt(CachedAdaptationProfile.AnalysisPercent / 10.0f);
+    if (bForceUpdate || bStyleChanged || bStageChanged || PreviousAnalysisBucket != NewAnalysisBucket)
+    {
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[EVAProfile] Updated Valid=%s Style=%s Stage=%s Analysis=%.1f Accuracy=%.2f HS=%.2f Distance=%.1f Close=%.2f Long=%.2f DamageTaken=%.2f Sprint=%.2f Aggression=%.2f Stealth=%.2f Exploration=%.2f Weapon=%s"),
+            CachedAdaptationProfile.bValid ? TEXT("true") : TEXT("false"),
+            *UEnum::GetValueAsString(CachedAdaptationProfile.CombatStyle),
+            *UEnum::GetValueAsString(CachedAdaptationProfile.EvaStage),
+            CachedAdaptationProfile.AnalysisPercent,
+            CachedAdaptationProfile.Accuracy,
+            CachedAdaptationProfile.HeadshotRate,
+            CachedAdaptationProfile.PreferredCombatDistance,
+            CachedAdaptationProfile.CloseRangeRatio,
+            CachedAdaptationProfile.LongRangeRatio,
+            CachedAdaptationProfile.DamageTakenRate,
+            CachedAdaptationProfile.SprintUsage,
+            CachedAdaptationProfile.AggressionScore,
+            CachedAdaptationProfile.StealthScore,
+            CachedAdaptationProfile.ExplorationScore,
+            *CachedAdaptationProfile.MostUsedWeapon.ToString());
+    }
+
+    return CachedAdaptationProfile;
+}
+
+void UEvaLearningSubsystem::SetProfileUpdatesEnabled(const bool bEnabled)
+{
+    bProfileUpdatesEnabled = bEnabled;
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[EVAProfile] UpdatesEnabled=%s"), bEnabled ? TEXT("true") : TEXT("false"));
+}
+
+void UEvaLearningSubsystem::RecordHunterDefeatedProfile()
+{
+    LastHunterDefeatedProfile = CachedAdaptationProfile.bValid ? CachedAdaptationProfile : BuildProfileFromTelemetry();
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[HunterAdapt] DefeatProfile Stored=%s Style=%s Analysis=%.1f"),
+        LastHunterDefeatedProfile.bValid ? TEXT("true") : TEXT("false"),
+        *UEnum::GetValueAsString(LastHunterDefeatedProfile.CombatStyle),
+        LastHunterDefeatedProfile.AnalysisPercent);
+}
+
+FEvaEnemyAdaptationTuning UEvaLearningSubsystem::BuildEnemyAdaptationTuning(
+    const EEvaEvolutionType EvolutionType) const
+{
+    const FEvaPlayerAdaptationProfile Profile = CachedAdaptationProfile.bValid ?
+        CachedAdaptationProfile : BuildProfileFromTelemetry();
+
+    FEvaEnemyAdaptationTuning Tuning;
+    Tuning.EvolutionType = EvolutionType;
+    Tuning.CounteredStyle = Profile.CombatStyle;
+    Tuning.HunterCounterType = CounterTypeFromCombatStyle(Profile.CombatStyle);
+
+    switch (Profile.CombatStyle)
+    {
+    case EEvaCombatStyle::Berserker:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Frontliner;
+        Tuning.AttackCooldownMultiplier = 0.92f;
+        Tuning.SidestepChance = 0.22f;
+        Tuning.SearchDuration = 3.5f;
+        break;
+    case EEvaCombatStyle::Ranger:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Flanker;
+        Tuning.MoveSpeedMultiplier = 1.07f;
+        Tuning.AttackCooldownMultiplier = 0.96f;
+        Tuning.SidestepChance = 0.45f;
+        Tuning.SearchDuration = 3.0f;
+        break;
+    case EEvaCombatStyle::Ghost:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Searcher;
+        Tuning.MoveSpeedMultiplier = 1.04f;
+        Tuning.SidestepChance = 0.28f;
+        Tuning.SearchDuration = 7.5f;
+        break;
+    case EEvaCombatStyle::Explorer:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Ambusher;
+        Tuning.MoveSpeedMultiplier = 1.02f;
+        Tuning.SidestepChance = 0.25f;
+        Tuning.SearchDuration = 5.5f;
+        break;
+    default:
+        break;
+    }
+
+    switch (EvolutionType)
+    {
+    case EEvaEvolutionType::Fast:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Flanker;
+        Tuning.MoveSpeedMultiplier *= 1.18f;
+        Tuning.AttackCooldownMultiplier *= 0.94f;
+        Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.38f);
+        break;
+    case EEvaEvolutionType::Armored:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::Frontliner;
+        Tuning.MoveSpeedMultiplier *= 0.88f;
+        Tuning.HealthMultiplier *= 1.20f;
+        Tuning.AttackCooldownMultiplier *= 1.06f;
+        Tuning.SidestepChance *= 0.55f;
+        break;
+    case EEvaEvolutionType::LongArm:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::MidRangePressure;
+        Tuning.AttackRangeMultiplier *= 1.28f;
+        Tuning.DamageMultiplier *= 1.08f;
+        Tuning.AttackCooldownMultiplier *= 1.08f;
+        break;
+    case EEvaEvolutionType::Composite:
+        Tuning.BehaviorRole = EEvaEnemyBehaviorRole::CompositeAdaptive;
+        if (Profile.CombatStyle == EEvaCombatStyle::Ranger)
+        {
+            Tuning.MoveSpeedMultiplier *= 1.14f;
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.52f);
+        }
+        else if (Profile.CombatStyle == EEvaCombatStyle::Berserker)
+        {
+            Tuning.HealthMultiplier *= 1.12f;
+            Tuning.AttackCooldownMultiplier *= 0.94f;
+        }
+        else if (Profile.CombatStyle == EEvaCombatStyle::Ghost)
+        {
+            Tuning.SearchDuration = FMath::Max(Tuning.SearchDuration, 8.0f);
+            Tuning.MoveSpeedMultiplier *= 1.08f;
+        }
+        else if (Profile.CombatStyle == EEvaCombatStyle::Explorer)
+        {
+            Tuning.AttackRangeMultiplier *= 1.12f;
+            Tuning.SidestepChance = FMath::Max(Tuning.SidestepChance, 0.34f);
+        }
+        else
+        {
+            Tuning.MoveSpeedMultiplier *= 1.05f;
+            Tuning.AttackRangeMultiplier *= 1.08f;
+        }
+        break;
+    default:
+        break;
+    }
+
+    const float AnalysisAlpha = FMath::Clamp(Profile.AnalysisPercent / 100.0f, 0.0f, 1.0f);
+    Tuning.MoveSpeedMultiplier = FMath::Lerp(1.0f, Tuning.MoveSpeedMultiplier, 0.45f + AnalysisAlpha * 0.45f);
+    Tuning.AttackRangeMultiplier = FMath::Lerp(1.0f, Tuning.AttackRangeMultiplier, 0.45f + AnalysisAlpha * 0.45f);
+    Tuning.AttackCooldownMultiplier = FMath::Lerp(1.0f, Tuning.AttackCooldownMultiplier, 0.45f + AnalysisAlpha * 0.35f);
+    Tuning.DamageMultiplier = FMath::Lerp(1.0f, Tuning.DamageMultiplier, 0.35f + AnalysisAlpha * 0.30f);
+    Tuning.SidestepChance *= 0.65f + AnalysisAlpha * 0.35f;
+
+    ClampTuning(Tuning);
+    Tuning.DebugSummary = FString::Printf(TEXT("%s/%s spd%.2f rng%.2f cd%.2f side%.2f"),
+        *UEnum::GetValueAsString(Tuning.BehaviorRole),
+        *UEnum::GetValueAsString(Tuning.CounteredStyle),
+        Tuning.MoveSpeedMultiplier,
+        Tuning.AttackRangeMultiplier,
+        Tuning.AttackCooldownMultiplier,
+        Tuning.SidestepChance);
+    return Tuning;
+}
+
+EEvaHunterCounterType UEvaLearningSubsystem::GetHunterCounterTypeForTier(const int32 RequestedHunterTier) const
+{
+    const FEvaPlayerAdaptationProfile SourceProfile =
+        RequestedHunterTier >= 2 && LastHunterDefeatedProfile.bValid ?
+        LastHunterDefeatedProfile :
+        (CachedAdaptationProfile.bValid ? CachedAdaptationProfile : BuildProfileFromTelemetry());
+    return CounterTypeFromCombatStyle(SourceProfile.CombatStyle);
+}
+
+FString UEvaLearningSubsystem::GetProfileDebugString() const
+{
+    const FEvaPlayerAdaptationProfile Profile = CachedAdaptationProfile.bValid ?
+        CachedAdaptationProfile : BuildProfileFromTelemetry();
+    return FString::Printf(TEXT("Style=%s Stage=%s Analysis=%.0f Acc=%.1f HS=%.1f Dist=%.0f Agg=%.2f Stealth=%.2f Explore=%.2f"),
+        *UEnum::GetValueAsString(Profile.CombatStyle),
+        *UEnum::GetValueAsString(Profile.EvaStage),
+        Profile.AnalysisPercent,
+        Profile.Accuracy * 100.0f,
+        Profile.HeadshotRate * 100.0f,
+        Profile.PreferredCombatDistance,
+        Profile.AggressionScore,
+        Profile.StealthScore,
+        Profile.ExplorationScore);
+}
+
+FEvaPlayerAdaptationProfile UEvaLearningSubsystem::BuildProfileFromTelemetry() const
+{
+    FEvaPlayerAdaptationProfile Profile;
+    Profile.HeadshotRate = FMath::Clamp(GetHeadshotRate(), 0.0f, 1.0f);
+    Profile.Accuracy = FMath::Clamp(GetAccuracy(), 0.0f, 1.0f);
+    Profile.PreferredCombatDistance = FMath::Clamp(AggregateTelemetry.AverageCombatDistance, 0.0f, 5000.0f);
+    Profile.MostUsedWeapon = GetDominantWeapon();
+    Profile.AnalysisPercent = GetEvaAnalysisRate();
+    Profile.EvaStage = GetAnalysisStage();
+
+    if (AggregateTelemetry.CombatDistanceSamples > 0)
+    {
+        Profile.CloseRangeRatio = FMath::Clamp(
+            1.0f - (Profile.PreferredCombatDistance - 350.0f) / 900.0f, 0.0f, 1.0f);
+        Profile.LongRangeRatio = FMath::Clamp(
+            (Profile.PreferredCombatDistance - 1100.0f) / 1200.0f, 0.0f, 1.0f);
+    }
+
+    const float DamageBaseline = FMath::Max(1.0f, static_cast<float>(AggregateTelemetry.DamageTakenSamples) * 100.0f);
+    Profile.DamageTakenRate = FMath::Clamp(AggregateTelemetry.PlayerDamageTakenTotal / DamageBaseline, 0.0f, 1.0f);
+
+    const float ActivityCount = FMath::Max(1.0f,
+        static_cast<float>(AggregateTelemetry.ShotCount + AggregateTelemetry.KillCount + AggregateTelemetry.SprintUseCount));
+    Profile.SprintUsage = FMath::Clamp(static_cast<float>(AggregateTelemetry.SprintUseCount) / ActivityCount, 0.0f, 1.0f);
+
+    const float LowShotScore = AggregateTelemetry.ShotCount <= 3 && AggregateTelemetry.KillCount == 0 ? 0.25f : 0.0f;
+    Profile.AggressionScore = FMath::Clamp(Profile.CloseRangeRatio * 0.45f +
+        Profile.DamageTakenRate * 0.25f + Profile.SprintUsage * 0.20f +
+        (AggregateTelemetry.ShotCount >= 12 ? 0.10f : 0.0f), 0.0f, 1.0f);
+    Profile.StealthScore = FMath::Clamp((!AggregateTelemetry.LastUsedHideSpot.IsNone() ? 0.48f : 0.0f) +
+        LowShotScore + (Profile.DamageTakenRate < 0.15f ? 0.12f : 0.0f), 0.0f, 1.0f);
+    Profile.ExplorationScore = FMath::Clamp((!AggregateTelemetry.LastKnownEscapeRoute.IsNone() ? 0.48f : 0.0f) +
+        (Profile.CloseRangeRatio > 0.25f && Profile.LongRangeRatio > 0.25f ? 0.18f : 0.0f) +
+        (AggregateTelemetry.CombatDistanceSamples >= 6 ? 0.12f : 0.0f), 0.0f, 1.0f);
+    Profile.bValid = AggregateTelemetry.ShotCount > 0 || AggregateTelemetry.HitCount > 0 ||
+        AggregateTelemetry.KillCount > 0 || AggregateTelemetry.DamageTakenSamples > 0 ||
+        AggregateTelemetry.SprintUseCount > 0 || Profile.AnalysisPercent > 0.0f ||
+        !AggregateTelemetry.LastKnownEscapeRoute.IsNone() || !AggregateTelemetry.LastUsedHideSpot.IsNone();
+    Profile.CombatStyle = ClassifyAdaptationProfile(Profile);
+    return Profile;
+}
+
+EEvaCombatStyle UEvaLearningSubsystem::ClassifyAdaptationProfile(const FEvaPlayerAdaptationProfile& Profile) const
+{
+    if (Profile.StealthScore >= 0.55f)
+    {
+        return EEvaCombatStyle::Ghost;
+    }
+    if (Profile.ExplorationScore >= 0.55f)
+    {
+        return EEvaCombatStyle::Explorer;
+    }
+    if (Profile.LongRangeRatio >= 0.45f && (Profile.Accuracy >= 0.35f || Profile.HeadshotRate >= 0.30f))
+    {
+        return EEvaCombatStyle::Ranger;
+    }
+    if (Profile.MostUsedWeapon == FName(TEXT("Shotgun")) || Profile.AggressionScore >= 0.45f ||
+        Profile.CloseRangeRatio >= 0.65f)
+    {
+        return EEvaCombatStyle::Berserker;
+    }
+    if (AggregateTelemetry.CombatDistanceSamples <= 0 && !Profile.bValid)
+    {
+        return EEvaCombatStyle::Unknown;
+    }
+    return EEvaCombatStyle::Tactician;
+}
+
+EEvaHunterCounterType UEvaLearningSubsystem::CounterTypeFromCombatStyle(const EEvaCombatStyle Style)
+{
+    switch (Style)
+    {
+    case EEvaCombatStyle::Berserker:
+        return EEvaHunterCounterType::AntiBerserker;
+    case EEvaCombatStyle::Ranger:
+        return EEvaHunterCounterType::AntiRanger;
+    case EEvaCombatStyle::Ghost:
+        return EEvaHunterCounterType::AntiGhost;
+    case EEvaCombatStyle::Explorer:
+        return EEvaHunterCounterType::AntiExplorer;
+    default:
+        return EEvaHunterCounterType::None;
+    }
+}
+
+void UEvaLearningSubsystem::ClampTuning(FEvaEnemyAdaptationTuning& Tuning)
+{
+    Tuning.MoveSpeedMultiplier = FMath::Clamp(Tuning.MoveSpeedMultiplier, 0.72f, 1.35f);
+    Tuning.AttackCooldownMultiplier = FMath::Clamp(Tuning.AttackCooldownMultiplier, 0.75f, 1.35f);
+    Tuning.SidestepChance = FMath::Clamp(Tuning.SidestepChance, 0.0f, 0.65f);
+    Tuning.SearchDuration = FMath::Clamp(Tuning.SearchDuration, 2.0f, 10.0f);
+    Tuning.AttackRangeMultiplier = FMath::Clamp(Tuning.AttackRangeMultiplier, 0.90f, 1.55f);
+    Tuning.HealthMultiplier = FMath::Clamp(Tuning.HealthMultiplier, 0.90f, 1.35f);
+    Tuning.DamageMultiplier = FMath::Clamp(Tuning.DamageMultiplier, 0.85f, 1.18f);
 }
 
 void UEvaLearningSubsystem::AddObservationMass(const float BaseAmount, const float ObserverAccuracy)

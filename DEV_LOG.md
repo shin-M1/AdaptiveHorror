@@ -1,5 +1,101 @@
 # Development Log
 
+## 2026-07-14 - Cycle 018: Gameplay Pass 1
+
+Branch: `feature/gameplay-pass1`
+
+### Scope
+
+- Added the first gameplay adaptation pass so existing telemetry now affects enemy/HUNTER behavior in a lightweight, bounded way.
+- No new weapons, maps, debug keys, major enemies, or flow changes were added.
+- Protected existing Runtime NavMesh/path-following, zombie chase, HUNTER deployment/reinsertion, ADAM, Stage Clear, player death, title/menu, pause/settings/game-over flow, visual/audio/horror passes, HP bars, and Boss HUD.
+
+### Implemented
+
+- EVA adaptation profile:
+  - Aggregates accuracy, headshot rate, preferred combat distance, close/long range ratios, damage-taken tendency, sprint usage, stealth/exploration hints, dominant weapon, current combat style, EVA analysis percent, and analysis stage.
+  - Updates only while active gameplay is running, pauses/stops with pause, death, title, and Stage Clear flow.
+  - Resets on new game/title reset.
+- Enemy behavior tuning:
+  - Zombies request a bounded `FEvaEnemyAdaptationTuning` from `UEvaLearningSubsystem`.
+  - Tuning can adjust behavior role, movement speed, attack interval, attack range, damage, health multiplier, sidestep chance, and search duration within safe clamps.
+  - Behavior roles include Standard, Flanker, Frontliner, MidRangePressure, Searcher, Ambusher, and CompositeAdaptive.
+  - Direct path-following/repathing logic was not replaced.
+- Evolution behavior:
+  - FAST / ARMORED / LONG ARM retain their specific identity.
+  - COMPOSITE is now an 80% analysis hybrid that stays bounded and chooses adaptation emphasis from the current player profile instead of simply stacking every advantage.
+- HUNTER adaptation:
+  - HUNTER locks a counter profile per deployment/reinsertion based on the current profile or the last defeated-HUNTER profile.
+  - HUNTER overhead label now shows counter intent such as `HUNTER T2 [ANTI-RANGER]`.
+  - HUNTER defeat stores the profile used by later tiers.
+- Player telemetry:
+  - Sprint usage is now recorded and lightly contributes to aggression/Berserker classification.
+- ADAM diagnostics:
+  - ADAM encounter start captures/logs the combat style at encounter start for debugging without changing ADAM attack logic.
+- HUD/debug:
+  - Normal HUD now shows EVA stage, analysis, and combat style.
+  - Debug HUD now exposes adaptation profile values, enemy tuning role/multipliers, and current HUNTER counter type.
+- Automation:
+  - Added Gameplay Pass 1 coverage for profile clamping, combat-style classification, enemy tuning, COMPOSITE bounded behavior, HUNTER counter profile, and new-game profile reset.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.h`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.h`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Components/EvaPlayerTelemetryComponent.h`
+- `Source/AdaptiveHorror/Components/EvaPlayerTelemetryComponent.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `README.md`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `git status` before work: clean on `main`.
+- `git pull --ff-only`: already up to date.
+- Created branch: `feature/gameplay-pass1`.
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - First run found a UE5.8/V7 compiler error (`C4458`: local `Character` variable hiding `AController::Character`); fixed by renaming the locals.
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 32 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+- Automation log contains `[EVAProfile]` and `[HunterAdapt]` profile/counter logs.
+- Runtime smoke starts in Title flow, so live enemy adaptation/HUNTER gameplay movement logs require PIE or a gameplay-directed runtime session.
+
+### Not verified by Codex
+
+- PIE visual confirmation that enemies visibly counter close/long/stealth/exploration styles.
+- PIE confirmation that HUNTER counter labels/readability feel good in combat.
+- PIE confirmation that COMPOSITE feels threatening but not unfair after the bounded change.
+- PIE confirmation that existing zombie chase, HUNTER reinsertion, ADAM, Stage Clear, death/respawn, UI flow, visual/audio/horror presentation are unchanged in viewport play.
+
+### Known risks / follow-up
+
+- Enemy adaptation is intentionally conservative and should be tuned by PIE feel, not expanded blindly.
+- Runtime smoke did not enter active gameplay, so `[EnemyAdapt]` movement/tuning logs should be checked in PIE or with a future gameplay smoke command.
+- UE startup logs still include unrelated engine/internal automation error-test lines; project automation completed with exit code 0.
+
 ## 2026-07-14 - Cycle 017: Horror Immersion Pass 1
 
 Branch: `feature/horror-immersion-pass1`

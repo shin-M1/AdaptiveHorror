@@ -1,4 +1,5 @@
 #include "AI/EvaHunterCharacter.h"
+#include "AdaptiveHorror.h"
 #include "AI/EvaHunterAIController.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "Audio/EvaAudioFunctionLibrary.h"
@@ -8,6 +9,26 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Pickups/EvaAnalysisCorePickup.h"
+
+namespace
+{
+FString EvaHunterCounterToShortLabel(const EEvaHunterCounterType CounterType)
+{
+    switch (CounterType)
+    {
+    case EEvaHunterCounterType::AntiBerserker:
+        return TEXT("ANTI-BERSERKER");
+    case EEvaHunterCounterType::AntiRanger:
+        return TEXT("ANTI-RANGER");
+    case EEvaHunterCounterType::AntiGhost:
+        return TEXT("ANTI-GHOST");
+    case EEvaHunterCounterType::AntiExplorer:
+        return TEXT("ANTI-EXPLORER");
+    default:
+        return TEXT("OBSERVE");
+    }
+}
+}
 
 AEvaHunterCharacter::AEvaHunterCharacter()
 {
@@ -80,8 +101,10 @@ void AEvaHunterCharacter::BeginPlay()
     {
         if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
+            Learning->UpdateAdaptationProfile(false);
             Learning->SetHunterState(EEvaHunterState::Deployed, HunterTier);
             Learning->SetLearningSpeedMultiplier(1.0f);
+            SetHunterCounterType(Learning->GetHunterCounterTypeForTier(HunterTier));
         }
     }
 }
@@ -95,6 +118,18 @@ void AEvaHunterCharacter::InitializeHunterTier(const int32 NewHunterTier)
     {
         HealthComponent->SetMaxHealth(HunterHP, true);
     }
+}
+
+void AEvaHunterCharacter::SetHunterCounterType(const EEvaHunterCounterType NewCounterType)
+{
+    HunterCounterType = NewCounterType;
+    SetPrototypeDebugLabel(FString::Printf(TEXT("HUNTER T%d [%s]"),
+        HunterTier,
+        *EvaHunterCounterToShortLabel(HunterCounterType)), FColor::Red, 46.0f);
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[HunterAdapt] Label Actor=%s Tier=%d Counter=%s"),
+        *GetName(),
+        HunterTier,
+        *UEnum::GetValueAsString(HunterCounterType));
 }
 
 void AEvaHunterCharacter::OnHunterDefeated()
@@ -111,6 +146,7 @@ void AEvaHunterCharacter::OnHunterDefeated()
     {
         if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
+            Learning->RecordHunterDefeatedProfile();
             Learning->SetHunterState(EEvaHunterState::DefeatedCooldown, HunterTier);
             Learning->SetLearningSpeedMultiplier(0.3f);
         }

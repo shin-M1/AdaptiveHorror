@@ -41,6 +41,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|AI")
     void ConfigurePerception(float NewSightRadius, float NewHearingRange);
 
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adaptation")
+    bool ApplyCurrentGameplayAdaptation(bool bForceApply = false);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FEvaPlayerAdaptationProfile GetCurrentAdaptationProfile() const { return LastAdaptationProfile; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FEvaEnemyAdaptationTuning GetCurrentAdaptationTuning() const { return CurrentAdaptationTuning; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FString GetCurrentAdaptationSummary() const { return CurrentAdaptationTuning.DebugSummary; }
+
 protected:
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
@@ -60,6 +72,8 @@ protected:
     bool ProjectNavigationPoint(const FVector& Point, FVector& OutProjectedLocation) const;
     bool EvaluateRepathForStationaryTarget(float DeltaSeconds);
     bool ReissueMoveToTarget(const TCHAR* RepathReason, bool bAbortCurrentMove);
+    bool TryMoveForAdaptationRole(const FEvaEnemyAdaptationTuning& Tuning, const FVector& PawnLocation,
+        const FVector& TargetLocation);
     void LogPathDiagnostics(const TCHAR* Context, const FVector& GoalLocation, EPathFollowingRequestResult::Type MoveResult) const;
     void LogRepathState(const TCHAR* RepathReason, EPathFollowingRequestResult::Type MoveResult, float RecentMoveDistance) const;
     AActor* FindNearestTaggedActor(FName Tag, const FVector& FromLocation) const;
@@ -86,11 +100,18 @@ protected:
     float AttackInterval = 1.5f;
 
 private:
+    float BaseConfiguredAttackRange = 150.0f;
+    float BaseConfiguredAttackDamage = 10.0f;
+    float BaseConfiguredAttackInterval = 1.5f;
+    float BaseConfiguredMoveSpeed = 0.0f;
     float LastAttackTime = -1000.0f;
     float LastAdaptiveMoveTime = -1000.0f;
+    float LastAdaptationApplyTime = -1000.0f;
     FVector LastObservedPawnLocation = FVector::ZeroVector;
     float TimeSinceMeaningfulMovement = 0.0f;
     EEvaAdaptationDirective LastAppliedDirective = EEvaAdaptationDirective::None;
+    FEvaPlayerAdaptationProfile LastAdaptationProfile;
+    FEvaEnemyAdaptationTuning CurrentAdaptationTuning;
     float LastMoveRequestTime = -1000.0f;
     float LastMoveDiagnosticLogTime = -1000.0f;
     FVector LastMoveRequestGoal = FVector::ZeroVector;

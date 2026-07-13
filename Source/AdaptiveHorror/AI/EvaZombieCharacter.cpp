@@ -283,9 +283,9 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     FColor DebugLabelColor = FColor::Green;
     FLinearColor VisualColor(0.18f, 0.65f, 0.22f, 1.0f);
 
-    const bool bFast = NewEvolutionType == EEvaEvolutionType::Fast || NewEvolutionType == EEvaEvolutionType::Composite;
-    const bool bArmored = NewEvolutionType == EEvaEvolutionType::Armored || NewEvolutionType == EEvaEvolutionType::Composite;
-    const bool bLongArm = NewEvolutionType == EEvaEvolutionType::LongArm || NewEvolutionType == EEvaEvolutionType::Composite;
+    const bool bFast = NewEvolutionType == EEvaEvolutionType::Fast;
+    const bool bArmored = NewEvolutionType == EEvaEvolutionType::Armored;
+    const bool bLongArm = NewEvolutionType == EEvaEvolutionType::LongArm;
 
     if (bFast)
     {
@@ -342,6 +342,22 @@ void AEvaZombieCharacter::ConfigureEvolution(const EEvaEvolutionType NewEvolutio
     if (NewEvolutionType == EEvaEvolutionType::Composite)
     {
         Tags.AddUnique(TEXT("EvolvedComposite"));
+        MovementSpeed *= 1.10f;
+        NewMaxHealth *= 1.12f;
+        HeadDamageMultiplier = 0.75f;
+        CurrentAttackRange += 120.0f;
+        CurrentAttackDamage *= 1.05f;
+        BodyScale = FVector(0.66f, 0.52f, 1.16f);
+        HeadScale = FVector(0.40f);
+        ArmScale = FVector(0.18f, 0.18f, 0.96f);
+        LeftArmLocation = FVector(0.0f, -54.0f, 40.0f);
+        RightArmLocation = FVector(0.0f, 54.0f, 40.0f);
+        LegScale = FVector(0.16f, 0.15f, 0.84f);
+        LeftLegLocation = FVector(0.0f, -20.0f, -58.0f);
+        RightLegLocation = FVector(0.0f, 20.0f, -58.0f);
+        ShoulderScale = FVector(0.36f, 0.24f, 0.28f);
+        LeftShoulderLocation = FVector(0.0f, -60.0f, 78.0f);
+        RightShoulderLocation = FVector(0.0f, 60.0f, 78.0f);
         DebugLabel = TEXT("COMPOSITE");
         DebugLabelColor = FColor::Magenta;
         VisualColor = FLinearColor(1.0f, 0.12f, 0.82f, 1.0f);
@@ -800,6 +816,7 @@ void AEvaZombieCharacter::ApplyEvolutionToController()
     if (AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(GetController()))
     {
         ZombieController->ConfigureCombat(CurrentAttackRange, CurrentAttackDamage, 1.5f);
+        ZombieController->ApplyCurrentGameplayAdaptation(true);
     }
 }
 

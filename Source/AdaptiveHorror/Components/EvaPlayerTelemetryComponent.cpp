@@ -84,6 +84,15 @@ void UEvaPlayerTelemetryComponent::RecordDamageTaken(const float DamageAmount, c
     }
 }
 
+void UEvaPlayerTelemetryComponent::RecordSprintUsed()
+{
+    ++Telemetry.SprintUseCount;
+    if (UEvaLearningSubsystem* Learning = GetLearningSubsystem())
+    {
+        Learning->RecordSprintUsed();
+    }
+}
+
 void UEvaPlayerTelemetryComponent::ResetTelemetry()
 {
     Telemetry = FEvaTelemetrySnapshot();

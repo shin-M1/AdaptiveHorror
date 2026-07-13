@@ -270,6 +270,9 @@ private:
     void PlayAmbientPulse();
     void SetHorrorWarning(const FString& Message, float Duration);
     void SpawnRuntimeFog();
+    void StartAdaptationProfileUpdates();
+    void StopAdaptationProfileUpdates();
+    void UpdateAdaptationProfileForGameplay();
 
     UPROPERTY()
     TObjectPtr<UStaticMesh> RuntimeCubeMesh;
@@ -287,6 +290,7 @@ private:
     FTimerHandle HunterTimeSpawnTimer;
     FTimerHandle HunterReinsertTimer;
     FTimerHandle NavigationReadinessTimer;
+    FTimerHandle AdaptationProfileTimer;
     bool bGameOver = false;
     EEvaGameFlowState GameFlowState = EEvaGameFlowState::Loading;
 
@@ -349,6 +353,7 @@ private:
     float RuntimeDirectionalLightBaseIntensity = 1.35f;
     float RuntimeSkyLightBaseIntensity = 0.28f;
     float RuntimeMainPointLightBaseIntensity = 4200.0f;
+    float AdaptationProfileUpdateInterval = 4.0f;
     FTimerHandle EmergencyLightFlickerTimer;
     FTimerHandle BlackoutTimer;
     FTimerHandle AmbientPulseTimer;

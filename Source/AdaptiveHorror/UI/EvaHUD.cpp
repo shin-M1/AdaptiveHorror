@@ -76,6 +76,9 @@ void AEvaHUD::DrawHUD()
     EEvaAnalysisStage AnalysisStage = EEvaAnalysisStage::Learning;
     EEvaAdaptationDirective AdaptationDirective = EEvaAdaptationDirective::None;
     EEvaEvolutionType NextEvolution = EEvaEvolutionType::None;
+    FEvaPlayerAdaptationProfile AdaptationProfile;
+    FEvaEnemyAdaptationTuning EnemyTuning;
+    EEvaHunterCounterType HunterCounterType = EEvaHunterCounterType::None;
     int32 HunterTier = 0;
     if (const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr)
     {
@@ -88,6 +91,21 @@ void AEvaHUD::DrawHUD()
             AnalysisStage = Learning->GetAnalysisStage();
             AdaptationDirective = Learning->GetAdaptationDirective();
             NextEvolution = Learning->GetRecommendedEvolutionType();
+            AdaptationProfile = Learning->GetCurrentAdaptationProfile();
+            if (AdaptationProfile.bValid)
+            {
+                switch (AdaptationProfile.CombatStyle)
+                {
+                case EEvaCombatStyle::Berserker: StyleText = TEXT("Berserker"); break;
+                case EEvaCombatStyle::Tactician: StyleText = TEXT("Tactician"); break;
+                case EEvaCombatStyle::Ranger: StyleText = TEXT("Ranger"); break;
+                case EEvaCombatStyle::Ghost: StyleText = TEXT("Ghost"); break;
+                case EEvaCombatStyle::Explorer: StyleText = TEXT("Explorer"); break;
+                default: StyleText = TEXT("Unknown"); break;
+                }
+            }
+            EnemyTuning = Learning->BuildEnemyAdaptationTuning(NextEvolution);
+            HunterCounterType = Learning->GetHunterCounterTypeForTier(HunterTier);
         }
     }
 
@@ -145,6 +163,7 @@ void AEvaHUD::DrawHUD()
         Weapon ? Weapon->GetReserveAmmo() : 0, Weapon && Weapon->IsReloading() ? TEXT("  RELOADING") : TEXT("")));
     DrawStat(FString::Printf(TEXT("EVA ANALYSIS: %.0f%%  x%.1f"), AnalysisRate, LearningMultiplier));
     DrawStat(FString::Printf(TEXT("EVA STAGE: %s"), *StageToString(AnalysisStage)));
+    DrawStat(FString::Printf(TEXT("STYLE: %s"), *StyleText));
     DrawStat(FString::Printf(TEXT("HUNTER: %s  TIER %d"), *HunterStateToString(HunterState), HunterTier));
 
     if (GameMode && GameMode->IsDebugHUDVisible())
@@ -152,9 +171,25 @@ void AEvaHUD::DrawHUD()
         DrawStat(FString::Printf(TEXT("KILLS: %d"), Stats.KillCount));
         DrawStat(FString::Printf(TEXT("ACCURACY: %.1f%%"), Telemetry->GetAccuracy() * 100.0f));
         DrawStat(FString::Printf(TEXT("HEADSHOTS: %.1f%%"), Telemetry->GetHeadshotRate() * 100.0f));
-        DrawStat(FString::Printf(TEXT("STYLE: %s"), *StyleText));
+        DrawStat(FString::Printf(TEXT("PREFERRED DIST: %.0f  CLOSE %.2f  LONG %.2f"),
+            AdaptationProfile.PreferredCombatDistance,
+            AdaptationProfile.CloseRangeRatio,
+            AdaptationProfile.LongRangeRatio));
+        DrawStat(FString::Printf(TEXT("PROFILE: Agg %.2f  Stealth %.2f  Explore %.2f  Sprint %.2f"),
+            AdaptationProfile.AggressionScore,
+            AdaptationProfile.StealthScore,
+            AdaptationProfile.ExplorationScore,
+            AdaptationProfile.SprintUsage));
         DrawStat(FString::Printf(TEXT("EVA ADAPT: %s"), *DirectiveToString(AdaptationDirective)));
         DrawStat(FString::Printf(TEXT("NEXT EVOLUTION: %s"), *EvolutionToString(NextEvolution)));
+        DrawStat(FString::Printf(TEXT("ENEMY ROLE: %s"), *UEnum::GetValueAsString(EnemyTuning.BehaviorRole)));
+        DrawStat(FString::Printf(TEXT("APPLIED: SPD %.2f RNG %.2f CD %.2f DMG %.2f SIDE %.2f"),
+            EnemyTuning.MoveSpeedMultiplier,
+            EnemyTuning.AttackRangeMultiplier,
+            EnemyTuning.AttackCooldownMultiplier,
+            EnemyTuning.DamageMultiplier,
+            EnemyTuning.SidestepChance));
+        DrawStat(FString::Printf(TEXT("HUNTER COUNTER: %s"), *UEnum::GetValueAsString(HunterCounterType)));
         DrawStat(FString::Printf(TEXT("ACTIVE ZOMBIES: %d  HUNTERS: %d  ADAM: %d"),
             GameMode->GetActiveZombieCount(), GameMode->GetActiveHunterCount(), GameMode->GetActiveAdamCount()));
         DrawStat(FString::Printf(TEXT("SPAWN: %s"), *GameMode->GetLastSpawnResult()));

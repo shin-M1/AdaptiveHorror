@@ -282,6 +282,7 @@ void AEvaPrototypeGameMode::BeginPlay()
 
 void AEvaPrototypeGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     Super::EndPlay(EndPlayReason);
 }
@@ -305,6 +306,7 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
     SetGameFlowState(EEvaGameFlowState::PlayerDead);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     CleanupCombatActorsForFlowReset();
@@ -340,6 +342,7 @@ void AEvaPrototypeGameMode::EnterTitleMode()
     UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
+    StopAdaptationProfileUpdates();
     CleanupCombatActorsForFlowReset();
     bGameOver = false;
     bStageClear = false;
@@ -349,6 +352,14 @@ void AEvaPrototypeGameMode::EnterTitleMode()
     if (CurrentDirector)
     {
         CurrentDirector->ResetForNewGame();
+    }
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->ResetLearning();
+            Learning->SetProfileUpdatesEnabled(false);
+        }
     }
 
     SetGameFlowState(EEvaGameFlowState::Title);
@@ -409,6 +420,8 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
         if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
             Learning->ResetLearning();
+            Learning->SetProfileUpdatesEnabled(true);
+            Learning->UpdateAdaptationProfile(true);
         }
     }
 
@@ -437,6 +450,7 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Playing);
+    StartAdaptationProfileUpdates();
     BeginHorrorRuntimeEffects();
     APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
     APawn* PossessedPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
@@ -459,6 +473,7 @@ void AEvaPrototypeGameMode::PauseGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Paused);
+    StopAdaptationProfileUpdates();
     UGameplayStatics::SetGamePaused(GetWorld(), true);
     if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
@@ -475,6 +490,7 @@ void AEvaPrototypeGameMode::ResumeGameFlow()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     SetGameFlowState(EEvaGameFlowState::Playing);
+    StartAdaptationProfileUpdates();
     if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
         EvaController->CloseMenusForGameplay();
@@ -588,6 +604,7 @@ void AEvaPrototypeGameMode::HandleStageClear()
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     const int32 ClearedEnemyAI = StopAllEnemyCombatForStageClear();
@@ -634,6 +651,7 @@ void AEvaPrototypeGameMode::RespawnPlayer()
     bGameOver = false;
     SetGameFlowState(EEvaGameFlowState::Playing);
     PlayerAwaitingRespawn = nullptr;
+    StartAdaptationProfileUpdates();
     BeginHorrorRuntimeEffects();
     ShowDebugStatusMessage(TEXT("Checkpoint restored. Enemy aggro reset."), 3.0f);
 }
@@ -1614,6 +1632,7 @@ void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) cons
     if (AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(Enemy->GetController()))
     {
         ZombieController->SetPlayerTarget(PlayerPawn);
+        ZombieController->ApplyCurrentGameplayAdaptation(true);
         UE_LOG(LogAdaptiveHorror, Log, TEXT("[AI] Enemy primed for pursuit Enemy=%s Controller=%s Target=%s Distance=%.1f"),
             *Enemy->GetName(),
             *ZombieController->GetName(),
@@ -1748,6 +1767,61 @@ void AEvaPrototypeGameMode::NotifyEnemyStuck(const FString& EnemyName)
     UE_LOG(LogAdaptiveHorror, Warning, TEXT("[AI] EnemyStuck Enemy=%s Count=%d"), *EnemyName, StuckEnemyCount);
 }
 
+void AEvaPrototypeGameMode::StartAdaptationProfileUpdates()
+{
+    if (!GetWorld() || !IsGameplayActive())
+    {
+        return;
+    }
+
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->SetProfileUpdatesEnabled(true);
+            Learning->UpdateAdaptationProfile(true);
+        }
+    }
+
+    if (!GetWorldTimerManager().IsTimerActive(AdaptationProfileTimer))
+    {
+        GetWorldTimerManager().SetTimer(AdaptationProfileTimer, this,
+            &AEvaPrototypeGameMode::UpdateAdaptationProfileForGameplay,
+            AdaptationProfileUpdateInterval, true, AdaptationProfileUpdateInterval);
+    }
+}
+
+void AEvaPrototypeGameMode::StopAdaptationProfileUpdates()
+{
+    if (GetWorld())
+    {
+        GetWorldTimerManager().ClearTimer(AdaptationProfileTimer);
+    }
+    if (UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->SetProfileUpdatesEnabled(false);
+        }
+    }
+}
+
+void AEvaPrototypeGameMode::UpdateAdaptationProfileForGameplay()
+{
+    if (!GetWorld() || !IsGameplayActive() || UGameplayStatics::IsGamePaused(GetWorld()))
+    {
+        return;
+    }
+
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->UpdateAdaptationProfile(false);
+        }
+    }
+}
+
 AActor* AEvaPrototypeGameMode::SpawnArenaBox(const FVector& Location, const FVector& Scale, const FRotator& Rotation)
 {
     if (!GetWorld() || !RuntimeCubeMesh)
@@ -1810,10 +1884,11 @@ void AEvaPrototypeGameMode::SpawnAdaptiveEnemy()
     }
 
     EEvaEvolutionType EvolutionType = EEvaEvolutionType::None;
-    if (const UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
     {
-        if (const UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
+            Learning->UpdateAdaptationProfile(false);
             EvolutionType = Learning->GetRecommendedEvolutionType();
         }
     }
@@ -1995,6 +2070,7 @@ void AEvaPrototypeGameMode::ClearStageClearTimers()
     GetWorldTimerManager().ClearTimer(AdaptiveSpawnTimer);
     GetWorldTimerManager().ClearTimer(HunterTimeSpawnTimer);
     GetWorldTimerManager().ClearTimer(HunterReinsertTimer);
+    GetWorldTimerManager().ClearTimer(AdaptationProfileTimer);
 }
 
 void AEvaPrototypeGameMode::CleanupCombatActorsForFlowReset()

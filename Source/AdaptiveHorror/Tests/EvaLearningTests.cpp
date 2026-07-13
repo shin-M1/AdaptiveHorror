@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "AI/EvaAdamBossCharacter.h"
+#include "AI/EvaHunterCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "AI/EvaZombieAIController.h"
 #include "AI/EvaZombieCharacter.h"
@@ -648,6 +649,177 @@ bool FEvaPlayerHorrorFeedbackClampTest::RunTest(const FString& Parameters)
     Player->SetFlashlightEnabled(true);
     TestTrue(TEXT("Flashlight state can be enabled"), Player->IsFlashlightEnabled());
 
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaAdaptationProfileClampTest,
+    "AdaptiveHorror.GameplayPass.AdaptationProfileClamp",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaAdaptationProfileClampTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+
+    Learning->DebugAddAnalysis(250.0f);
+    Learning->RecordHit(true, 99999.0f);
+    Learning->RecordDamageTaken(5000.0f, TEXT("Automation"));
+    Learning->RecordSprintUsed();
+    const FEvaPlayerAdaptationProfile Profile = Learning->UpdateAdaptationProfile(true);
+
+    TestTrue(TEXT("Analysis is clamped"), Profile.AnalysisPercent >= 0.0f && Profile.AnalysisPercent <= 100.0f);
+    TestTrue(TEXT("Accuracy is clamped"), Profile.Accuracy >= 0.0f && Profile.Accuracy <= 1.0f);
+    TestTrue(TEXT("Headshot rate is clamped"), Profile.HeadshotRate >= 0.0f && Profile.HeadshotRate <= 1.0f);
+    TestTrue(TEXT("Distance is clamped"), Profile.PreferredCombatDistance >= 0.0f && Profile.PreferredCombatDistance <= 5000.0f);
+    TestTrue(TEXT("Damage taken rate is clamped"), Profile.DamageTakenRate >= 0.0f && Profile.DamageTakenRate <= 1.0f);
+    TestTrue(TEXT("Sprint usage is clamped"), Profile.SprintUsage >= 0.0f && Profile.SprintUsage <= 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaAdaptationCombatStyleSelectionTest,
+    "AdaptiveHorror.GameplayPass.CombatStyleSelection",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaAdaptationCombatStyleSelectionTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+
+    UEvaLearningSubsystem* BerserkerLearning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    BerserkerLearning->RecordHit(false, 260.0f);
+    BerserkerLearning->RecordSprintUsed();
+    TestTrue(TEXT("Close/sprint profile becomes Berserker"),
+        BerserkerLearning->UpdateAdaptationProfile(true).CombatStyle == EEvaCombatStyle::Berserker);
+
+    UEvaLearningSubsystem* RangerLearning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    RangerLearning->RecordShot(TEXT("Handgun"));
+    RangerLearning->RecordHit(true, 2200.0f);
+    TestTrue(TEXT("Accurate long-range profile becomes Ranger"),
+        RangerLearning->UpdateAdaptationProfile(true).CombatStyle == EEvaCombatStyle::Ranger);
+
+    UEvaLearningSubsystem* GhostLearning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    GhostLearning->RecordHideSpot(TEXT("HideAutomation"));
+    TestTrue(TEXT("Hide spot profile becomes Ghost"),
+        GhostLearning->UpdateAdaptationProfile(true).CombatStyle == EEvaCombatStyle::Ghost);
+
+    UEvaLearningSubsystem* ExplorerLearning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    ExplorerLearning->RecordEscapeRoute(TEXT("RouteAutomation"));
+    for (int32 Index = 0; Index < 6; ++Index)
+    {
+        ExplorerLearning->RecordHit(false, 900.0f);
+    }
+    TestTrue(TEXT("Route/zone movement profile becomes Explorer"),
+        ExplorerLearning->UpdateAdaptationProfile(true).CombatStyle == EEvaCombatStyle::Explorer);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaEnemyAdaptationTuningTest,
+    "AdaptiveHorror.GameplayPass.EnemyAdaptationTuning",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaEnemyAdaptationTuningTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordShot(TEXT("Handgun"));
+    Learning->RecordHit(true, 2200.0f);
+    Learning->DebugAddAnalysis(70.0f);
+    Learning->UpdateAdaptationProfile(true);
+
+    const FEvaEnemyAdaptationTuning FastTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::Fast);
+    TestTrue(TEXT("Fast tuning acts as flanker"), FastTuning.BehaviorRole == EEvaEnemyBehaviorRole::Flanker);
+    TestTrue(TEXT("Fast tuning increases movement within clamp"),
+        FastTuning.MoveSpeedMultiplier > 1.0f && FastTuning.MoveSpeedMultiplier <= 1.35f);
+
+    const FEvaEnemyAdaptationTuning LongArmTuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::LongArm);
+    TestTrue(TEXT("Long Arm tuning becomes mid-range pressure"),
+        LongArmTuning.BehaviorRole == EEvaEnemyBehaviorRole::MidRangePressure);
+    TestTrue(TEXT("Long Arm range multiplier remains bounded"),
+        LongArmTuning.AttackRangeMultiplier > 1.0f && LongArmTuning.AttackRangeMultiplier <= 1.55f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaCompositeAdaptationSelectionTest,
+    "AdaptiveHorror.GameplayPass.CompositeAdaptationSelection",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaCompositeAdaptationSelectionTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordHideSpot(TEXT("HideAutomation"));
+    Learning->DebugAddAnalysis(85.0f);
+    Learning->UpdateAdaptationProfile(true);
+
+    const FEvaEnemyAdaptationTuning Tuning = Learning->BuildEnemyAdaptationTuning(EEvaEvolutionType::Composite);
+    TestTrue(TEXT("Composite uses adaptive role instead of maximizing all roles"),
+        Tuning.BehaviorRole == EEvaEnemyBehaviorRole::CompositeAdaptive);
+    TestTrue(TEXT("Composite speed stays fair"), Tuning.MoveSpeedMultiplier <= 1.35f);
+    TestTrue(TEXT("Composite damage stays fair"), Tuning.DamageMultiplier <= 1.18f);
+    TestTrue(TEXT("Composite produces debug summary"), !Tuning.DebugSummary.IsEmpty());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaHunterCounterProfileTest,
+    "AdaptiveHorror.GameplayPass.HunterCounterProfile",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaHunterCounterProfileTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordShot(TEXT("Handgun"));
+    Learning->RecordHit(true, 2400.0f);
+    Learning->UpdateAdaptationProfile(true);
+
+    TestTrue(TEXT("Tier 1 Hunter counters Ranger"),
+        Learning->GetHunterCounterTypeForTier(1) == EEvaHunterCounterType::AntiRanger);
+
+    Learning->RecordHunterDefeatedProfile();
+    Learning->RecordHideSpot(TEXT("HideAfterHunter"));
+    Learning->UpdateAdaptationProfile(true);
+    TestTrue(TEXT("Tier 2 Hunter keeps previous defeated profile counter"),
+        Learning->GetHunterCounterTypeForTier(2) == EEvaHunterCounterType::AntiRanger);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaLearningResetClearsProfileTest,
+    "AdaptiveHorror.GameplayPass.NewGameProfileReset",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaLearningResetClearsProfileTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UEvaLearningSubsystem* Learning = NewObject<UEvaLearningSubsystem>(GameInstance);
+    Learning->RecordHit(false, 250.0f);
+    TestTrue(TEXT("Profile becomes valid before reset"), Learning->UpdateAdaptationProfile(true).bValid);
+
+    Learning->ResetLearning();
+    const FEvaPlayerAdaptationProfile Profile = Learning->GetCurrentAdaptationProfile();
+    TestFalse(TEXT("Reset clears adaptation profile validity"), Profile.bValid);
+    TestTrue(TEXT("Reset returns analysis to zero"), FMath::IsNearlyZero(Learning->GetEvaAnalysisRate()));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaZombieCompositeStatsBoundedTest,
+    "AdaptiveHorror.GameplayPass.CompositeStatsBounded",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaZombieCompositeStatsBoundedTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>();
+    TestNotNull(TEXT("Zombie spawns for composite bounds test"), Zombie);
+    if (!Zombie)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Zombie->ConfigureEvolution(EEvaEvolutionType::Composite);
+    TestTrue(TEXT("Composite keeps actor scale stable"), Zombie->GetActorScale3D().Equals(FVector::OneVector, KINDA_SMALL_NUMBER));
+    TestTrue(TEXT("Composite label is visible on type component"),
+        Zombie->GetTypeLabelComponent() && Zombie->GetTypeLabelComponent()->Text.ToString().Contains(TEXT("COMPOSITE")));
     World->DestroyWorld(false);
     return true;
 }

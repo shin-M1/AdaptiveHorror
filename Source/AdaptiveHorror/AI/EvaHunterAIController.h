@@ -13,9 +13,14 @@ public:
     AEvaHunterAIController();
     virtual void Tick(float DeltaSeconds) override;
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Hunter")
+    EEvaHunterCounterType GetLockedCounterType() const { return LockedCounterType; }
+
 protected:
     void ObserveTarget();
+    void InitializeCounterProfile();
     void ExecuteCounterBehavior(EEvaCombatStyle ObservedStyle);
+    EEvaCombatStyle CounterTypeToCombatStyle(EEvaHunterCounterType CounterType) const;
     FName ResolveNearbyTaggedActorId(FName Tag, const FVector& FromLocation, float MaxDistance) const;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Hunter")
@@ -27,4 +32,6 @@ protected:
 private:
     float LastObservationTime = -1000.0f;
     float LastCounterMoveTime = -1000.0f;
+    bool bCounterProfileLocked = false;
+    EEvaHunterCounterType LockedCounterType = EEvaHunterCounterType::None;
 };

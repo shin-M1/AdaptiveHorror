@@ -1,5 +1,32 @@
 # Adaptive Horror FPS Demo
 
+## Gameplay Pass 1 adaptive behavior - Cycle 018
+
+Current branch: `feature/gameplay-pass1`.
+
+The prototype now uses the existing telemetry to drive lightweight enemy adaptation during active gameplay. This is intentionally bounded: it should make the player feel observed and countered without replacing the working zombie chase, Runtime NavMesh, HUNTER, ADAM, Stage Clear, or UI flow.
+
+Normal HUD now shows:
+
+- EVA analysis stage.
+- EVA analysis percent.
+- Current combat style.
+
+Debug HUD (`F9` / `N`) additionally shows:
+
+- Headshot rate, accuracy, preferred combat distance, close/long range ratios.
+- Aggression, stealth, exploration, and sprint-use profile values.
+- Current adaptation role such as Flanker, MidRangePressure, Searcher, Ambusher, or CompositeAdaptive.
+- Applied enemy tuning multipliers for speed, range, cooldown, damage, and sidestep chance.
+- HUNTER counter type.
+
+HUNTER labels can show a counter tag such as `HUNTER T2 [ANTI-RANGER]`.
+
+Evolution label note:
+
+- `COMPOSITE` is the 80% EVA analysis evolved variant.
+- In Cycle 018, COMPOSITE was bounded so it does not simply stack every FAST / ARMORED / LONG ARM advantage at full strength; it now chooses an adaptation emphasis from the current player profile.
+
 ## Horror immersion pass controls - Cycle 017
 
 Gameplay controls now include:

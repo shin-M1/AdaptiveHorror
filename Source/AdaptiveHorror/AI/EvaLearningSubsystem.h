@@ -33,6 +33,9 @@ public:
     void RecordDamageTaken(float DamageAmount, FName DamageSource);
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Learning")
+    void RecordSprintUsed();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Learning")
     void RecordHunterObservation(EEvaCombatStyle ObservedStyle, float DistanceToPlayer,
         FName EscapeRouteId, FName HideSpotId);
 
@@ -53,6 +56,15 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Learning")
     void ResetLearning();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adaptation")
+    FEvaPlayerAdaptationProfile UpdateAdaptationProfile(bool bForceUpdate = false);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Adaptation")
+    void SetProfileUpdatesEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Hunter")
+    void RecordHunterDefeatedProfile();
 
     UFUNCTION(BlueprintPure, Category = "EVA|Learning")
     float GetLearningSpeedMultiplier() const { return LearningSpeedMultiplier; }
@@ -87,6 +99,18 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Learning")
     EEvaEvolutionType GetRecommendedEvolutionType() const;
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FEvaPlayerAdaptationProfile GetCurrentAdaptationProfile() const { return CachedAdaptationProfile; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FEvaEnemyAdaptationTuning BuildEnemyAdaptationTuning(EEvaEvolutionType EvolutionType) const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    EEvaHunterCounterType GetHunterCounterTypeForTier(int32 RequestedHunterTier) const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Adaptation")
+    FString GetProfileDebugString() const;
+
     UFUNCTION(BlueprintPure, Category = "EVA|Hunter")
     EEvaHunterState GetHunterState() const { return HunterState; }
 
@@ -98,6 +122,10 @@ public:
 
 private:
     void AddObservationMass(float BaseAmount, float ObserverAccuracy = 0.35f);
+    FEvaPlayerAdaptationProfile BuildProfileFromTelemetry() const;
+    EEvaCombatStyle ClassifyAdaptationProfile(const FEvaPlayerAdaptationProfile& Profile) const;
+    static EEvaHunterCounterType CounterTypeFromCombatStyle(EEvaCombatStyle Style);
+    static void ClampTuning(FEvaEnemyAdaptationTuning& Tuning);
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Learning")
     FEvaTelemetrySnapshot AggregateTelemetry;
@@ -113,4 +141,14 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Hunter")
     int32 HunterTier = 0;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Adaptation")
+    FEvaPlayerAdaptationProfile CachedAdaptationProfile;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Adaptation")
+    FEvaPlayerAdaptationProfile LastHunterDefeatedProfile;
+
+    float LastProfileUpdateTime = -1000.0f;
+    float ProfileUpdateInterval = 4.0f;
+    bool bProfileUpdatesEnabled = true;
 };

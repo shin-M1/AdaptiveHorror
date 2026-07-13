@@ -1,5 +1,32 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 018 status - Gameplay Pass 1
+
+- [x] Create `feature/gameplay-pass1` from latest `main`.
+- [x] Add a bounded EVA adaptation profile from existing telemetry.
+- [x] Make active-gameplay profile updates start/stop with New Game, Pause, Resume, Player Death, Title, and Stage Clear.
+- [x] Let zombies apply bounded adaptation tuning without replacing the existing path-following/repathing fixes.
+- [x] Add enemy behavior roles: Standard, Flanker, Frontliner, MidRangePressure, Searcher, Ambusher, CompositeAdaptive.
+- [x] Keep FAST / ARMORED / LONG ARM identities intact.
+- [x] Rework COMPOSITE as the 80% analysis hybrid that adapts from profile data without full-strength stat stacking.
+- [x] Let HUNTER lock a counter profile per deployment/reinsertion and preserve the defeated-HUNTER profile for later tiers.
+- [x] Show normal HUD combat style and Debug HUD adaptation values.
+- [x] Add Automation coverage for Gameplay Pass 1 profile/tuning/HUNTER/COMPOSITE behavior.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 32 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+- [x] `git diff --check` run before commit.
+
+### Next TODO
+
+- [ ] PIE-verify that close-range/Berserker play causes enemies/HUNTER to counter by spacing or flanking without breaking chase.
+- [ ] PIE-verify that long-range/Ranger play causes cover/side-pressure behavior without making enemies passive.
+- [ ] PIE-verify that Ghost/Searcher/Ambusher behavior reads clearly when hide spots / escape routes are logged.
+- [ ] PIE-verify COMPOSITE at 80% EVA analysis feels distinct but fair.
+- [ ] PIE-verify HUNTER counter label and behavior after defeat/reinsertion.
+- [ ] Confirm active gameplay logs include `[EnemyAdapt]`, `[EVAProfile]`, and `[HunterAdapt]` during PIE combat.
+- [ ] Tune adaptation clamp values only after PIE feel testing.
+
 ## Cycle 009 状態メモ
 
 障害物回避リカバリ、頭上ラベル、敵タイプ識別、全Automation導線を改善した。
