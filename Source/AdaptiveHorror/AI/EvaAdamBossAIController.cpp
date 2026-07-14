@@ -1,4 +1,5 @@
 #include "AI/EvaAdamBossAIController.h"
+#include "AdaptiveHorror.h"
 #include "AI/EvaAdamBossCharacter.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "Characters/EvaPlayerCharacter.h"
@@ -46,6 +47,22 @@ void AEvaAdamBossAIController::Tick(const float DeltaSeconds)
 
     CurrentTargetDistance = FVector::Distance(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation());
     SetFocus(TargetActor);
+
+    if (!bCapturedEncounterProfile)
+    {
+        bCapturedEncounterProfile = true;
+        if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+        {
+            if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+            {
+                const FEvaPlayerAdaptationProfile Profile = Learning->UpdateAdaptationProfile(false);
+                EncounterStartCombatStyle = Profile.CombatStyle;
+            }
+        }
+        UE_LOG(LogAdaptiveHorror, Log, TEXT("[AdamAdapt] EncounterProfile Style=%s Distance=%.1f"),
+            *UEnum::GetValueAsString(EncounterStartCombatStyle),
+            CurrentTargetDistance);
+    }
 
     if (CanAttackTarget())
     {

@@ -34,6 +34,7 @@
 #include "GameFramework/HUD.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationData.h"
 #include "NavigationSystem.h"
@@ -282,6 +283,7 @@ void AEvaPrototypeGameMode::BeginPlay()
 
 void AEvaPrototypeGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     Super::EndPlay(EndPlayReason);
 }
@@ -305,6 +307,7 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
     SetGameFlowState(EEvaGameFlowState::PlayerDead);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     CleanupCombatActorsForFlowReset();
@@ -340,6 +343,7 @@ void AEvaPrototypeGameMode::EnterTitleMode()
     UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
+    StopAdaptationProfileUpdates();
     CleanupCombatActorsForFlowReset();
     bGameOver = false;
     bStageClear = false;
@@ -349,6 +353,14 @@ void AEvaPrototypeGameMode::EnterTitleMode()
     if (CurrentDirector)
     {
         CurrentDirector->ResetForNewGame();
+    }
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->ResetLearning();
+            Learning->SetProfileUpdatesEnabled(false);
+        }
     }
 
     SetGameFlowState(EEvaGameFlowState::Title);
@@ -409,6 +421,8 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
         if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
             Learning->ResetLearning();
+            Learning->SetProfileUpdatesEnabled(true);
+            Learning->UpdateAdaptationProfile(true);
         }
     }
 
@@ -437,6 +451,7 @@ void AEvaPrototypeGameMode::StartNewGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Playing);
+    StartAdaptationProfileUpdates();
     BeginHorrorRuntimeEffects();
     APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
     APawn* PossessedPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
@@ -459,6 +474,7 @@ void AEvaPrototypeGameMode::PauseGameFlow()
     }
 
     SetGameFlowState(EEvaGameFlowState::Paused);
+    StopAdaptationProfileUpdates();
     UGameplayStatics::SetGamePaused(GetWorld(), true);
     if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
@@ -475,6 +491,7 @@ void AEvaPrototypeGameMode::ResumeGameFlow()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     SetGameFlowState(EEvaGameFlowState::Playing);
+    StartAdaptationProfileUpdates();
     if (AEvaPlayerController* EvaController = Cast<AEvaPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
         EvaController->CloseMenusForGameplay();
@@ -588,6 +605,7 @@ void AEvaPrototypeGameMode::HandleStageClear()
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
+    StopAdaptationProfileUpdates();
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     const int32 ClearedEnemyAI = StopAllEnemyCombatForStageClear();
@@ -634,6 +652,7 @@ void AEvaPrototypeGameMode::RespawnPlayer()
     bGameOver = false;
     SetGameFlowState(EEvaGameFlowState::Playing);
     PlayerAwaitingRespawn = nullptr;
+    StartAdaptationProfileUpdates();
     BeginHorrorRuntimeEffects();
     ShowDebugStatusMessage(TEXT("Checkpoint restored. Enemy aggro reset."), 3.0f);
 }
@@ -1614,6 +1633,9 @@ void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) cons
     if (AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(Enemy->GetController()))
     {
         ZombieController->SetPlayerTarget(PlayerPawn);
+        ZombieController->ApplyCurrentGameplayAdaptation(true);
+        ZombieController->EnsureCurrentActionIntent();
+        Enemy->RefreshDebugIntentDisplay(true);
         UE_LOG(LogAdaptiveHorror, Log, TEXT("[AI] Enemy primed for pursuit Enemy=%s Controller=%s Target=%s Distance=%.1f"),
             *Enemy->GetName(),
             *ZombieController->GetName(),
@@ -1622,6 +1644,7 @@ void AEvaPrototypeGameMode::PrimeEnemyForPlayer(AEvaZombieCharacter* Enemy) cons
     }
     else
     {
+        Enemy->RefreshDebugIntentDisplay(true);
         UE_LOG(LogAdaptiveHorror, Warning, TEXT("[AI] Enemy spawned without EVA AI controller Enemy=%s Controller=%s"),
             *Enemy->GetName(),
             Enemy->GetController() ? *Enemy->GetController()->GetName() : TEXT("None"));
@@ -1748,6 +1771,87 @@ void AEvaPrototypeGameMode::NotifyEnemyStuck(const FString& EnemyName)
     UE_LOG(LogAdaptiveHorror, Warning, TEXT("[AI] EnemyStuck Enemy=%s Count=%d"), *EnemyName, StuckEnemyCount);
 }
 
+void AEvaPrototypeGameMode::StartAdaptationProfileUpdates()
+{
+    if (!GetWorld() || !IsGameplayActive())
+    {
+        return;
+    }
+
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->SetProfileUpdatesEnabled(true);
+            Learning->UpdateAdaptationProfile(true);
+        }
+    }
+
+    if (!GetWorldTimerManager().IsTimerActive(AdaptationProfileTimer))
+    {
+        GetWorldTimerManager().SetTimer(AdaptationProfileTimer, this,
+            &AEvaPrototypeGameMode::UpdateAdaptationProfileForGameplay,
+            AdaptationProfileUpdateInterval, true, AdaptationProfileUpdateInterval);
+    }
+}
+
+void AEvaPrototypeGameMode::StopAdaptationProfileUpdates()
+{
+    if (GetWorld())
+    {
+        GetWorldTimerManager().ClearTimer(AdaptationProfileTimer);
+    }
+    if (UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->SetProfileUpdatesEnabled(false);
+        }
+    }
+}
+
+void AEvaPrototypeGameMode::UpdateAdaptationProfileForGameplay()
+{
+    if (!GetWorld() || !IsGameplayActive() || UGameplayStatics::IsGamePaused(GetWorld()))
+    {
+        return;
+    }
+
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    {
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        {
+            Learning->UpdateAdaptationProfile(false);
+        }
+    }
+}
+
+void AEvaPrototypeGameMode::SyncEnemyDebugIntentDisplays(const bool bForceLog) const
+{
+#if !UE_BUILD_SHIPPING
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    for (TActorIterator<AEvaZombieCharacter> It(GetWorld()); It; ++It)
+    {
+        AEvaZombieCharacter* Enemy = *It;
+        if (!Enemy)
+        {
+            continue;
+        }
+        if (AEvaZombieAIController* ZombieController = Cast<AEvaZombieAIController>(Enemy->GetController()))
+        {
+            ZombieController->EnsureCurrentActionIntent();
+        }
+        Enemy->RefreshDebugIntentDisplay(bForceLog);
+    }
+#else
+    (void)bForceLog;
+#endif
+}
+
 AActor* AEvaPrototypeGameMode::SpawnArenaBox(const FVector& Location, const FVector& Scale, const FRotator& Rotation)
 {
     if (!GetWorld() || !RuntimeCubeMesh)
@@ -1810,10 +1914,11 @@ void AEvaPrototypeGameMode::SpawnAdaptiveEnemy()
     }
 
     EEvaEvolutionType EvolutionType = EEvaEvolutionType::None;
-    if (const UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+    if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
     {
-        if (const UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
+        if (UEvaLearningSubsystem* Learning = GameInstance->GetSubsystem<UEvaLearningSubsystem>())
         {
+            Learning->UpdateAdaptationProfile(false);
             EvolutionType = Learning->GetRecommendedEvolutionType();
         }
     }
@@ -1995,6 +2100,7 @@ void AEvaPrototypeGameMode::ClearStageClearTimers()
     GetWorldTimerManager().ClearTimer(AdaptiveSpawnTimer);
     GetWorldTimerManager().ClearTimer(HunterTimeSpawnTimer);
     GetWorldTimerManager().ClearTimer(HunterReinsertTimer);
+    GetWorldTimerManager().ClearTimer(AdaptationProfileTimer);
 }
 
 void AEvaPrototypeGameMode::CleanupCombatActorsForFlowReset()
@@ -2704,19 +2810,49 @@ void AEvaPrototypeGameMode::DebugPrintTelemetrySnapshot()
 void AEvaPrototypeGameMode::DebugToggleNavigationVisualization()
 {
 #if !UE_BUILD_SHIPPING
-    bNavigationDebugVisible = !bNavigationDebugVisible;
-    bDebugHUDVisible = !bDebugHUDVisible;
-
     if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
     {
+        const bool bPressedNextPage = PlayerController->WasInputKeyJustPressed(EKeys::N) &&
+            !PlayerController->WasInputKeyJustPressed(EKeys::F9);
+        if (bPressedNextPage)
+        {
+            if (bDebugHUDVisible)
+            {
+                DebugHUDPageIndex = (DebugHUDPageIndex + 1) % DebugHUDPageCount;
+            }
+            else
+            {
+                bDebugHUDVisible = true;
+                DebugHUDPageIndex = 0;
+            }
+            ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG N: page %d/%d"),
+                DebugHUDPageIndex + 1, DebugHUDPageCount), 3.0f);
+            SyncEnemyDebugIntentDisplays(true);
+            return;
+        }
+
+        bDebugHUDVisible = !bDebugHUDVisible;
+        if (!bDebugHUDVisible)
+        {
+            DebugHUDPageIndex = 0;
+            bNavigationDebugVisible = false;
+        }
+        else
+        {
+            bNavigationDebugVisible = !bNavigationDebugVisible;
+        }
+
         PlayerController->ConsoleCommand(TEXT("Show Navigation"), true);
         PlayerController->ConsoleCommand(bNavigationDebugVisible ? TEXT("ShowFlag.Navigation 1") :
             TEXT("ShowFlag.Navigation 0"), true);
     }
 
     LogNavigationStatus(TEXT("DebugToggleNavigationVisualization"));
-    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9/N: Debug HUD %s / Navigation visualization %s"),
+    SyncEnemyDebugIntentDisplays(true);
+    ShowDebugStatusMessage(FString::Printf(TEXT("DEBUG F9: Debug HUD %s page %d/%d / Navigation visualization %s"),
         bDebugHUDVisible ? TEXT("ON") : TEXT("OFF"),
+        DebugHUDPageIndex + 1,
+        DebugHUDPageCount,
         bNavigationDebugVisible ? TEXT("ON") : TEXT("OFF")), 4.0f);
 #endif
 }

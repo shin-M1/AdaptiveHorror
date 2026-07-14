@@ -41,8 +41,20 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Visual")
     UTextRenderComponent* GetTypeLabelComponent() const { return TypeLabel; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    UTextRenderComponent* GetDebugIntentLabelComponent() const { return DebugIntentLabel; }
+
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void EnsurePrototypeDebugLabelInitialized();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void SetDebugIntentText(const FString& IntentText);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
+    void RefreshDebugIntentDisplay(bool bForceLog = false);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Visual")
+    FString GetResolvedDebugIntentText() const;
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Visual")
     void SetOverheadHealthBarEnabled(bool bEnabled);
@@ -80,6 +92,7 @@ protected:
     void UpdatePrototypeHealthBar();
     void LogPrototypeDebugLabelState(const FString& Context) const;
     bool ShouldShowDebugHealthNumbers() const;
+    bool ShouldShowDebugIntentLabel() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|AI")
     TObjectPtr<UEvaHealthComponent> HealthComponent;
@@ -116,6 +129,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
     TObjectPtr<UTextRenderComponent> HealthValueLabel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Visual")
+    TObjectPtr<UTextRenderComponent> DebugIntentLabel;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Visual")
     float DebugLabelMaxVisibleDistance = 12000.0f;
@@ -171,5 +187,9 @@ protected:
     float PrototypeVisualActionEndTime = -1000.0f;
     FName PrototypeVisualAction = NAME_None;
 
+    float LastDebugIntentRefreshTime = -1000.0f;
+    float LastEnemyIntentLogTime = -1000.0f;
+    bool bLastDebugIntentVisible = false;
     bool bDefeatHandled = false;
+    FString CurrentDebugIntentText;
 };

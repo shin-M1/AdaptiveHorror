@@ -1,5 +1,262 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 020 Enemy Intent Display Consistency
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms Gameplay Pass 1 Polish in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 37 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- `git diff --check`: succeeded, no whitespace errors. CRLF conversion warnings only.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Fixed inconsistent overhead Intent display for existing/spawned enemies while Debug HUD is ON.
+- Zombie AI intent now resolves to a safe non-empty state instead of staying blank:
+  - `CHASE`
+  - `ATTACK`
+  - `SEARCH`
+  - `IDLE`
+- Spawn priming now forces an intent refresh for initial zombies, wave zombies, evolved/adaptive spawns, HUNTER, and HUNTER reinsertion paths that use the common enemy priming flow.
+- Debug HUD F9/N now synchronizes existing enemies, so already-spawned enemies update when Debug HUD is toggled or pages are switched.
+- Debug Intent labels are still hidden in normal play and remain separate from enemy name / HP bar.
+- ADAM was intentionally not given an overhead Intent label.
+- Added low-frequency `[EnemyIntent]` logs:
+  - Actor
+  - EnemyType
+  - Intent
+  - DebugVisible
+  - ControllerValid
+- Added automation coverage for:
+  - Spawned enemy intent initialization.
+  - Controller fallback intent.
+  - Debug OFF hiding the intent label while keeping text initialized.
+  - HUNTER counter intent preservation.
+
+### Next highest-priority task
+
+Run PIE and verify only the overhead Intent display consistency. Do not add new features, enemies, weapons, maps, or balance changes.
+
+PIE checklist:
+
+1. Press F9 and confirm Debug HUD turns ON.
+2. Confirm overhead Intent appears for:
+   - Initial Zombie.
+   - Wave Zombie.
+   - FAST.
+   - ARMORED.
+   - LONG ARM.
+   - COMPOSITE.
+   - HUNTER.
+   - HUNTER reinserted individual.
+3. Confirm no displayed enemy has an empty Intent.
+4. Confirm reasonable fallback text appears when state is not yet assigned, e.g. `IDLE`, `SEARCH`, or `CHASE`.
+5. Confirm N page switching keeps existing enemy Intent labels synchronized.
+6. Confirm F9 Debug OFF hides Intent labels for all existing enemies.
+7. Confirm normal enemy name and HP bar remain readable and do not overlap more than before.
+8. Confirm ADAM does not receive an overhead Intent label.
+9. Confirm gameplay loop, enemy behavior, HUNTER, ADAM, and Stage Clear still behave as before.
+
+If a problem remains:
+
+- Fix only the Intent display inconsistency.
+- Do not change AI balance, path following, spawn rules, ADAM, HUNTER behavior, Stage Clear, UI flow, audio, or visual presentation unless the Intent display change directly caused the regression.
+
+### Important files
+
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that all target enemies show non-empty Intent while Debug HUD is ON.
+- User confirms Intent hides for all enemies when Debug HUD is OFF.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
+## Latest handoff - 2026-07-14 Cycle 019 Gameplay Pass 1 Polish
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms the Gameplay Pass 1 Polish in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 35 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- PIE visual/gameplay confirmation is still required; Codex did not visually inspect the viewport.
+
+### Most recent implementation
+
+- Debug HUD:
+  - Split into 3 pages.
+  - F9 toggles Debug HUD ON/OFF and preserves existing Navigation visualization toggle behavior.
+  - N advances Debug HUD pages without toggling Navigation visualization.
+  - Page 1: EVA / Gameplay.
+  - Page 2: Enemy Adaptation.
+  - Page 3: Navigation / Spawn.
+- Enemy role visibility:
+  - Added Debug-only overhead Intent labels for enemies/HUNTER.
+  - Intent labels update only when the actual AI intent changes.
+  - Intent labels hide when Debug HUD is off, enemy dies, overhead display is disabled, or Stage Clear stops combat.
+- Role polish:
+  - FAST has clearer flank/sidestep behavior.
+  - ARMORED is slower and less likely to sidestep/disengage.
+  - LONG ARM has clearer mid-range attack pressure with wall-hit protection for long-reach attacks.
+  - COMPOSITE remains bounded, exposes a short Hybrid Type, and keeps its selected hybrid for a minimum hold window.
+  - HUNTER balance was not broadly changed; only counter display readability was improved.
+
+### Next highest-priority task
+
+Run PIE and verify only the Gameplay Pass 1 Polish. Do not add new enemies, weapons, maps, debug keys, or large UI changes.
+
+PIE checklist:
+
+1. Confirm F9 toggles Debug HUD and Navigation visualization.
+2. Confirm N advances DEBUG 1/3 -> 2/3 -> 3/3 without toggling Navigation visualization.
+3. Confirm Debug HUD does not overlap normal HUD at 1280x720.
+4. Confirm Debug HUD is hidden in Title / Game Over / Stage Clear.
+5. Confirm enemy overhead Intent labels appear only while Debug HUD is ON.
+6. Confirm Intent labels do not overlap enemy name / HP bar.
+7. Confirm FAST visibly flanks and feels faster without getting stuck.
+8. Confirm ARMORED feels slower and front-holding without blocking all paths.
+9. Confirm LONG ARM attacks from a clearer longer range and does not attack through walls.
+10. Confirm COMPOSITE shows a readable Hybrid Type and feels like a bounded counter, not an all-max enemy.
+11. Confirm HUNTER still feels unchanged in balance, with improved counter readability.
+12. Confirm existing zombie chase, HUNTER reinsertion, ADAM, Stage Clear, death/respawn, UI flow, visual/audio/horror presentation, HP bars, and Boss HUD still work.
+
+If a problem is found:
+
+- Fix only the observed Gameplay Pass 1 Polish regression.
+- Preserve Runtime NavMesh, path-following/repathing, spawn safety, HUNTER reinsertion, ADAM, Stage Clear, Player Death, Title, Pause, Settings, Game Over, Visual / Audio, Horror Immersion, Boss HUD, and enemy HP bars.
+
+### Important files
+
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms the Debug HUD pages and Intent labels are readable in PIE.
+- User confirms FAST / ARMORED / LONG ARM / COMPOSITE differences are more visible without game-loop regression.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
+## Latest handoff - 2026-07-14 Cycle 018 Gameplay Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/gameplay-pass1`.
+
+Do not merge this branch into `main` until the user confirms the adaptive gameplay pass in PIE.
+
+### Current verified state
+
+- Branch was created from latest `main`.
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 32 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- PIE visual/gameplay confirmation is still required; Codex did not visually inspect the viewport.
+
+### Most recent implementation
+
+- EVA adaptation profile:
+  - Aggregates weapon/combat telemetry into a bounded profile.
+  - Tracks headshot rate, accuracy, preferred distance, close/long range ratios, damage-taken tendency, sprint usage, stealth, exploration, dominant weapon, combat style, EVA analysis percent, and analysis stage.
+  - Updates only while gameplay is active; pauses/stops during pause, death, title, and Stage Clear.
+- Enemy behavior:
+  - Zombies apply safe adaptation tuning from the profile.
+  - Roles include Standard, Flanker, Frontliner, MidRangePressure, Searcher, Ambusher, and CompositeAdaptive.
+  - Existing path-following/repathing behavior was preserved.
+- Evolution:
+  - FAST / ARMORED / LONG ARM remain specific.
+  - COMPOSITE remains the 80% EVA analysis variant, but no longer stacks every advantage at full strength.
+- HUNTER:
+  - HUNTER locks a counter profile per deployment/reinsertion.
+  - HUNTER defeat stores the profile for later tiers.
+  - Labels can show counter tags such as `HUNTER T2 [ANTI-RANGER]`.
+- HUD:
+  - Normal HUD shows EVA stage, analysis, and combat style.
+  - Debug HUD (`F9` / `N`) shows adaptation profile, enemy tuning multipliers, and HUNTER counter type.
+- Tests:
+  - Added Gameplay Pass 1 tests for profile clamping, combat style selection, enemy tuning, COMPOSITE bounded behavior, HUNTER counter profile, and reset behavior.
+
+### Next highest-priority task
+
+Run PIE and verify the adaptive gameplay feel only. Do not add new enemies, weapons, maps, debug keys, or large UI changes. Do not rebalance until a specific observed problem is found.
+
+PIE checklist:
+
+1. Start New Game and confirm baseline title/menu/pause/game-over/stage-clear flow still works.
+2. Confirm normal zombies still chase, repath around obstacles, attack, take damage, and die.
+3. Use F1/F3/F7 and ordinary combat to raise EVA analysis and observe adaptation debug values.
+4. Confirm close-range/Berserker play causes enemies/HUNTER to counter by spacing, flanking, or pressure without breaking chase.
+5. Confirm long-range/Ranger play causes cover/side-pressure behavior without making enemies passive.
+6. Confirm Ghost/Searcher/Ambusher behavior is understandable when hide spots or escape routes are logged.
+7. Confirm COMPOSITE at 80% analysis is distinct but not unfair.
+8. Confirm HUNTER labels/counter behavior after spawn, defeat, and reinsertion.
+9. Confirm ADAM still starts, fights, dies, and Stage Clear still fires once.
+10. Confirm logs during active gameplay include `[EVAProfile]`, `[EnemyAdapt]`, and `[HunterAdapt]`.
+
+If a problem is found:
+
+- Fix only the observed Gameplay Pass 1 regression.
+- Preserve Runtime NavMesh, zombie path following, HUNTER reinsertion, ADAM, Stage Clear, player death, UI flow, visual/audio/horror pass behavior, HP bars, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/AI/EvaTelemetryTypes.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.h`
+- `Source/AdaptiveHorror/AI/EvaLearningSubsystem.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieCharacter.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.h`
+- `Source/AdaptiveHorror/AI/EvaHunterAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.h`
+- `Source/AdaptiveHorror/AI/EvaHunterCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that enemies feel adaptive without new progression blockers.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with the actual PIE result.
+
 ## Latest handoff - 2026-07-14 Cycle 017 Horror Immersion Pass 1
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

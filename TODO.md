@@ -1,5 +1,85 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 020 status - Enemy Intent Display Consistency
+
+- [x] Fixed blank/unsynced overhead Intent for existing enemies when Debug HUD is toggled ON.
+- [x] Added safe fallback Intent from actual AI state: `CHASE`, `ATTACK`, `SEARCH`, or `IDLE`.
+- [x] Initialized Intent on `SetPlayerTarget()` and spawn/prime refresh paths.
+- [x] Synced existing enemies when Debug HUD is toggled or paged.
+- [x] Kept Debug HUD OFF hiding Intent labels.
+- [x] Preserved HUNTER `ANTI-*` counter display during controller initialization.
+- [x] Added `[EnemyIntent]` low-frequency logs.
+- [x] Added Automation for spawn-time Intent initialization and controller fallback Intent.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 37 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+- [x] `git diff --check` succeeded with no whitespace errors.
+
+### Next TODO
+
+- [ ] PIE-verify Debug HUD ON updates Intent for already-spawned enemies.
+- [ ] PIE-verify initial Zombie, Wave Zombie, FAST, ARMORED, LONG ARM, COMPOSITE, HUNTER, and HUNTER reinsertion all show non-empty Intent.
+- [ ] PIE-verify Debug HUD OFF hides all Intent labels.
+- [ ] PIE-verify Intent labels still do not overlap enemy name / HP bars.
+
+## Cycle 019 status - Gameplay Pass 1 Polish
+
+- [x] Confirmed work continued on `feature/gameplay-pass1`.
+- [x] Split Debug HUD into 3 pages.
+- [x] Kept F9 as Debug HUD ON/OFF and reused N for page advance without adding new keys.
+- [x] Prevented Debug HUD from drawing during non-gameplay terminal/menu states.
+- [x] Added short readable Role / Intent / Hybrid labels.
+- [x] Added Debug-only enemy overhead intent label component.
+- [x] Kept normal play overhead display to enemy name + HP bar.
+- [x] Split HUNTER label into normal `HUNTER Tn` plus Debug-only counter intent line.
+- [x] Strengthened FAST flank priority within clamp.
+- [x] Strengthened ARMORED frontliner identity while reducing sidestep/disengage.
+- [x] Strengthened LONG ARM mid-range pressure and protected long-reach attacks from WorldStatic wall hits.
+- [x] Kept COMPOSITE bounded and limited to at most 2 hybrid roles.
+- [x] Added Automation coverage for Debug HUD pages, hidden debug-intent labels, role tuning, COMPOSITE hybrid limits, clamp safety, and Stage Clear intent hiding.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 35 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+
+### Next TODO
+
+- [ ] PIE-verify Debug HUD readability at 1280x720.
+- [ ] PIE-verify F9 toggles Debug HUD and Navigation as expected.
+- [ ] PIE-verify N advances Debug pages without toggling Navigation visualization.
+- [ ] PIE-verify overhead Intent labels do not overlap enemy name / HP bars.
+- [ ] PIE-verify FAST feels like a flank attacker.
+- [ ] PIE-verify ARMORED feels slower and front-holding.
+- [ ] PIE-verify LONG ARM attacks clearly from longer range without wall hits.
+- [ ] PIE-verify COMPOSITE Hybrid Type stays readable and fair.
+- [ ] PIE-verify HUNTER counter line remains readable without changing HUNTER balance.
+
+## Cycle 018 status - Gameplay Pass 1
+
+- [x] Create `feature/gameplay-pass1` from latest `main`.
+- [x] Add a bounded EVA adaptation profile from existing telemetry.
+- [x] Make active-gameplay profile updates start/stop with New Game, Pause, Resume, Player Death, Title, and Stage Clear.
+- [x] Let zombies apply bounded adaptation tuning without replacing the existing path-following/repathing fixes.
+- [x] Add enemy behavior roles: Standard, Flanker, Frontliner, MidRangePressure, Searcher, Ambusher, CompositeAdaptive.
+- [x] Keep FAST / ARMORED / LONG ARM identities intact.
+- [x] Rework COMPOSITE as the 80% analysis hybrid that adapts from profile data without full-strength stat stacking.
+- [x] Let HUNTER lock a counter profile per deployment/reinsertion and preserve the defeated-HUNTER profile for later tiers.
+- [x] Show normal HUD combat style and Debug HUD adaptation values.
+- [x] Add Automation coverage for Gameplay Pass 1 profile/tuning/HUNTER/COMPOSITE behavior.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 32 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+- [x] `git diff --check` run before commit.
+
+### Next TODO
+
+- [ ] PIE-verify that close-range/Berserker play causes enemies/HUNTER to counter by spacing or flanking without breaking chase.
+- [ ] PIE-verify that long-range/Ranger play causes cover/side-pressure behavior without making enemies passive.
+- [ ] PIE-verify that Ghost/Searcher/Ambusher behavior reads clearly when hide spots / escape routes are logged.
+- [ ] PIE-verify COMPOSITE at 80% EVA analysis feels distinct but fair.
+- [ ] PIE-verify HUNTER counter label and behavior after defeat/reinsertion.
+- [ ] Confirm active gameplay logs include `[EnemyAdapt]`, `[EVAProfile]`, and `[HunterAdapt]` during PIE combat.
+- [ ] Tune adaptation clamp values only after PIE feel testing.
+
 ## Cycle 009 状態メモ
 
 障害物回避リカバリ、頭上ラベル、敵タイプ識別、全Automation導線を改善した。

@@ -1,5 +1,55 @@
 # Adaptive Horror FPS Demo
 
+## Gameplay Pass 1 Polish debug controls - Cycle 019
+
+Current branch: `feature/gameplay-pass1`.
+
+Debug HUD is now paged to avoid overlap:
+
+- `F9`: toggles Debug HUD ON/OFF and preserves the existing Navigation visualization toggle behavior.
+- `N`: advances Debug HUD pages while keeping Navigation visualization unchanged.
+- `DEBUG 1/3`: EVA / Gameplay.
+- `DEBUG 2/3`: Enemy Adaptation.
+- `DEBUG 3/3`: Navigation / Spawn.
+
+Debug HUD is hidden outside active gameplay.
+
+When Debug HUD is ON, enemies can show a short overhead intent line such as:
+
+- `FLANK LEFT`
+- `HOLD FRONT`
+- `KEEP DISTANCE`
+- `ANTI-RANGER`
+
+Normal play still shows enemy name + HP bar only. HUNTER normally shows `HUNTER Tn`; its counter type is shown on the debug-intent line only.
+
+## Gameplay Pass 1 adaptive behavior - Cycle 018
+
+Current branch: `feature/gameplay-pass1`.
+
+The prototype now uses the existing telemetry to drive lightweight enemy adaptation during active gameplay. This is intentionally bounded: it should make the player feel observed and countered without replacing the working zombie chase, Runtime NavMesh, HUNTER, ADAM, Stage Clear, or UI flow.
+
+Normal HUD now shows:
+
+- EVA analysis stage.
+- EVA analysis percent.
+- Current combat style.
+
+Debug HUD (`F9` / `N`) additionally shows:
+
+- Headshot rate, accuracy, preferred combat distance, close/long range ratios.
+- Aggression, stealth, exploration, and sprint-use profile values.
+- Current adaptation role such as Flanker, MidRangePressure, Searcher, Ambusher, or CompositeAdaptive.
+- Applied enemy tuning multipliers for speed, range, cooldown, damage, and sidestep chance.
+- HUNTER counter type.
+
+HUNTER labels can show a counter tag such as `HUNTER T2 [ANTI-RANGER]`.
+
+Evolution label note:
+
+- `COMPOSITE` is the 80% EVA analysis evolved variant.
+- In Cycle 018, COMPOSITE was bounded so it does not simply stack every FAST / ARMORED / LONG ARM advantage at full strength; it now chooses an adaptation emphasis from the current player profile.
+
 ## Horror immersion pass controls - Cycle 017
 
 Gameplay controls now include:

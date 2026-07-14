@@ -543,6 +543,10 @@ void AEvaPlayerCharacter::StartSprint()
     if (IsGameplayInputAllowed())
     {
         bIsSprinting = true;
+        if (TelemetryComponent)
+        {
+            TelemetryComponent->RecordSprintUsed();
+        }
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
         {
             MovementComponent->MaxWalkSpeed = SprintSpeed;

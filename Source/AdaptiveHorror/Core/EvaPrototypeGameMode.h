@@ -161,6 +161,12 @@ public:
     bool IsDebugHUDVisible() const { return bDebugHUDVisible; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    int32 GetDebugHUDPageIndex() const { return DebugHUDPageIndex; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
+    int32 GetDebugHUDPageCount() const { return DebugHUDPageCount; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Debug")
     bool IsRespawnScheduledForDebug() const;
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Horror")
@@ -270,6 +276,10 @@ private:
     void PlayAmbientPulse();
     void SetHorrorWarning(const FString& Message, float Duration);
     void SpawnRuntimeFog();
+    void StartAdaptationProfileUpdates();
+    void StopAdaptationProfileUpdates();
+    void UpdateAdaptationProfileForGameplay();
+    void SyncEnemyDebugIntentDisplays(bool bForceLog) const;
 
     UPROPERTY()
     TObjectPtr<UStaticMesh> RuntimeCubeMesh;
@@ -287,6 +297,7 @@ private:
     FTimerHandle HunterTimeSpawnTimer;
     FTimerHandle HunterReinsertTimer;
     FTimerHandle NavigationReadinessTimer;
+    FTimerHandle AdaptationProfileTimer;
     bool bGameOver = false;
     EEvaGameFlowState GameFlowState = EEvaGameFlowState::Loading;
 
@@ -322,6 +333,8 @@ private:
     bool bInitialZombieSpawned = false;
     bool bNavigationDebugVisible = false;
     bool bDebugHUDVisible = false;
+    int32 DebugHUDPageIndex = 0;
+    static constexpr int32 DebugHUDPageCount = 3;
     bool bRuntimeNavigationReady = false;
     bool bRuntimeNavigationFailed = false;
     int32 NavigationReadinessAttempts = 0;
@@ -349,6 +362,7 @@ private:
     float RuntimeDirectionalLightBaseIntensity = 1.35f;
     float RuntimeSkyLightBaseIntensity = 0.28f;
     float RuntimeMainPointLightBaseIntensity = 4200.0f;
+    float AdaptationProfileUpdateInterval = 4.0f;
     FTimerHandle EmergencyLightFlickerTimer;
     FTimerHandle BlackoutTimer;
     FTimerHandle AmbientPulseTimer;
