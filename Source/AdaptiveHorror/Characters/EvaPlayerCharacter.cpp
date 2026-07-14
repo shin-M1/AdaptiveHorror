@@ -1,4 +1,5 @@
 #include "Characters/EvaPlayerCharacter.h"
+#include "AdaptiveHorror.h"
 #include "AI/EvaLearningSubsystem.h"
 #include "Audio/EvaAudioFunctionLibrary.h"
 #include "Camera/CameraComponent.h"
@@ -617,6 +618,12 @@ void AEvaPlayerCharacter::Interact()
     if (Director && Director->IsResearchLogOpen())
     {
         Director->CloseResearchLog();
+        LastInteractionFailure = TEXT("ClosedResearchLog");
+        bLastInteractionHit = false;
+        bLastInteractionImplementsInteractable = false;
+        bLastInteractionEnabled = true;
+        bLastInteractionLineOfSightClear = true;
+        LogInteractionDiagnostics(TEXT("CloseResearchLog"), true, true);
         if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
         {
             PlayerController->SetInputMode(FInputModeGameOnly());
@@ -627,17 +634,27 @@ void AEvaPlayerCharacter::Interact()
 
     if (!IsGameplayInputAllowed())
     {
+        LastInteractionFailure = TEXT("GameplayInputBlocked");
+        LogInteractionDiagnostics(TEXT("Blocked"), true, false);
         return;
     }
 
-    UpdateFocusedInteractable();
+    UpdateFocusedInteractable(true, true);
+    bool bExecuteResult = false;
     if (FocusedInteractable.IsValid())
     {
-        FocusedInteractable->Interact(this);
+        bExecuteResult = FocusedInteractable->Interact(this);
+        LastInteractionFailure = bExecuteResult ? FString(TEXT("None")) : FString(TEXT("ExecuteFailed"));
     }
+    else if (LastInteractionFailure.IsEmpty() || LastInteractionFailure == TEXT("None"))
+    {
+        LastInteractionFailure = TEXT("NoCurrentInteractable");
+    }
+
+    LogInteractionDiagnostics(TEXT("Execute"), true, bExecuteResult);
 }
 
-void AEvaPlayerCharacter::UpdateFocusedInteractable()
+void AEvaPlayerCharacter::UpdateFocusedInteractable(const bool bLogDiagnostics, const bool bInputReceived)
 {
     FocusedInteractable.Reset();
     FocusedInteractionPrompt.Empty();
@@ -647,39 +664,144 @@ void AEvaPlayerCharacter::UpdateFocusedInteractable()
     if (Director && Director->IsResearchLogOpen())
     {
         FocusedInteractionPrompt = TEXT("E - CLOSE LOG");
+        LastInteractionFailure = TEXT("ResearchLogOpen");
         return;
     }
 
     if (!FirstPersonCamera || !IsGameplayInputAllowed())
     {
+        LastInteractionFailure = !FirstPersonCamera ? TEXT("NoCamera") : TEXT("GameplayInputBlocked");
+        if (bLogDiagnostics)
+        {
+            LogInteractionDiagnostics(TEXT("FocusBlocked"), bInputReceived, false);
+        }
         return;
     }
 
     const FVector TraceStart = FirstPersonCamera->GetComponentLocation();
     const FVector TraceEnd = TraceStart + FirstPersonCamera->GetForwardVector() * InteractionTraceDistance;
-    FHitResult Hit;
+    LastInteractionCameraLocation = FirstPersonCamera->GetComponentLocation();
+    LastInteractionTraceStart = TraceStart;
+    LastInteractionTraceEnd = TraceEnd;
+    LastInteractionDistance = -1.0f;
+    LastInteractionHitActor = TEXT("None");
+    LastInteractionHitComponent = TEXT("None");
+    bLastInteractionHit = false;
+    bLastInteractionImplementsInteractable = false;
+    bLastInteractionEnabled = false;
+    bLastInteractionLineOfSightClear = false;
+    LastInteractionFailure = TEXT("NoHit");
+
+    TArray<FHitResult> Hits;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaInteractTrace), false, this);
-    if (!GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+    QueryParams.AddIgnoredActor(this);
+    if (CurrentWeapon)
     {
+        QueryParams.AddIgnoredActor(CurrentWeapon);
+    }
+    const FCollisionShape InteractionSweep = FCollisionShape::MakeSphere(18.0f);
+    if (!GetWorld()->SweepMultiByChannel(Hits, TraceStart, TraceEnd, FQuat::Identity,
+        ECC_Visibility, InteractionSweep, QueryParams))
+    {
+        if (bLogDiagnostics)
+        {
+            LogInteractionDiagnostics(TEXT("FocusTrace"), bInputReceived, false);
+        }
         return;
     }
 
-    AEvaFacilityInteractable* Interactable = Cast<AEvaFacilityInteractable>(Hit.GetActor());
-    if (!Interactable)
+    Hits.Sort([](const FHitResult& Left, const FHitResult& Right)
     {
-        Interactable = Hit.GetComponent() ? Cast<AEvaFacilityInteractable>(Hit.GetComponent()->GetOwner()) : nullptr;
-    }
-    if (!Interactable)
+        return Left.Distance < Right.Distance;
+    });
+
+    for (const FHitResult& Hit : Hits)
     {
-        return;
+        AActor* HitActor = Hit.GetActor();
+        UPrimitiveComponent* HitComponent = Hit.GetComponent();
+        if (!HitActor && !HitComponent)
+        {
+            continue;
+        }
+
+        AEvaFacilityInteractable* Interactable = Cast<AEvaFacilityInteractable>(HitActor);
+        if (!Interactable && HitComponent)
+        {
+            Interactable = Cast<AEvaFacilityInteractable>(HitComponent->GetOwner());
+        }
+
+        bLastInteractionHit = true;
+        LastInteractionHitActor = HitActor ? HitActor->GetName() : TEXT("None");
+        LastInteractionHitComponent = HitComponent ? HitComponent->GetName() : TEXT("None");
+        LastInteractionDistance = Hit.Distance;
+        bLastInteractionImplementsInteractable = Interactable != nullptr;
+
+        if (Interactable)
+        {
+            const FString Prompt = Interactable->GetInteractionPrompt(this);
+            bLastInteractionEnabled = !Prompt.IsEmpty();
+            bLastInteractionLineOfSightClear = true;
+            if (!Prompt.IsEmpty())
+            {
+                FocusedInteractable = Interactable;
+                FocusedInteractionPrompt = Prompt;
+                LastInteractionFailure = TEXT("None");
+                if (bLogDiagnostics)
+                {
+                    LogInteractionDiagnostics(TEXT("FocusTrace"), bInputReceived, false);
+                }
+                return;
+            }
+
+            LastInteractionFailure = TEXT("InteractionDisabled");
+            if (Hit.bBlockingHit)
+            {
+                break;
+            }
+            continue;
+        }
+
+        if (Hit.bBlockingHit)
+        {
+            LastInteractionFailure = FString::Printf(TEXT("BlockedBy:%s"),
+                HitActor ? *HitActor->GetName() : TEXT("Unknown"));
+            bLastInteractionLineOfSightClear = false;
+            break;
+        }
     }
 
-    const FString Prompt = Interactable->GetInteractionPrompt(this);
-    if (!Prompt.IsEmpty())
+    if (bLogDiagnostics)
     {
-        FocusedInteractable = Interactable;
-        FocusedInteractionPrompt = Prompt;
+        LogInteractionDiagnostics(TEXT("FocusTrace"), bInputReceived, false);
     }
+}
+
+FString AEvaPlayerCharacter::GetFocusedInteractableDebugName() const
+{
+    return FocusedInteractable.IsValid() ? FocusedInteractable->GetName() : FString(TEXT("None"));
+}
+
+void AEvaPlayerCharacter::LogInteractionDiagnostics(const FString& Context, const bool bInputReceived,
+    const bool bExecuteResult) const
+{
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[Interaction] Context=%s InputReceived=%s CameraLocation=%s TraceStart=%s TraceEnd=%s Hit=%s HitActor=%s HitComponent=%s Distance=%.1f ImplementsInteractable=%s InteractionEnabled=%s LineOfSightClear=%s FailureReason=%s ExecuteResult=%s CurrentInteractable=%s Prompt=\"%s\""),
+        *Context,
+        bInputReceived ? TEXT("true") : TEXT("false"),
+        *LastInteractionCameraLocation.ToCompactString(),
+        *LastInteractionTraceStart.ToCompactString(),
+        *LastInteractionTraceEnd.ToCompactString(),
+        bLastInteractionHit ? TEXT("true") : TEXT("false"),
+        *LastInteractionHitActor,
+        *LastInteractionHitComponent,
+        LastInteractionDistance,
+        bLastInteractionImplementsInteractable ? TEXT("true") : TEXT("false"),
+        bLastInteractionEnabled ? TEXT("true") : TEXT("false"),
+        bLastInteractionLineOfSightClear ? TEXT("true") : TEXT("false"),
+        *LastInteractionFailure,
+        bExecuteResult ? TEXT("true") : TEXT("false"),
+        *GetFocusedInteractableDebugName(),
+        *FocusedInteractionPrompt);
 }
 
 void AEvaPlayerCharacter::SpawnStarterWeapon()

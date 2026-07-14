@@ -1,5 +1,109 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 023 Content Interactable Visibility and Pickup Fix
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed:
+  - Keycard `MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - Research Log x3 `MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `ResearchLogCount=3 RequiredResearchLogCount=3`
+- Runtime smoke showed no project Fatal / Ensure / Assertion.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Security Keycard:
+  - Moved to a safer Security Corridor position.
+  - Enlarged/lifted mesh so it is a visible object, not only a label.
+  - Added dedicated actor-owned interaction collision.
+  - Interaction collision blocks Visibility, ignores Pawn, and is not the text label.
+- Research Logs:
+  - All three required logs now have larger, lifted tablet/terminal-like mesh bodies.
+  - All three have dedicated actor-owned interaction collision.
+  - Labels remain close to their mesh bodies.
+- Interaction Trace:
+  - E-key focus now uses camera-origin Visibility sphere sweep.
+  - It still stops on blocking non-interactable hits, so wall-through interaction remains prohibited.
+  - Prompt and execute both use the same `FocusedInteractable`.
+  - E press emits `[Interaction]` logs with HitActor, HitComponent, FailureReason, ExecuteResult, etc.
+- Debug HUD Page 3:
+  - Shows Keycard Valid / Visible / Distance.
+  - Shows Logs Visible 0-3.
+  - Shows Current Interactable.
+  - Shows Last Interaction Failure.
+- Diagnostics:
+  - `[InteractableSpawn]` logs include actor/class/location, mesh world location/scale/visibility, trace collision bounds/responses, prompt, distance, floor validity, and reachability.
+
+### Next highest-priority task
+
+Run PIE and verify only the Content Pass 1 interactable flow. Do not add new AI, enemies, weapons, maps, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game.
+2. Restore facility power.
+3. Confirm objective becomes `Find Security Keycard`.
+4. Confirm Security Keycard is visibly present as an object, not just text.
+5. Look at the Keycard and confirm `E - PICK UP KEYCARD`.
+6. Press E and confirm the Keycard is acquired.
+7. Confirm objective advances to `Unlock Observation Lab`.
+8. Confirm the Observation Lab door prompt changes and the door opens after Keycard acquisition.
+9. Confirm all three Research Logs are visible as objects:
+   - `EVA LEARNING NOTES`
+   - `HUNTER CONTAINMENT REPORT`
+   - `ADAM EXPERIMENT RECORD`
+10. Confirm each Research Log prompt appears and opens/closes correctly.
+11. If interaction fails, capture the new `[Interaction]` log line and inspect:
+    - HitActor
+    - HitComponent
+    - InteractionEnabled
+    - LineOfSightClear
+    - FailureReason
+    - ExecuteResult
+12. Confirm prior fixes remain stable:
+    - closed-door damage blocking,
+    - enemy spawn presentation,
+    - objective chain,
+    - Gameplay Pass 1 debug HUD,
+    - Runtime NavMesh,
+    - Zombie/HUNTER/ADAM/Stage Clear,
+    - Title/Pause/Settings/Game Over.
+
+If a problem is found:
+
+- Fix only Keycard / Research Log visibility, interaction trace, prompt/execute target mismatch, or content objective pickup state.
+- Preserve AI, HUNTER, ADAM, Stage Clear, Death/Game Over, UI flow, horror presentation, and gameplay balance.
+
+### Important files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that the Keycard is visible and collectible.
+- User confirms objective advances past `Find Security Keycard`.
+- User confirms all three Research Logs are visible/readable.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 022 Content Pass 1 Placement / Door / Spawn Presentation Fix
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

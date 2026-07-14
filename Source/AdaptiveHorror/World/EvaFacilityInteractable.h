@@ -6,6 +6,9 @@
 
 class AEvaPlayerCharacter;
 class AEvaResearchFacilityDirector;
+class UBoxComponent;
+class UMaterialInstanceDynamic;
+class UPrimitiveComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
 
@@ -52,6 +55,21 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Interaction")
     FString GetDisplayName() const { return DisplayName; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    UStaticMeshComponent* GetVisualComponentForDebug() const { return Visual; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    UPrimitiveComponent* GetInteractionCollisionComponentForDebug() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    bool IsInteractionCollisionEnabledForDebug() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    bool IsMeshVisibleForDebug() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    FVector GetInteractionTraceLocation() const;
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Interaction")
     TObjectPtr<USceneComponent> SceneRoot;
@@ -60,7 +78,13 @@ protected:
     TObjectPtr<UStaticMeshComponent> Visual;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Interaction")
+    TObjectPtr<UBoxComponent> InteractionCollision;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Interaction")
     TObjectPtr<UTextRenderComponent> Label;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UMaterialInstanceDynamic> VisualMaterial;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EVA|Interaction")
     EEvaFacilityInteractableType InteractableType = EEvaFacilityInteractableType::Keycard;
@@ -83,6 +107,8 @@ protected:
 private:
     void ApplyVisualState(bool bActive);
     void ApplyDoorState(bool bOpen);
+    void ConfigureInteractionCollision(const FVector& RelativeLocation, const FVector& Extent, bool bActive);
+    void ApplyVisualColor(const FLinearColor& Color);
     AEvaResearchFacilityDirector* ResolveDirector() const;
     FString TypeDefaultPrompt() const;
 

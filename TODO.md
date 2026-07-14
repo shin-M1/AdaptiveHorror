@@ -1,5 +1,34 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 023 status - Content Interactable Visibility and Pickup Fix
+
+- [x] Continued on `feature/content-pass1`.
+- [x] Kept the fix scoped to Keycard / Research Log visibility, interaction collision, E-key trace diagnostics, and Debug HUD Page 3.
+- [x] Moved the Security Keycard to a safer Security Corridor position.
+- [x] Enlarged and lifted the Keycard mesh so it has a visible body, not only text.
+- [x] Added dedicated Keycard interaction collision that blocks Visibility and ignores Pawn movement.
+- [x] Enlarged/lifted all three Research Log meshes and gave them dedicated interaction collision:
+  - `EVA LEARNING NOTES`
+  - `HUNTER CONTAINMENT REPORT`
+  - `ADAM EXPERIMENT RECORD`
+- [x] Added `[InteractableSpawn]` diagnostics for mesh, collision, prompt, distance, visibility responses, bounds, floor validity, and reachability.
+- [x] Added `[Interaction]` diagnostics on E press/log close.
+- [x] Changed interaction focus detection to camera-origin Visibility sphere sweep while preserving wall-through blocking.
+- [x] Added Debug HUD Page 3 readouts for Keycard Valid/Visible/Distance, Logs Visible, Current Interactable, and Last Interaction Failure.
+- [x] Added Automation coverage for Keycard mesh/interaction collision/pickup and Research Log visible interaction collision.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0 and confirmed Keycard/ResearchLog MeshVisible=true, InteractionEnabled=true, VisibilityBlock=true logs.
+
+### Next TODO
+
+- [ ] PIE-verify Security Keycard is visually obvious in the field.
+- [ ] PIE-verify looking at the Keycard shows `E - PICK UP KEYCARD` and pressing E acquires it.
+- [ ] PIE-verify objective advances from `Find Security Keycard` to `Unlock Observation Lab`.
+- [ ] PIE-verify all three Research Logs are visually discoverable and readable.
+- [ ] PIE-verify `[Interaction]` logs if any prompt/execution mismatch remains.
+- [ ] PIE-verify door opening after Keycard acquisition now becomes reachable and does not regress prior damage-block fix.
+
 ## Cycle 022 status - Content Pass 1 Placement / Door / Spawn Presentation Fix
 
 - [x] Continued on `feature/content-pass1`.

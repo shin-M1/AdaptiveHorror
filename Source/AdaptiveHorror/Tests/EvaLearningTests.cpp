@@ -8,6 +8,7 @@
 #include "AI/EvaZombieCharacter.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/EvaPrototypeGameMode.h"
@@ -1156,6 +1157,92 @@ bool FEvaContentPassInteractablePromptTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Door prompt changes after keycard"), Door->GetInteractionPrompt(Player),
         FString(TEXT("E - UNLOCK OBSERVATION LAB")));
     TestTrue(TEXT("Door interact succeeds after keycard"), Door->Interact(Player));
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassInteractableVisibilityAndPickupTest,
+    "AdaptiveHorror.ContentPass.InteractableVisibilityAndPickup",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassInteractableVisibilityAndPickupTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+    AEvaFacilityInteractable* Keycard = World->SpawnActor<AEvaFacilityInteractable>(
+        AEvaFacilityInteractable::StaticClass(), FVector(0.0f, 0.0f, 96.0f), FRotator::ZeroRotator);
+
+    TestNotNull(TEXT("Director spawns for interactable visibility test"), Director);
+    TestNotNull(TEXT("Player spawns for interactable visibility test"), Player);
+    TestNotNull(TEXT("Keycard spawns for interactable visibility test"), Keycard);
+    if (!Director || !Player || !Keycard)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Director->ResetForNewGame();
+    TestTrue(TEXT("Power restore advances to Find Security Keycard"), Director->TryRestoreFacilityPower());
+    TestEqual(TEXT("Objective is Find Security Keycard"), Director->GetObjectiveIndex(), 1);
+
+    Keycard->ConfigureInteractable(EEvaFacilityInteractableType::Keycard, Director, TEXT("SECURITY KEYCARD"));
+    UPrimitiveComponent* KeycardInteraction = Keycard->GetInteractionCollisionComponentForDebug();
+    TestTrue(TEXT("Keycard mesh is visible"), Keycard->IsMeshVisibleForDebug());
+    TestNotNull(TEXT("Keycard has interaction collision"), KeycardInteraction);
+    if (KeycardInteraction)
+    {
+        TestNotEqual(TEXT("Keycard interaction collision is enabled"),
+            KeycardInteraction->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+        TestEqual(TEXT("Keycard interaction collision blocks Visibility"),
+            KeycardInteraction->GetCollisionResponseToChannel(ECC_Visibility), ECR_Block);
+        TestEqual(TEXT("Keycard interaction collision ignores Pawn movement"),
+            KeycardInteraction->GetCollisionResponseToChannel(ECC_Pawn), ECR_Ignore);
+    }
+    TestTrue(TEXT("Keycard interaction is enabled"), Keycard->CanInteract(Player));
+    TestEqual(TEXT("Keycard prompt is available when objective asks for keycard"),
+        Keycard->GetInteractionPrompt(Player), FString(TEXT("E - PICK UP KEYCARD")));
+    TestTrue(TEXT("Interacting with same keycard actor succeeds"), Keycard->Interact(Player));
+    TestTrue(TEXT("Director records keycard acquired after interaction"), Director->HasSecurityKeycard());
+
+    const TCHAR* LogTitles[] =
+    {
+        TEXT("EVA LEARNING NOTES"),
+        TEXT("HUNTER CONTAINMENT REPORT"),
+        TEXT("ADAM EXPERIMENT RECORD")
+    };
+    int32 VisibleInteractableLogs = 0;
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        AEvaFacilityInteractable* Log = World->SpawnActor<AEvaFacilityInteractable>(
+            AEvaFacilityInteractable::StaticClass(), FVector(160.0f * Index, 180.0f, 86.0f), FRotator::ZeroRotator);
+        TestNotNull(TEXT("Research log spawns for visibility test"), Log);
+        if (!Log)
+        {
+            continue;
+        }
+
+        Log->ConfigureInteractable(EEvaFacilityInteractableType::ResearchLog, Director, LogTitles[Index],
+            FName(*FString::Printf(TEXT("AutomationVisibleLog%d"), Index)),
+            LogTitles[Index], TEXT("Automation research log body."));
+
+        UPrimitiveComponent* LogInteraction = Log->GetInteractionCollisionComponentForDebug();
+        TestTrue(TEXT("Research log mesh is visible"), Log->IsMeshVisibleForDebug());
+        TestNotNull(TEXT("Research log has interaction collision"), LogInteraction);
+        if (LogInteraction)
+        {
+            TestNotEqual(TEXT("Research log interaction collision is enabled"),
+                LogInteraction->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+            TestEqual(TEXT("Research log interaction collision blocks Visibility"),
+                LogInteraction->GetCollisionResponseToChannel(ECC_Visibility), ECR_Block);
+        }
+        TestEqual(TEXT("Research log prompt is readable"), Log->GetInteractionPrompt(Player),
+            FString(TEXT("E - READ LOG")));
+        ++VisibleInteractableLogs;
+    }
+
+    TestEqual(TEXT("All three research logs have visible interactable bodies"), VisibleInteractableLogs, 3);
 
     World->DestroyWorld(false);
     return true;

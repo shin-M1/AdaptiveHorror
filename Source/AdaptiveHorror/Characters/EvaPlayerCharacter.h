@@ -79,6 +79,12 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Interaction")
     FString GetInteractionPrompt() const { return FocusedInteractionPrompt; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    FString GetFocusedInteractableDebugName() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction|Debug")
+    FString GetLastInteractionFailure() const { return LastInteractionFailure; }
+
 protected:
     virtual void PostInitializeComponents() override;
     virtual void BeginPlay() override;
@@ -99,7 +105,8 @@ protected:
     void ToggleFlashlightInput();
     void Interact();
     void SpawnStarterWeapon();
-    void UpdateFocusedInteractable();
+    void UpdateFocusedInteractable(bool bLogDiagnostics = false, bool bInputReceived = false);
+    void LogInteractionDiagnostics(const FString& Context, bool bInputReceived, bool bExecuteResult) const;
     void UpdateFlashlightVisibility();
     void ResetHorrorFeedback();
     void PlayBreathingPulse();
@@ -219,4 +226,15 @@ private:
     TWeakObjectPtr<AEvaFacilityInteractable> FocusedInteractable;
     FString FocusedInteractionPrompt;
     float InteractionTraceDistance = 360.0f;
+    FString LastInteractionFailure = TEXT("None");
+    FString LastInteractionHitActor = TEXT("None");
+    FString LastInteractionHitComponent = TEXT("None");
+    FVector LastInteractionCameraLocation = FVector::ZeroVector;
+    FVector LastInteractionTraceStart = FVector::ZeroVector;
+    FVector LastInteractionTraceEnd = FVector::ZeroVector;
+    float LastInteractionDistance = -1.0f;
+    bool bLastInteractionHit = false;
+    bool bLastInteractionImplementsInteractable = false;
+    bool bLastInteractionEnabled = false;
+    bool bLastInteractionLineOfSightClear = false;
 };

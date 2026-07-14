@@ -1,5 +1,54 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 023 execution result - Content Interactable Visibility and Pickup Fix
+
+Date: 2026-07-14
+
+Branch: `feature/content-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Project Automation count: 43 tests.
+- New test confirmed successful:
+  - `AdaptiveHorror.ContentPass.InteractableVisibilityAndPickup`
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+- Latest runtime smoke log confirmed:
+  - `[InteractableSpawn] Keycard MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `[InteractableSpawn] ResearchLog Title=EVA LEARNING NOTES MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `[InteractableSpawn] ResearchLog Title=HUNTER CONTAINMENT REPORT MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `[InteractableSpawn] ResearchLog Title=ADAM EXPERIMENT RECORD MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `[ContentSpawn] Context=NavigationReady ResearchLogCount=3 RequiredResearchLogCount=3`
+- Latest smoke log did not show project Fatal / Ensure / Assertion.
+
+Notes:
+
+- New includes for this fix:
+  - `AdaptiveHorror.h`
+  - `Components/BoxComponent.h`
+  - `Components/PrimitiveComponent.h`
+  - `Materials/MaterialInstanceDynamic.h`
+  - `Materials/MaterialInterface.h`
+  - `World/EvaFacilityInteractable.h`
+- Live Coding-free Development Editor build confirmed those includes compile in UE5.8.
+- Runtime smoke confirms component state and startup diagnostics, not PIE visibility from the player's actual viewpoint.
+- Non-Win64 SDK validation warnings may still appear in engine output; Win64 build/automation succeeded.
+
 ## Cycle 022 execution result - Content Pass 1 Placement / Door / Spawn Presentation Fix
 
 Date: 2026-07-14

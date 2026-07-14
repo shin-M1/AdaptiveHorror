@@ -1,5 +1,104 @@
 # Development Log
 
+## 2026-07-14 - Cycle 023: Content Interactable Visibility and Pickup Fix
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Continued the Content Pass 1 PIE fix after the latest user check.
+- Fixed only Keycard / Research Log visibility, interaction collision, E-key trace diagnostics, and debug visibility readouts.
+- Did not change AI behavior, enemy spawning rules, combat balance, doors beyond prior blocking behavior, HUNTER, ADAM, Stage Clear, Player Death, Title/Pause/Settings/Game Over, blackout, flashlight, or map progression rules.
+
+### Implemented
+
+- Keycard visibility / pickup:
+  - Moved the Security Keycard to a safer, more central Security Corridor floor position.
+  - Increased the temporary mesh size and lifted the mesh so it cannot be visually buried in the floor/text component.
+  - Added dedicated `InteractionCollision` on the Keycard actor.
+  - Interaction collision blocks `Visibility`, ignores `Pawn`, and is separate from the label so the label is not the pickup target.
+  - Kept `SECURITY KEYCARD` label visible above the actor.
+- Research Log visibility:
+  - Gave all three logs a larger tablet/terminal-like mesh body and dedicated interaction collision:
+    - `EVA LEARNING NOTES`
+    - `HUNTER CONTAINMENT REPORT`
+    - `ADAM EXPERIMENT RECORD`
+  - Adjusted log positions slightly away from the wall edge and lifted mesh/collision bounds.
+  - Kept actors present before they are required by objective progression.
+- Interaction diagnostics / trace:
+  - Changed E-key focus detection to a camera-origin Visibility sphere sweep so small interactable bodies are easier to hit.
+  - The sweep still stops on the first non-interactable blocking hit, preserving wall-through interaction prevention.
+  - Prompt target and E execution target both use the same `FocusedInteractable`.
+  - Added `[Interaction]` logs on E press / log close with:
+    - InputReceived, CameraLocation, TraceStart, TraceEnd, Hit, HitActor, HitComponent, Distance, ImplementsInteractable, InteractionEnabled, LineOfSightClear, FailureReason, ExecuteResult, CurrentInteractable, Prompt.
+- Interactable spawn diagnostics:
+  - Added `[InteractableSpawn]` logs after all facility interactables spawn and after Runtime NavMesh readiness.
+  - Logs now include actor/class/location, mesh validity/asset/location/scale/visibility/hidden state, trace collision enabled/object type/responses/bounds, prompt text, interaction distance, enabled state, registered count, floor validity, and reachability.
+  - Added short summary lines for grep:
+    - `Keycard MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=... MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+- Debug HUD:
+  - Debug HUD Page 3 now shows:
+    - Keycard Valid / Visible / Distance
+    - Logs Visible 0-3
+    - Current Interactable
+    - Last Interaction Failure
+- Automation:
+  - Added `AdaptiveHorror.ContentPass.InteractableVisibilityAndPickup`.
+  - Confirms Keycard mesh visibility, Visibility-blocking interaction collision, interaction enabled state, prompt, and successful keycard acquisition.
+  - Confirms all three Research Logs have visible meshes, active interaction collision, Visibility blocking, and `E - READ LOG` prompt.
+
+### Changed files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest Automation log confirmed the new `InteractableVisibilityAndPickup` test succeeded.
+  - Project Automation count is now 43 tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed:
+    - `Keycard MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=EVA LEARNING NOTES MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=HUNTER CONTAINMENT REPORT MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=ADAM EXPERIMENT RECORD MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLogCount=3 RequiredResearchLogCount=3`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- Include/build safety:
+  - Added includes for `AdaptiveHorror.h`, `Components/BoxComponent.h`, `Components/PrimitiveComponent.h`, `Materials/MaterialInstanceDynamic.h`, `Materials/MaterialInterface.h`, and `World/EvaFacilityInteractable.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- PIE viewport confirmation that the Keycard is now visually obvious and can be picked up.
+- PIE viewport confirmation that all three Research Logs are visually discoverable in the actual play route.
+- PIE viewport confirmation that the new sphere-sweep interaction feels correct at close range.
+- PIE viewport confirmation that Objective advances from `Find Security Keycard` after pickup.
+
+### Known risks / follow-up
+
+- Runtime smoke confirms component state, not actual player eyesight/composition in PIE.
+- If the Keycard still feels easy to miss in PIE, adjust presentation only: color/scale/location/marker, not objective logic.
+- If E-key still fails in PIE, use the new `[Interaction]` logs to inspect the exact HitActor/HitComponent/FailureReason.
+
 ## 2026-07-14 - Cycle 022: Content Pass 1 Placement / Door / Spawn Presentation Fix
 
 Branch: `feature/content-pass1`

@@ -139,6 +139,57 @@ namespace
         }
     }
 
+    FString CollisionEnabledToText(const ECollisionEnabled::Type CollisionEnabled)
+    {
+        switch (CollisionEnabled)
+        {
+        case ECollisionEnabled::NoCollision:
+            return TEXT("NoCollision");
+        case ECollisionEnabled::QueryOnly:
+            return TEXT("QueryOnly");
+        case ECollisionEnabled::PhysicsOnly:
+            return TEXT("PhysicsOnly");
+        case ECollisionEnabled::QueryAndPhysics:
+            return TEXT("QueryAndPhysics");
+        default:
+            return TEXT("Unknown");
+        }
+    }
+
+    FString CollisionResponseToText(const ECollisionResponse Response)
+    {
+        switch (Response)
+        {
+        case ECR_Ignore:
+            return TEXT("Ignore");
+        case ECR_Overlap:
+            return TEXT("Overlap");
+        case ECR_Block:
+            return TEXT("Block");
+        default:
+            return TEXT("Unknown");
+        }
+    }
+
+    FString CollisionObjectTypeToText(const ECollisionChannel Channel)
+    {
+        switch (Channel)
+        {
+        case ECC_WorldStatic:
+            return TEXT("WorldStatic");
+        case ECC_WorldDynamic:
+            return TEXT("WorldDynamic");
+        case ECC_Pawn:
+            return TEXT("Pawn");
+        case ECC_Visibility:
+            return TEXT("Visibility");
+        case ECC_Camera:
+            return TEXT("Camera");
+        default:
+            return FString::Printf(TEXT("Channel%d"), static_cast<int32>(Channel));
+        }
+    }
+
     FString RuntimeGenerationToText(const ERuntimeGenerationType RuntimeGeneration)
     {
         switch (RuntimeGeneration)
@@ -848,24 +899,25 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
 
     SpawnFacilityInteractable(CurrentDirector, FVector(-3260.0f, 500.0f, 110.0f), FRotator(0.0f, -90.0f, 0.0f),
         EEvaFacilityInteractableType::PowerConsole, TEXT("POWER CONSOLE"));
-    SpawnFacilityInteractable(CurrentDirector, FVector(-2680.0f, -470.0f, 92.0f), FRotator::ZeroRotator,
+    SpawnFacilityInteractable(CurrentDirector, FVector(-2750.0f, -240.0f, 96.0f), FRotator(0.0f, 25.0f, 0.0f),
         EEvaFacilityInteractableType::Keycard, TEXT("SECURITY KEYCARD"));
     SpawnFacilityInteractable(CurrentDirector, FVector(-2100.0f, 0.0f, 170.0f), FRotator::ZeroRotator,
         EEvaFacilityInteractableType::LockedDoor, TEXT("OBSERVATION LAB LOCK"));
-    SpawnFacilityInteractable(CurrentDirector, FVector(-1200.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
+    SpawnFacilityInteractable(CurrentDirector, FVector(-1200.0f, 520.0f, 86.0f), FRotator(0.0f, 180.0f, 0.0f),
         EEvaFacilityInteractableType::ResearchLog, TEXT("EVA LEARNING NOTES"),
         FName(TEXT("CONTENT_LOG_EVA")), TEXT("EVA Learning Notes"),
         TEXT("EVA correlates repeated player choices with survival outcomes. It is already classifying you."));
-    SpawnFacilityInteractable(CurrentDirector, FVector(600.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
+    SpawnFacilityInteractable(CurrentDirector, FVector(600.0f, 520.0f, 86.0f), FRotator(0.0f, 180.0f, 0.0f),
         EEvaFacilityInteractableType::ResearchLog, TEXT("HUNTER CONTAINMENT REPORT"),
         FName(TEXT("CONTENT_LOG_HUNTER")), TEXT("HUNTER Containment Report"),
         TEXT("HUNTER units record combat distance, hit bias, and escape routes with near-perfect fidelity."));
-    SpawnFacilityInteractable(CurrentDirector, FVector(2400.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
+    SpawnFacilityInteractable(CurrentDirector, FVector(2400.0f, 520.0f, 86.0f), FRotator(0.0f, 180.0f, 0.0f),
         EEvaFacilityInteractableType::ResearchLog, TEXT("ADAM EXPERIMENT RECORD"),
         FName(TEXT("CONTENT_LOG_ADAM")), TEXT("Adam Experiment Record"),
         TEXT("ADAM is not a subject. It is EVA's preferred answer when observation alone is insufficient."));
     SpawnFacilityInteractable(CurrentDirector, FVector(2560.0f, -480.0f, 105.0f), FRotator(0.0f, 90.0f, 0.0f),
         EEvaFacilityInteractableType::DataCoreConsole, TEXT("DATA CORE CONSOLE"));
+    LogFacilityInteractableSpawnStatus(TEXT("AfterAllFacilityInteractablesSpawned"));
 
     if (ADirectionalLight* DirectionalLight = GetWorld()->SpawnActor<ADirectionalLight>(
         FVector(-1600.0f, -2600.0f, 1800.0f), FRotator(-45.0f, 35.0f, 0.0f)))
@@ -1470,6 +1522,18 @@ void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Co
     }
 
     int32 ResearchLogCount = 0;
+    int32 RegisteredCount = 0;
+    for (TActorIterator<AEvaFacilityInteractable> It(GetWorld()); It; ++It)
+    {
+        const AEvaFacilityInteractable* Interactable = *It;
+        if (!IsValid(Interactable))
+        {
+            continue;
+        }
+        ++RegisteredCount;
+    }
+
+    const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
     for (TActorIterator<AEvaFacilityInteractable> It(GetWorld()); It; ++It)
     {
         const AEvaFacilityInteractable* Interactable = *It;
@@ -1485,6 +1549,82 @@ void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Co
 
         const bool bFloorValid = IsFloorValidAt(GetWorld(), Interactable->GetActorLocation());
         const bool bReachable = IsNavigationReachableAt(GetWorld(), Interactable->GetActorLocation());
+        const UStaticMeshComponent* MeshComponent = Interactable->GetVisualComponentForDebug();
+        const UPrimitiveComponent* TraceComponent = Interactable->GetInteractionCollisionComponentForDebug();
+        const UPrimitiveComponent* CollisionComponent = TraceComponent ? TraceComponent : MeshComponent;
+        const UStaticMesh* MeshAsset = MeshComponent ? MeshComponent->GetStaticMesh() : nullptr;
+        const FString PromptText = Player ? Interactable->GetInteractionPrompt(Player) : FString(TEXT("NoPlayer"));
+        const float InteractionDistance = Player ?
+            FVector::Dist(Player->GetActorLocation(), Interactable->GetInteractionTraceLocation()) : -1.0f;
+        const bool bMeshVisible = Interactable->IsMeshVisibleForDebug();
+        const bool bInteractionEnabled = Interactable->IsInteractionCollisionEnabledForDebug();
+        const bool bVisibilityBlock = CollisionComponent &&
+            CollisionComponent->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block;
+        const FString ComponentBounds = CollisionComponent ?
+            CollisionComponent->Bounds.GetBox().ToString() : FString(TEXT("None"));
+
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[InteractableSpawn] Context=%s ActorName=%s ActorClass=%s Type=%s WorldLocation=%s MeshComponentValid=%s MeshAsset=%s MeshWorldLocation=%s MeshWorldScale=%s MeshVisible=%s HiddenInGame=%s ActorHidden=%s CollisionEnabled=%s CollisionObjectType=%s VisibilityResponse=%s CameraResponse=%s PawnResponse=%s ComponentBounds=%s PromptText=\"%s\" InteractionDistance=%.1f InteractableEnabled=%s InteractionEnabled=%s VisibilityBlock=%s RegisteredCount=%d FloorValid=%s Reachable=%s"),
+            *Context,
+            *Interactable->GetName(),
+            *Interactable->GetClass()->GetName(),
+            *FacilityInteractableTypeToText(Interactable->GetInteractableType()),
+            *Interactable->GetActorLocation().ToCompactString(),
+            *BoolText(MeshComponent != nullptr),
+            MeshAsset ? *MeshAsset->GetPathName() : TEXT("None"),
+            MeshComponent ? *MeshComponent->GetComponentLocation().ToCompactString() : TEXT("None"),
+            MeshComponent ? *MeshComponent->GetComponentScale().ToCompactString() : TEXT("None"),
+            *BoolText(bMeshVisible),
+            MeshComponent ? *BoolText(MeshComponent->bHiddenInGame) : TEXT("None"),
+            *BoolText(Interactable->IsHidden()),
+            CollisionComponent ? *CollisionEnabledToText(CollisionComponent->GetCollisionEnabled()) : TEXT("None"),
+            CollisionComponent ? *CollisionObjectTypeToText(CollisionComponent->GetCollisionObjectType()) : TEXT("None"),
+            CollisionComponent ? *CollisionResponseToText(CollisionComponent->GetCollisionResponseToChannel(ECC_Visibility)) : TEXT("None"),
+            CollisionComponent ? *CollisionResponseToText(CollisionComponent->GetCollisionResponseToChannel(ECC_Camera)) : TEXT("None"),
+            CollisionComponent ? *CollisionResponseToText(CollisionComponent->GetCollisionResponseToChannel(ECC_Pawn)) : TEXT("None"),
+            *ComponentBounds,
+            *PromptText,
+            InteractionDistance,
+            *BoolText(Interactable->CanInteract(Player)),
+            *BoolText(bInteractionEnabled),
+            *BoolText(bVisibilityBlock),
+            RegisteredCount,
+            *BoolText(bFloorValid),
+            *BoolText(bReachable));
+
+        if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::Keycard)
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[InteractableSpawn] Keycard MeshVisible=%s InteractionEnabled=%s VisibilityBlock=%s PromptText=\"%s\" Distance=%.1f"),
+                *BoolText(bMeshVisible),
+                *BoolText(bInteractionEnabled),
+                *BoolText(bVisibilityBlock),
+                *PromptText,
+                InteractionDistance);
+        }
+        else if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::ResearchLog)
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[InteractableSpawn] ResearchLog Title=%s MeshVisible=%s InteractionEnabled=%s VisibilityBlock=%s PromptText=\"%s\" Distance=%.1f"),
+                *Interactable->GetDisplayName(),
+                *BoolText(bMeshVisible),
+                *BoolText(bInteractionEnabled),
+                *BoolText(bVisibilityBlock),
+                *PromptText,
+                InteractionDistance);
+        }
+
+#if !UE_BUILD_SHIPPING
+        if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::Keycard ||
+            Interactable->GetInteractableType() == EEvaFacilityInteractableType::ResearchLog)
+        {
+            const FColor DebugColor = Interactable->GetInteractableType() == EEvaFacilityInteractableType::Keycard ?
+                FColor::Cyan : FColor::Orange;
+            DrawDebugSphere(GetWorld(), Interactable->GetInteractionTraceLocation(), 38.0f, 12,
+                DebugColor, false, 8.0f, 0, 2.0f);
+        }
+#endif
+
         UE_LOG(LogAdaptiveHorror, Log,
             TEXT("[ContentSpawn] Context=%s Type=%s Title=%s Location=%s FloorValid=%s Reachable=%s Hidden=%s Collision=%s"),
             *Context,

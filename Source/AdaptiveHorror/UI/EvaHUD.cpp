@@ -16,6 +16,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "UI/EvaBossHUDWidget.h"
 #include "Weapons/EvaWeaponBase.h"
+#include "World/EvaFacilityInteractable.h"
 #include "World/EvaResearchFacilityDirector.h"
 
 void AEvaHUD::BeginPlay()
@@ -258,6 +259,37 @@ void AEvaHUD::DrawHUD()
         }
         else
         {
+            bool bKeycardValid = false;
+            bool bKeycardVisible = false;
+            float KeycardDistance = -1.0f;
+            int32 VisibleResearchLogs = 0;
+            if (World)
+            {
+                for (TActorIterator<AEvaFacilityInteractable> InteractableIt(World); InteractableIt; ++InteractableIt)
+                {
+                    const AEvaFacilityInteractable* Interactable = *InteractableIt;
+                    if (!Interactable)
+                    {
+                        continue;
+                    }
+
+                    if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::Keycard)
+                    {
+                        bKeycardValid = true;
+                        bKeycardVisible = Interactable->IsMeshVisibleForDebug() &&
+                            Interactable->IsInteractionCollisionEnabledForDebug();
+                        KeycardDistance = FVector::Dist(Player->GetActorLocation(),
+                            Interactable->GetInteractionTraceLocation());
+                    }
+                    else if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::ResearchLog &&
+                        Interactable->IsMeshVisibleForDebug() &&
+                        Interactable->IsInteractionCollisionEnabledForDebug())
+                    {
+                        ++VisibleResearchLogs;
+                    }
+                }
+            }
+
             DrawDebugStat(TEXT("PAGE: NAV / SPAWN"));
             DrawDebugStat(FString::Printf(TEXT("Nav Ready: %s"), GameMode->IsNavMeshAvailable() ? TEXT("YES") : TEXT("NO")));
             DrawDebugStat(FString::Printf(TEXT("RecastNavMesh: %s"), GameMode->IsNavMeshAvailable() ? TEXT("READY") : TEXT("NOT READY")));
@@ -275,6 +307,15 @@ void AEvaHUD::DrawHUD()
             DrawDebugStat(FString::Printf(TEXT("Keycard: %s"), Director && Director->HasSecurityKeycard() ? TEXT("YES") : TEXT("NO")));
             DrawDebugStat(FString::Printf(TEXT("Door: %s"), Director && Director->IsObservationDoorOpen() ? TEXT("OPEN") : TEXT("LOCKED")));
             DrawDebugStat(FString::Printf(TEXT("Logs: %d"), Director ? Director->GetCollectedStoryLogCount() : 0));
+            DrawDebugStat(FString::Printf(TEXT("Keycard Obj: %s / %s / %.0f"),
+                bKeycardValid ? TEXT("Valid") : TEXT("Missing"),
+                bKeycardVisible ? TEXT("Visible") : TEXT("Hidden"),
+                KeycardDistance));
+            DrawDebugStat(FString::Printf(TEXT("Logs Visible: %d/3"), VisibleResearchLogs));
+            DrawDebugStat(FString::Printf(TEXT("Current Interactable: %s"),
+                *Player->GetFocusedInteractableDebugName()));
+            DrawDebugStat(FString::Printf(TEXT("Last Interaction: %s"),
+                *Player->GetLastInteractionFailure()));
             DrawDebugStat(FString::Printf(TEXT("Data Core: %s"), Director && Director->IsDataCoreAccessed() ? TEXT("DONE") : TEXT("LOCKED")));
             DrawDebugStat(FString::Printf(TEXT("Arena: %s"), Director && Director->IsAdamArenaUnlocked() ? TEXT("UNLOCKED") : TEXT("LOCKED")));
         }
