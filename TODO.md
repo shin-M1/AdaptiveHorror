@@ -1,5 +1,87 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 023 status - Content Interactable Visibility and Pickup Fix
+
+- [x] Continued on `feature/content-pass1`.
+- [x] Kept the fix scoped to Keycard / Research Log visibility, interaction collision, E-key trace diagnostics, and Debug HUD Page 3.
+- [x] Moved the Security Keycard to a safer Security Corridor position.
+- [x] Enlarged and lifted the Keycard mesh so it has a visible body, not only text.
+- [x] Added dedicated Keycard interaction collision that blocks Visibility and ignores Pawn movement.
+- [x] Enlarged/lifted all three Research Log meshes and gave them dedicated interaction collision:
+  - `EVA LEARNING NOTES`
+  - `HUNTER CONTAINMENT REPORT`
+  - `ADAM EXPERIMENT RECORD`
+- [x] Added `[InteractableSpawn]` diagnostics for mesh, collision, prompt, distance, visibility responses, bounds, floor validity, and reachability.
+- [x] Added `[Interaction]` diagnostics on E press/log close.
+- [x] Changed interaction focus detection to camera-origin Visibility sphere sweep while preserving wall-through blocking.
+- [x] Added Debug HUD Page 3 readouts for Keycard Valid/Visible/Distance, Logs Visible, Current Interactable, and Last Interaction Failure.
+- [x] Added Automation coverage for Keycard mesh/interaction collision/pickup and Research Log visible interaction collision.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0 and confirmed Keycard/ResearchLog MeshVisible=true, InteractionEnabled=true, VisibilityBlock=true logs.
+
+### Next TODO
+
+- [ ] PIE-verify Security Keycard is visually obvious in the field.
+- [ ] PIE-verify looking at the Keycard shows `E - PICK UP KEYCARD` and pressing E acquires it.
+- [ ] PIE-verify objective advances from `Find Security Keycard` to `Unlock Observation Lab`.
+- [ ] PIE-verify all three Research Logs are visually discoverable and readable.
+- [ ] PIE-verify `[Interaction]` logs if any prompt/execution mismatch remains.
+- [ ] PIE-verify door opening after Keycard acquisition now becomes reachable and does not regress prior damage-block fix.
+
+## Cycle 022 status - Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+- [x] Continued on `feature/content-pass1`.
+- [x] Kept the fix scoped to Content Pass 1 placement, closed-door blocking, and enemy spawn presentation.
+- [x] Repositioned 3 required Research Logs onto reachable floor positions:
+  - `EVA LEARNING NOTES`
+  - `HUNTER CONTAINMENT REPORT`
+  - `ADAM EXPERIMENT RECORD`
+- [x] Added duplicate runtime placement protection for facility interactables.
+- [x] Added `[ContentSpawn]` diagnostics for Research Log placement, floor validity, reachability, collision, hidden state, and total Research Log count.
+- [x] Strengthened closed Observation Lab door collision against player/enemy passage, Visibility, Camera, and attack/charge trace paths.
+- [x] Added melee/charge line-of-sight checks so enemies do not apply damage through closed doors/walls.
+- [x] Updated presentation-safe enemy spawn selection to reject too-close, in-view, directly visible, front-of-player, near-interactable, near-checkpoint, non-floor, non-nav, and crowded candidates.
+- [x] Added subtle spawn cue and short delayed AI priming for presentation-safe spawns.
+- [x] Added Automation coverage for Research Log placement state and Observation Lab door blocking/opening trace behavior.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 42 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0 and confirmed Research Log count/reachability plus locked-door collision logs.
+- [x] `git diff --check` succeeded with no whitespace errors.
+
+### Next TODO
+
+- [ ] PIE-verify the three Research Logs are visible, reachable, and readable in the intended stage flow.
+- [ ] PIE-verify E-key prompt target and actual read/open/pickup target always match and cannot interact through walls.
+- [ ] PIE-verify the closed Observation Lab door blocks player movement, enemies, sight/attack damage, and opens cleanly after unlock.
+- [ ] PIE-verify enemies no longer pop into view during normal wave/adaptive/evolved/HUNTER/ADAM-summoned spawn situations.
+- [ ] PIE-verify the short delayed AI prime does not make spawned enemies feel passive.
+- [ ] PIE-verify the existing objective chain still reaches ADAM and Stage Clear without regression.
+
+## Cycle 021 status - Content Pass 1 Research Facility Progression
+
+- [x] Created `feature/content-pass1` from latest `main`.
+- [x] Added explicit objective chain: Restore Facility Power -> Find Security Keycard -> Unlock Observation Lab -> Search Containment Records -> Access Data Core -> Reach Adam Arena -> Defeat Adam.
+- [x] Added E-key interaction for power console, security keycard, locked door, research logs, and Data Core console.
+- [x] Added HUD objective progress, interaction prompt, research log overlay, and Debug HUD content-state readout.
+- [x] Added progression gates for Observation Lab, Containment Ward, and Adam Arena.
+- [x] Kept F4 ADAM debug path available without changing ADAM combat behavior.
+- [x] Kept existing Title / New Game / Pause / Settings / Game Over / Stage Clear, Runtime NavMesh, Zombie, HUNTER, ADAM, Boss HUD, Horror, Visual / Audio, and Gameplay Pass systems intact.
+- [x] Added Automation coverage for Content Pass objective progression and interactable prompt/state changes.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 40 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+
+### Next TODO
+
+- [ ] PIE-verify one full content lap from Entry Lobby to Adam Arena with E-key interactions only.
+- [ ] PIE-verify the Observation Lab door blocks before keycard/power and opens cleanly after unlock.
+- [ ] PIE-verify research log open/close input does not confuse combat input.
+- [ ] PIE-verify Data Core access unlocks Adam Arena and objective text updates clearly.
+- [ ] PIE-verify Runtime Graybox traversal remains comfortable for player and enemies after the locked door opens.
+- [ ] PIE-verify F4 ADAM debug start still starts ADAM encounter and does not require content gates.
+- [ ] Add final UI polish for objective prompt readability only after PIE confirms the interaction flow.
+
 ## Cycle 020 status - Enemy Intent Display Consistency
 
 - [x] Fixed blank/unsynced overhead Intent for existing enemies when Debug HUD is toggled ON.

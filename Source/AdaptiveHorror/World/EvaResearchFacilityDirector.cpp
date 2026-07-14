@@ -15,6 +15,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Pickups/EvaAmmoPickup.h"
 #include "Pickups/EvaHealthPickup.h"
+#include "World/EvaFacilityInteractable.h"
 
 AEvaResearchFacilityDirector::AEvaResearchFacilityDirector()
 {
@@ -35,12 +36,19 @@ void AEvaResearchFacilityDirector::BeginPlay()
 {
     Super::BeginPlay();
 
-    SetObjectiveForZone(CurrentZone);
+    SetObjectiveFromIndex();
     if (!TriggeredZones.Contains(CurrentZone))
     {
         TriggeredZones.Add(CurrentZone);
         SpawnZoneEncounter(CurrentZone);
     }
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->SetFacilityPowerOnline(bFacilityPowerOnline);
+    }
+    RefreshFacilityInteractables();
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] ObjectiveStart Index=%d Objective=%s"),
+        ObjectiveIndex, *CurrentObjective);
 }
 
 void AEvaResearchFacilityDirector::NotifyZoneEntered(const EEvaFacilityZone NewZone)
@@ -50,8 +58,23 @@ void AEvaResearchFacilityDirector::NotifyZoneEntered(const EEvaFacilityZone NewZ
         return;
     }
 
+    FString RejectReason;
+    if (!IsZoneEntryAllowed(NewZone, RejectReason))
+    {
+        if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+        {
+            GameMode->ShowDebugStatusMessage(RejectReason, 3.0f);
+        }
+        UE_LOG(LogAdaptiveHorror, Warning, TEXT("[Content] ZoneEntryRejected Zone=%s Reason=%s"),
+            *UEnum::GetValueAsString(NewZone), *RejectReason);
+        return;
+    }
+
     CurrentZone = NewZone;
-    SetObjectiveForZone(NewZone);
+    if (NewZone == EEvaFacilityZone::AdamArena)
+    {
+        AdvanceObjectiveTo(6, TEXT("ReachAdamArena"));
+    }
     const bool bFirstVisit = !TriggeredZones.Contains(NewZone);
     if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {
@@ -78,23 +101,157 @@ void AEvaResearchFacilityDirector::NotifyZoneEntered(const EEvaFacilityZone NewZ
 void AEvaResearchFacilityDirector::NotifyStoryLogCollected(const FName LogId, const FString& Title,
     const FString& Body)
 {
-    if (!LogId.IsNone())
+    TryReadResearchLog(LogId, Title, Body);
+}
+
+bool AEvaResearchFacilityDirector::TryRestoreFacilityPower()
+{
+    if (bStageClear)
     {
-        CollectedStoryLogs.AddUnique(LogId);
+        return false;
+    }
+    if (bFacilityPowerOnline)
+    {
+        return false;
+    }
+
+    bFacilityPowerOnline = true;
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->SetFacilityPowerOnline(true);
+        GameMode->ShowDebugStatusMessage(TEXT("POWER RESTORED - emergency locks responding."), 4.0f);
+    }
+    AdvanceObjectiveTo(1, TEXT("PowerRestored"));
+    RefreshFacilityInteractables();
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] PowerRestored ObjectiveIndex=%d"), ObjectiveIndex);
+    return true;
+}
+
+bool AEvaResearchFacilityDirector::TryAcquireSecurityKeycard()
+{
+    if (bStageClear || bSecurityKeycardAcquired)
+    {
+        return false;
+    }
+
+    bSecurityKeycardAcquired = true;
+    AdvanceObjectiveTo(2, TEXT("KeycardAcquired"));
+    RefreshFacilityInteractables();
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->ShowDebugStatusMessage(TEXT("SECURITY KEYCARD ACQUIRED."), 4.0f);
+    }
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] KeycardAcquired ObjectiveIndex=%d"), ObjectiveIndex);
+    return true;
+}
+
+bool AEvaResearchFacilityDirector::TryOpenObservationDoor()
+{
+    if (bStageClear || bObservationDoorOpen)
+    {
+        return false;
+    }
+    if (!bSecurityKeycardAcquired)
+    {
+        if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+        {
+            GameMode->ShowDebugStatusMessage(TEXT("KEYCARD REQUIRED"), 3.0f);
+        }
+        UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] DoorRejected Reason=MissingKeycard"));
+        return false;
+    }
+
+    bObservationDoorOpen = true;
+    AdvanceObjectiveTo(3, TEXT("ObservationDoorOpened"));
+    RefreshFacilityInteractables();
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->TriggerDoorEffect(GetActorLocation(), TEXT("Observation Lab"));
+        GameMode->ShowDebugStatusMessage(TEXT("OBSERVATION LAB UNLOCKED."), 4.0f);
+    }
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] DoorUnlocked Door=ObservationLab ObjectiveIndex=%d"), ObjectiveIndex);
+    return true;
+}
+
+bool AEvaResearchFacilityDirector::TryReadResearchLog(const FName LogId, const FString& Title, const FString& Body)
+{
+    if (bStageClear)
+    {
+        return false;
+    }
+
+    const bool bFirstRead = !LogId.IsNone() && !CollectedStoryLogs.Contains(LogId);
+    if (bFirstRead)
+    {
+        CollectedStoryLogs.Add(LogId);
     }
     bEvaLogAcquired = true;
+    bResearchLogOpen = true;
     LastStoryLogTitle = Title;
     LastStoryLogBody = Body;
     LastStoryLogTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
-    if (LogId == FName(TEXT("EVA_LOG_03")))
+    if (LogId == FName(TEXT("EVA_LOG_03")) || LogId == FName(TEXT("CONTENT_LOG_HUNTER")))
     {
         bEvolutionUnlocked = true;
     }
+    if (bFirstRead)
+    {
+        AdvanceObjectiveTo(4, TEXT("ResearchLogCollected"));
+    }
     if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {
-        GameMode->ShowDebugStatusMessage(FString::Printf(TEXT("EVA log recovered: %s"), *Title), 4.0f);
+        GameMode->ShowDebugStatusMessage(FString::Printf(TEXT("LOG OPEN: %s"), *Title), 4.0f);
     }
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[Content] ResearchLogRead Log=%s FirstRead=%s Logs=%d ObjectiveIndex=%d"),
+        *LogId.ToString(),
+        bFirstRead ? TEXT("true") : TEXT("false"),
+        CollectedStoryLogs.Num(),
+        ObjectiveIndex);
+    return true;
+}
+
+bool AEvaResearchFacilityDirector::TryAccessDataCore()
+{
+    if (bStageClear || bDataCoreAccessed)
+    {
+        return false;
+    }
+    if (CollectedStoryLogs.Num() <= 0)
+    {
+        if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+        {
+            GameMode->ShowDebugStatusMessage(TEXT("CONTAINMENT RECORD REQUIRED"), 3.0f);
+        }
+        UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] DataCoreRejected Reason=NoResearchLog"));
+        return false;
+    }
+
+    bDataCoreAccessed = true;
+    bAdamArenaUnlocked = true;
+    AdvanceObjectiveTo(5, TEXT("DataCoreAccessed"));
+    RefreshFacilityInteractables();
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->ShowDebugStatusMessage(TEXT("DATA CORE ACCESSED - ADAM ARENA UNLOCKED."), 5.0f);
+    }
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[Content] DataCoreComplete ArenaUnlocked=%s ObjectiveIndex=%d"),
+        bAdamArenaUnlocked ? TEXT("true") : TEXT("false"),
+        ObjectiveIndex);
+    return true;
+}
+
+void AEvaResearchFacilityDirector::CloseResearchLog()
+{
+    if (!bResearchLogOpen)
+    {
+        return;
+    }
+    bResearchLogOpen = false;
+    LastStoryLogTime = -1000.0f;
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] ResearchLogClosed"));
 }
 
 void AEvaResearchFacilityDirector::NotifyAdamDefeated(AEvaAdamBossCharacter* Adam)
@@ -142,7 +299,7 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
     {
         bAdamEncounterActive = true;
         CurrentZone = EEvaFacilityZone::AdamArena;
-        CurrentObjective = TEXT("Defeat ADAM.");
+        AdvanceObjectiveTo(6, TEXT("AdamEncounterExisting"));
         if (!ActiveAdam->GetController())
         {
             ActiveAdam->SpawnDefaultController();
@@ -161,7 +318,7 @@ void AEvaResearchFacilityDirector::StartAdamEncounter()
 
     bAdamEncounterActive = false;
     CurrentZone = EEvaFacilityZone::AdamArena;
-    CurrentObjective = TEXT("Defeat ADAM.");
+    AdvanceObjectiveTo(6, TEXT("AdamEncounterStarted"));
     if (AEvaPrototypeGameMode* GameMode = GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>())
     {
         GameMode->ShowDebugStatusMessage(TEXT("ADAM encounter started."), 5.0f);
@@ -320,7 +477,8 @@ void AEvaResearchFacilityDirector::CompleteStage()
 
     bStageClear = true;
     CurrentZone = EEvaFacilityZone::Clear;
-    CurrentObjective = TEXT("Stage clear. TODO: return to title.");
+    ObjectiveIndex = 7;
+    SetObjectiveFromIndex();
     if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
     {
         GameMode->ShowDebugStatusMessage(TEXT("Stage objective complete: escape the research facility."), 6.0f);
@@ -331,9 +489,16 @@ void AEvaResearchFacilityDirector::CompleteStage()
 void AEvaResearchFacilityDirector::ResetForNewGame()
 {
     CurrentZone = EEvaFacilityZone::EntryLobby;
+    ObjectiveIndex = 0;
     TriggeredZones.Reset();
     TriggeredZones.Add(CurrentZone);
     bEvaLogAcquired = false;
+    bFacilityPowerOnline = false;
+    bSecurityKeycardAcquired = false;
+    bObservationDoorOpen = false;
+    bDataCoreAccessed = false;
+    bAdamArenaUnlocked = false;
+    bResearchLogOpen = false;
     bEvolutionUnlocked = false;
     bHunterEventTriggered = false;
     bAdamEncounterActive = false;
@@ -343,7 +508,13 @@ void AEvaResearchFacilityDirector::ResetForNewGame()
     LastStoryLogTitle.Empty();
     LastStoryLogBody.Empty();
     LastStoryLogTime = -1000.0f;
-    SetObjectiveForZone(CurrentZone);
+    SetObjectiveFromIndex();
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->SetFacilityPowerOnline(false);
+    }
+    RefreshFacilityInteractables();
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] ProgressReset ObjectiveIndex=%d"), ObjectiveIndex);
 }
 
 FString AEvaResearchFacilityDirector::GetCurrentZoneName() const
@@ -366,6 +537,10 @@ bool AEvaResearchFacilityDirector::ShouldDisplayStoryLog() const
     if (LastStoryLogTitle.IsEmpty())
     {
         return false;
+    }
+    if (bResearchLogOpen)
+    {
+        return true;
     }
     const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
     return Now - LastStoryLogTime <= StoryLogDisplaySeconds;
@@ -413,7 +588,10 @@ void AEvaResearchFacilityDirector::SpawnZoneEncounter(const EEvaFacilityZone Zon
         }
         break;
     case EEvaFacilityZone::AdamArena:
-        StartAdamEncounter();
+        if (bAdamArenaUnlocked)
+        {
+            StartAdamEncounter();
+        }
         break;
     default:
         break;
@@ -478,33 +656,112 @@ void AEvaResearchFacilityDirector::SpawnSupportPickupsForZone(const EEvaFacility
     }
 }
 
-void AEvaResearchFacilityDirector::SetObjectiveForZone(const EEvaFacilityZone Zone)
+void AEvaResearchFacilityDirector::SetObjectiveFromIndex()
 {
-    switch (Zone)
+    switch (ObjectiveIndex)
     {
-    case EEvaFacilityZone::EntryLobby:
-        CurrentObjective = TEXT("Find a weapon path and survive the first infected.");
+    case 0:
+        CurrentObjective = TEXT("Restore Facility Power");
         break;
-    case EEvaFacilityZone::SecurityCorridor:
-        CurrentObjective = TEXT("Push through the corridor. Fire, reload, keep moving.");
+    case 1:
+        CurrentObjective = TEXT("Find Security Keycard");
         break;
-    case EEvaFacilityZone::ObservationLab:
-        CurrentObjective = TEXT("Recover EVA logs. The system is watching.");
+    case 2:
+        CurrentObjective = TEXT("Unlock Observation Lab");
         break;
-    case EEvaFacilityZone::ContainmentWard:
-        CurrentObjective = TEXT("Containment breach. Evolved infected are appearing.");
+    case 3:
+        CurrentObjective = TEXT("Search Containment Records");
         break;
-    case EEvaFacilityZone::DataCoreRoom:
-        CurrentObjective = TEXT("Reach the data core. HUNTER is being deployed.");
+    case 4:
+        CurrentObjective = TEXT("Access Data Core");
         break;
-    case EEvaFacilityZone::AdamArena:
-        CurrentObjective = TEXT("ADAM is awake. End the experiment.");
+    case 5:
+        CurrentObjective = TEXT("Reach Adam Arena");
         break;
-    case EEvaFacilityZone::Clear:
+    case 6:
+        CurrentObjective = TEXT("Defeat Adam");
+        break;
+    case 7:
         CurrentObjective = TEXT("Stage clear. TODO: return to title.");
         break;
     default:
         CurrentObjective = TEXT("Proceed.");
         break;
     }
+}
+
+bool AEvaResearchFacilityDirector::AdvanceObjectiveTo(const int32 NewObjectiveIndex, const FString& Reason)
+{
+    if (bStageClear || NewObjectiveIndex <= ObjectiveIndex)
+    {
+        return false;
+    }
+
+    ObjectiveIndex = FMath::Clamp(NewObjectiveIndex, 0, 7);
+    SetObjectiveFromIndex();
+    if (AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr)
+    {
+        GameMode->ShowDebugStatusMessage(FString::Printf(TEXT("Objective: %s"), *CurrentObjective), 4.0f);
+    }
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] ObjectiveAdvanced Index=%d Objective=%s Reason=%s"),
+        ObjectiveIndex, *CurrentObjective, *Reason);
+    return true;
+}
+
+bool AEvaResearchFacilityDirector::IsZoneEntryAllowed(const EEvaFacilityZone NewZone, FString& OutReason) const
+{
+    switch (NewZone)
+    {
+    case EEvaFacilityZone::ObservationLab:
+        if (!bObservationDoorOpen)
+        {
+            OutReason = bSecurityKeycardAcquired ? TEXT("Unlock the Observation Lab door first.") :
+                TEXT("Find the Security Keycard first.");
+            return false;
+        }
+        break;
+    case EEvaFacilityZone::ContainmentWard:
+        if (CollectedStoryLogs.Num() <= 0)
+        {
+            OutReason = TEXT("Read at least one research log first.");
+            return false;
+        }
+        break;
+    case EEvaFacilityZone::AdamArena:
+        if (!bAdamArenaUnlocked)
+        {
+            OutReason = TEXT("Access the Data Core first.");
+            return false;
+        }
+        break;
+    default:
+        break;
+    }
+
+    OutReason.Empty();
+    return true;
+}
+
+void AEvaResearchFacilityDirector::RefreshFacilityInteractables() const
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    for (TActorIterator<AEvaFacilityInteractable> It(GetWorld()); It; ++It)
+    {
+        if (AEvaFacilityInteractable* Interactable = *It)
+        {
+            Interactable->RefreshFromDirector();
+        }
+    }
+}
+
+FString AEvaResearchFacilityDirector::GetObjectiveProgressText() const
+{
+    return FString::Printf(TEXT("Logs %d/3 | Keycard %s | Power %s"),
+        FMath::Min(CollectedStoryLogs.Num(), 3),
+        bSecurityKeycardAcquired ? TEXT("YES") : TEXT("NO"),
+        bFacilityPowerOnline ? TEXT("ONLINE") : TEXT("OFFLINE"));
 }

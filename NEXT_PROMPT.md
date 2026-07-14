@@ -1,5 +1,300 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 023 Content Interactable Visibility and Pickup Fix
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed:
+  - Keycard `MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - Research Log x3 `MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+  - `ResearchLogCount=3 RequiredResearchLogCount=3`
+- Runtime smoke showed no project Fatal / Ensure / Assertion.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Security Keycard:
+  - Moved to a safer Security Corridor position.
+  - Enlarged/lifted mesh so it is a visible object, not only a label.
+  - Added dedicated actor-owned interaction collision.
+  - Interaction collision blocks Visibility, ignores Pawn, and is not the text label.
+- Research Logs:
+  - All three required logs now have larger, lifted tablet/terminal-like mesh bodies.
+  - All three have dedicated actor-owned interaction collision.
+  - Labels remain close to their mesh bodies.
+- Interaction Trace:
+  - E-key focus now uses camera-origin Visibility sphere sweep.
+  - It still stops on blocking non-interactable hits, so wall-through interaction remains prohibited.
+  - Prompt and execute both use the same `FocusedInteractable`.
+  - E press emits `[Interaction]` logs with HitActor, HitComponent, FailureReason, ExecuteResult, etc.
+- Debug HUD Page 3:
+  - Shows Keycard Valid / Visible / Distance.
+  - Shows Logs Visible 0-3.
+  - Shows Current Interactable.
+  - Shows Last Interaction Failure.
+- Diagnostics:
+  - `[InteractableSpawn]` logs include actor/class/location, mesh world location/scale/visibility, trace collision bounds/responses, prompt, distance, floor validity, and reachability.
+
+### Next highest-priority task
+
+Run PIE and verify only the Content Pass 1 interactable flow. Do not add new AI, enemies, weapons, maps, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game.
+2. Restore facility power.
+3. Confirm objective becomes `Find Security Keycard`.
+4. Confirm Security Keycard is visibly present as an object, not just text.
+5. Look at the Keycard and confirm `E - PICK UP KEYCARD`.
+6. Press E and confirm the Keycard is acquired.
+7. Confirm objective advances to `Unlock Observation Lab`.
+8. Confirm the Observation Lab door prompt changes and the door opens after Keycard acquisition.
+9. Confirm all three Research Logs are visible as objects:
+   - `EVA LEARNING NOTES`
+   - `HUNTER CONTAINMENT REPORT`
+   - `ADAM EXPERIMENT RECORD`
+10. Confirm each Research Log prompt appears and opens/closes correctly.
+11. If interaction fails, capture the new `[Interaction]` log line and inspect:
+    - HitActor
+    - HitComponent
+    - InteractionEnabled
+    - LineOfSightClear
+    - FailureReason
+    - ExecuteResult
+12. Confirm prior fixes remain stable:
+    - closed-door damage blocking,
+    - enemy spawn presentation,
+    - objective chain,
+    - Gameplay Pass 1 debug HUD,
+    - Runtime NavMesh,
+    - Zombie/HUNTER/ADAM/Stage Clear,
+    - Title/Pause/Settings/Game Over.
+
+If a problem is found:
+
+- Fix only Keycard / Research Log visibility, interaction trace, prompt/execute target mismatch, or content objective pickup state.
+- Preserve AI, HUNTER, ADAM, Stage Clear, Death/Game Over, UI flow, horror presentation, and gameplay balance.
+
+### Important files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that the Keycard is visible and collectible.
+- User confirms objective advances past `Find Security Keycard`.
+- User confirms all three Research Logs are visible/readable.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
+## Latest handoff - 2026-07-14 Cycle 022 Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 42 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed the three required Research Logs are spawned, visible to diagnostics, floor-valid, navigation-reachable after Runtime NavMesh readiness, and not duplicated.
+- Runtime smoke confirmed the Observation Lab door is closed with collision enabled at startup.
+- `git diff --check`: succeeded, no whitespace errors. CRLF conversion warnings only.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Repositioned three required Research Logs to reachable floor locations:
+  - Observation Lab: `EVA LEARNING NOTES`
+  - Containment Ward: `HUNTER CONTAINMENT REPORT`
+  - Data Core area: `ADAM EXPERIMENT RECORD`
+- Added `[ContentSpawn]` diagnostics for interactable placement, floor validity, reachability, hidden/collision state, door locked collision, and Research Log count.
+- Strengthened the closed Observation Lab door so it blocks player/enemy passage, sight/attack traces, and charge traces.
+- Opened door disables collision and updates Runtime NavMesh dirty state.
+- Added enemy melee and ADAM charge line-of-sight checks so closed doors/walls cannot apply damage through geometry.
+- Updated presentation-safe enemy spawns to reject candidates that are too close, in front of the player, in camera view, directly visible, near interactables/checkpoints, off floor, off NavMesh, or crowded.
+- Added a subtle spawn cue and short AI prime delay for presentation-safe spawns.
+- Added Automation coverage for Research Log placement state and closed/open door trace behavior.
+
+### Next highest-priority task
+
+Run PIE and verify only the fixed Content Pass 1 issues. Do not add new AI, enemies, weapons, maps, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game from the stable UI flow.
+2. Confirm objective reaches `Find Security Keycard` as before.
+3. Confirm the three Research Logs are physically present, on floor/reachable, and visually discoverable:
+   - `EVA LEARNING NOTES`
+   - `HUNTER CONTAINMENT REPORT`
+   - `ADAM EXPERIMENT RECORD`
+4. Confirm E-key prompt target and actual interacted object match.
+5. Confirm research log overlay opens with E, closes with E, restores input, first read counts, and reread does not duplicate progress.
+6. Confirm the closed Observation Lab door blocks:
+   - player movement,
+   - enemy movement,
+   - enemy melee damage,
+   - ADAM charge damage if tested against a closed obstacle,
+   - wall/door-through interaction.
+7. Confirm opening the Observation Lab door allows clean passage and does not permanently break enemy traversal.
+8. Confirm normal wave/adaptive/evolved/HUNTER/ADAM-summoned enemies no longer pop directly into the player view unless intentionally spawned by debug/encounter setup.
+9. Confirm existing regressions remain stable:
+   - objective chain,
+   - Gameplay Pass 1 adaptation/debug HUD,
+   - Runtime NavMesh,
+   - spawn floor safety,
+   - Zombie chase/attack,
+   - HUNTER,
+   - Adam,
+   - flashlight/blackout,
+   - Stage Clear,
+   - Death/Game Over,
+   - Title/Pause/Settings flow.
+
+If a problem is found:
+
+- Fix only Content Pass 1 placement, door blocking, interaction trace, or spawn-presentation issues.
+- Preserve Runtime NavMesh, Zombie/HUNTER/ADAM behavior, Stage Clear, Player Death, Title/Pause/Settings/Game Over, Visual/Audio/Horror presentation, Gameplay Pass adaptation, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that logs are visible/reachable/readable, the closed door blocks movement/damage/interactions, and enemies no longer spawn obviously in view.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
+## Latest handoff - 2026-07-14 Cycle 021 Content Pass 1 Research Facility Progression
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 40 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed startup content state logs only.
+- Full content event flow is covered by Automation, not by Codex PIE viewport confirmation.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent implementation
+
+- Added explicit objective progression:
+  1. Restore Facility Power.
+  2. Find Security Keycard.
+  3. Unlock Observation Lab.
+  4. Search Containment Records.
+  5. Access Data Core.
+  6. Reach Adam Arena.
+  7. Defeat Adam.
+- Added E-key interaction through `AEvaFacilityInteractable` for:
+  - Power Console.
+  - Security Keycard.
+  - Observation Lab locked door.
+  - Research Logs.
+  - Data Core Console.
+- Added content-state management in `AEvaResearchFacilityDirector`:
+  - Objective index.
+  - Facility power.
+  - Keycard.
+  - Observation door.
+  - Research log count/open state.
+  - Data Core access.
+  - Adam Arena unlock.
+- Added progression gates:
+  - Observation Lab requires the door to be opened.
+  - Containment Ward requires at least one research log.
+  - Adam Arena requires Data Core access.
+- HUD now displays:
+  - Current Objective.
+  - Compact objective progress.
+  - E-key interaction prompt.
+  - Research log overlay.
+  - Debug HUD page 3 content state.
+- Facility power now affects runtime lighting separately from blackout state.
+
+### Next highest-priority task
+
+Run PIE and verify only the Content Pass 1 flow. Do not add new enemies, weapons, maps, AI behavior, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game from the stable UI flow.
+2. Confirm the objective starts at `Restore Facility Power`.
+3. Press E on the Power Console and confirm lighting/objective update.
+4. Pick up the Security Keycard with E.
+5. Confirm the Observation Lab door prompt changes from blocked/required to unlock/open.
+6. Unlock/open the Observation Lab door and confirm it does not trap the player or enemies.
+7. Read at least one Research Log and close it with E.
+8. Confirm movement/shooting are blocked while the log is open, then restored after closing.
+9. Reach Containment Ward only after the log gate is satisfied.
+10. Access the Data Core Console and confirm Adam Arena unlock/objective update.
+11. Reach Adam Arena and confirm Adam encounter still starts.
+12. Defeat Adam and confirm Stage Clear still works.
+13. Confirm F4 ADAM debug start still works independently of content gates.
+14. Confirm Pause, Retry, Game Over, and Return to Title do not leave research log/input/prompt state stuck.
+
+If a problem is found:
+
+- Fix only Content Pass 1 interaction/progression/HUD issues.
+- Preserve Runtime NavMesh, Zombie/HUNTER/ADAM behavior, Stage Clear, Player Death, Title/Pause/Settings/Game Over, Visual/Audio/Horror presentation, Gameplay Pass adaptation, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms the E-key content progression can be completed in PIE.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 020 Enemy Intent Display Consistency
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

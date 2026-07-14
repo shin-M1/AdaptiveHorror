@@ -1,5 +1,289 @@
 # Development Log
 
+## 2026-07-14 - Cycle 023: Content Interactable Visibility and Pickup Fix
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Continued the Content Pass 1 PIE fix after the latest user check.
+- Fixed only Keycard / Research Log visibility, interaction collision, E-key trace diagnostics, and debug visibility readouts.
+- Did not change AI behavior, enemy spawning rules, combat balance, doors beyond prior blocking behavior, HUNTER, ADAM, Stage Clear, Player Death, Title/Pause/Settings/Game Over, blackout, flashlight, or map progression rules.
+
+### Implemented
+
+- Keycard visibility / pickup:
+  - Moved the Security Keycard to a safer, more central Security Corridor floor position.
+  - Increased the temporary mesh size and lifted the mesh so it cannot be visually buried in the floor/text component.
+  - Added dedicated `InteractionCollision` on the Keycard actor.
+  - Interaction collision blocks `Visibility`, ignores `Pawn`, and is separate from the label so the label is not the pickup target.
+  - Kept `SECURITY KEYCARD` label visible above the actor.
+- Research Log visibility:
+  - Gave all three logs a larger tablet/terminal-like mesh body and dedicated interaction collision:
+    - `EVA LEARNING NOTES`
+    - `HUNTER CONTAINMENT REPORT`
+    - `ADAM EXPERIMENT RECORD`
+  - Adjusted log positions slightly away from the wall edge and lifted mesh/collision bounds.
+  - Kept actors present before they are required by objective progression.
+- Interaction diagnostics / trace:
+  - Changed E-key focus detection to a camera-origin Visibility sphere sweep so small interactable bodies are easier to hit.
+  - The sweep still stops on the first non-interactable blocking hit, preserving wall-through interaction prevention.
+  - Prompt target and E execution target both use the same `FocusedInteractable`.
+  - Added `[Interaction]` logs on E press / log close with:
+    - InputReceived, CameraLocation, TraceStart, TraceEnd, Hit, HitActor, HitComponent, Distance, ImplementsInteractable, InteractionEnabled, LineOfSightClear, FailureReason, ExecuteResult, CurrentInteractable, Prompt.
+- Interactable spawn diagnostics:
+  - Added `[InteractableSpawn]` logs after all facility interactables spawn and after Runtime NavMesh readiness.
+  - Logs now include actor/class/location, mesh validity/asset/location/scale/visibility/hidden state, trace collision enabled/object type/responses/bounds, prompt text, interaction distance, enabled state, registered count, floor validity, and reachability.
+  - Added short summary lines for grep:
+    - `Keycard MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=... MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+- Debug HUD:
+  - Debug HUD Page 3 now shows:
+    - Keycard Valid / Visible / Distance
+    - Logs Visible 0-3
+    - Current Interactable
+    - Last Interaction Failure
+- Automation:
+  - Added `AdaptiveHorror.ContentPass.InteractableVisibilityAndPickup`.
+  - Confirms Keycard mesh visibility, Visibility-blocking interaction collision, interaction enabled state, prompt, and successful keycard acquisition.
+  - Confirms all three Research Logs have visible meshes, active interaction collision, Visibility blocking, and `E - READ LOG` prompt.
+
+### Changed files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest Automation log confirmed the new `InteractableVisibilityAndPickup` test succeeded.
+  - Project Automation count is now 43 tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed:
+    - `Keycard MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=EVA LEARNING NOTES MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=HUNTER CONTAINMENT REPORT MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLog Title=ADAM EXPERIMENT RECORD MeshVisible=true InteractionEnabled=true VisibilityBlock=true`
+    - `ResearchLogCount=3 RequiredResearchLogCount=3`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- Include/build safety:
+  - Added includes for `AdaptiveHorror.h`, `Components/BoxComponent.h`, `Components/PrimitiveComponent.h`, `Materials/MaterialInstanceDynamic.h`, `Materials/MaterialInterface.h`, and `World/EvaFacilityInteractable.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- PIE viewport confirmation that the Keycard is now visually obvious and can be picked up.
+- PIE viewport confirmation that all three Research Logs are visually discoverable in the actual play route.
+- PIE viewport confirmation that the new sphere-sweep interaction feels correct at close range.
+- PIE viewport confirmation that Objective advances from `Find Security Keycard` after pickup.
+
+### Known risks / follow-up
+
+- Runtime smoke confirms component state, not actual player eyesight/composition in PIE.
+- If the Keycard still feels easy to miss in PIE, adjust presentation only: color/scale/location/marker, not objective logic.
+- If E-key still fails in PIE, use the new `[Interaction]` logs to inspect the exact HitActor/HitComponent/FailureReason.
+
+## 2026-07-14 - Cycle 022: Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Fixed only the Content Pass 1 PIE issues reported after Cycle 021.
+- No new AI behavior, enemy type, weapon, combat balance, HUNTER logic, ADAM logic, Stage Clear flow, Player Death flow, Title/Pause/Settings/Game Over flow, flashlight, blackout, or major UI redesign was added.
+
+### Implemented
+
+- Research Log placement:
+  - Repositioned three Runtime Graybox Research Logs onto visible, reachable floor positions:
+    - Observation Lab: `EVA LEARNING NOTES`
+    - Containment Ward: `HUNTER CONTAINMENT REPORT`
+    - Data Core area: `ADAM EXPERIMENT RECORD`
+  - Increased the temporary research-log visual/readability so the logs are harder to miss in the graybox.
+  - Added duplicate runtime placement protection for facility interactables.
+  - Added `[ContentSpawn]` logs for interactable type, title, location, floor validity, navigation reachability, hidden state, collision state, and total Research Log count.
+- Observation Lab door blocking:
+  - Strengthened the locked door collision so the closed door blocks Pawn / Visibility / Camera / WorldStatic-style attack traces.
+  - Opened door disables collision and marks navigation dirty so movement can resume through the doorway.
+  - Added attack line-of-sight validation before zombie melee damage is applied.
+  - Added the same obstacle line check before ADAM charge damage starts, so closed doors/walls do not allow charge damage through geometry.
+- Enemy spawn presentation:
+  - Updated safe enemy spawn selection to prefer behind/side/occluded positions when presentation safety is requested.
+  - Rejects candidates that are too close, in front of the player, inside the camera cone, directly visible by Visibility trace, near interactables/checkpoints, off the RuntimeFloor, off NavMesh, or too close to other enemies.
+  - Added a subtle spawn cue plus a short AI prime delay for presentation-safe wave/adaptive/evolved-style spawns.
+  - Kept intentional visible/debug spawns such as initial visible setup and ADAM encounter paths from being forced into the presentation-safe filter.
+- Automation:
+  - Added Content Pass tests for Research Log placement state and Observation Lab door attack-trace blocking/opening.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Project Automation count is now 42 tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed:
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=EVA LEARNING NOTES ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=HUNTER CONTAINMENT REPORT ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=ADAM EXPERIMENT RECORD ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady DoorLockedCollision=true DoorOpen=false`
+    - `[ContentSpawn] Context=NavigationReady ResearchLogCount=3 RequiredResearchLogCount=3`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+- Include/build safety:
+  - Added includes for `Camera/PlayerCameraManager.h` and `NavigationSystem.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+
+### Not verified by Codex
+
+- PIE viewport confirmation that the logs are visually easy to find and read in the final camera path.
+- PIE viewport confirmation that locked Observation Lab door spacing feels natural while blocking both player and enemies.
+- PIE viewport confirmation that enemies no longer spawn in view during real combat pacing.
+- PIE viewport confirmation that the E-key prompt target and actual interact target feel identical in all angles.
+
+### Known risks / follow-up
+
+- Runtime smoke starts and exits quickly, so live combat spawn-presentation feel remains a PIE task.
+- The door open/closed collision is now covered by Automation trace checks, but full NavMesh doorway feel should still be verified manually in PIE.
+- Spawn rejection logs are most useful during actual gameplay/wave spawning; runtime smoke confirms startup content placement, not every combat spawn path.
+
+## 2026-07-14 - Cycle 021: Content Pass 1 Research Facility Progression
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Added a lightweight exploration/progression layer to the existing Runtime Graybox research facility.
+- Did not add new maps, weapons, enemies, AI balance changes, NavMesh rewrites, ADAM behavior changes, HUNTER behavior changes, Stage Clear changes, horror presentation changes, or UI flow rewrites.
+
+### Implemented
+
+- Objective progression:
+  - Added explicit objective index/state in `AEvaResearchFacilityDirector`.
+  - Objective chain: Restore Facility Power -> Find Security Keycard -> Unlock Observation Lab -> Search Containment Records -> Access Data Core -> Reach Adam Arena -> Defeat Adam.
+  - Objective advances only forward, rejects duplicate/late updates, stops after Stage Clear, resets on New Game / Return to Title, and persists during Retry.
+- Interaction:
+  - Added `AEvaFacilityInteractable` for Runtime Graybox content interactables.
+  - Added E-key camera trace interaction to `AEvaPlayerCharacter`.
+  - Trace is distance-limited, uses the first Visibility hit, and does not interact through blocking geometry.
+  - Added prompts for Keycard, locked door, power console, research logs, and Data Core console.
+- Content objects:
+  - Security Keycard in Security Corridor.
+  - Observation Lab locked door.
+  - Power Console in Security Corridor.
+  - Three E-key Research Logs: EVA Learning Notes, HUNTER Containment Report, Adam Experiment Record.
+  - Data Core Console.
+- Progression gates:
+  - Observation Lab requires door unlock.
+  - Containment Ward requires at least one research log.
+  - Adam Arena requires Data Core access.
+  - F4 ADAM debug path remains available because it directly starts the encounter after warp.
+- HUD:
+  - Normal HUD now shows Current Objective plus compact progress: Logs, Keycard, Power.
+  - HUD shows E-key interaction prompt near the crosshair.
+  - Research log reading displays a short overlay and blocks movement/shooting until E closes it.
+  - Debug HUD page 3 now shows Objective Index, Power, Keycard, Door, Logs, Data Core, and Arena state.
+- Lighting:
+  - Facility power state is separate from blackout state.
+  - Power OFF keeps facility lighting dim.
+  - Power restoration brings lighting back without breaking blackout restore.
+- Automation:
+  - Added Content Pass tests for objective duplicate prevention, keycard duplicate prevention, door rejection/opening, power one-shot behavior, log first-read counting/reread, Data Core unlock, Stage Clear update block, New Game reset, and interactable prompt changes.
+
+### Changed files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+- `README.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 40 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed Content startup logs:
+    - `[Content] ObjectiveStart Index=0 Objective=Restore Facility Power`
+    - `[Content] FacilityPowerState Online=false`
+    - `[Content] ProgressReset ObjectiveIndex=0`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- Content progression event logs were verified through Automation logs:
+  - Power restored.
+  - Keycard acquired.
+  - Door unlocked.
+  - Research log read/re-read.
+  - Data Core complete.
+  - Arena unlocked.
+- Include/build safety:
+  - Added includes for `World/EvaFacilityInteractable.h` and `World/EvaResearchFacilityDirector.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- PIE visual confirmation of actual E-key trace feel.
+- PIE confirmation that the door blocks/opens with comfortable spacing for player and enemies.
+- PIE confirmation that logs can be read/closed during combat without input confusion.
+- PIE one-lap confirmation from Entry Lobby to Adam Arena using only player interaction.
+
+### Known risks / follow-up
+
+- Runtime smoke starts and exits without manual gameplay, so full Content Pass flow remains PIE work.
+- Door/NavMesh behavior should be watched in PIE; the door disables collision after opening and should not permanently split NavMesh, but visual confirmation is still required.
+- The normal Runtime smoke log only confirms startup content state; full Power/Keycard/Door/Log/DataCore event logs are currently verified by Automation.
+
 ## 2026-07-14 - Cycle 020: Enemy Intent Display Consistency Fix
 
 Branch: `feature/gameplay-pass1`

@@ -570,19 +570,30 @@ bool AEvaZombieAIController::CanAttackTarget() const
         return false;
     }
 
-    const bool bLongReachAttack = CurrentAdaptationTuning.BehaviorRole == EEvaEnemyBehaviorRole::MidRangePressure ||
-        CurrentAdaptationTuning.EvolutionType == EEvaEvolutionType::LongArm;
-    if (bLongReachAttack && GetWorld())
+    return HasAttackLineOfSightToTarget();
+}
+
+bool AEvaZombieAIController::HasAttackLineOfSightToTarget() const
+{
+    if (!GetWorld() || !GetPawn() || !TargetActor)
     {
-        FHitResult ObstacleHit;
-        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaEnemyAttackLineOfSight), false, GetPawn());
-        QueryParams.AddIgnoredActor(TargetActor);
-        const FVector TraceStart = GetPawn()->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
-        const FVector TraceEnd = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
-        if (GetWorld()->LineTraceSingleByChannel(ObstacleHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
-        {
-            return false;
-        }
+        return false;
+    }
+
+    FHitResult ObstacleHit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaEnemyAttackLineOfSight), false, GetPawn());
+    QueryParams.AddIgnoredActor(GetPawn());
+    const FVector TraceStart = GetPawn()->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+    const FVector TraceEnd = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+    if (GetWorld()->LineTraceSingleByChannel(ObstacleHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
+    {
+        UE_LOG(LogAdaptiveHorror, Verbose,
+            TEXT("[EnemyAttack] BlockedByObstacle Pawn=%s Target=%s Hit=%s Location=%s"),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            TargetActor ? *TargetActor->GetName() : TEXT("None"),
+            ObstacleHit.GetActor() ? *ObstacleHit.GetActor()->GetName() : TEXT("None"),
+            *ObstacleHit.ImpactPoint.ToCompactString());
+        return false;
     }
 
     return true;
@@ -604,6 +615,10 @@ void AEvaZombieAIController::TryAttackTarget()
 
     const float Now = GetWorld()->GetTimeSeconds();
     if (Now - LastAttackTime < AttackInterval)
+    {
+        return;
+    }
+    if (!CanAttackTarget())
     {
         return;
     }
