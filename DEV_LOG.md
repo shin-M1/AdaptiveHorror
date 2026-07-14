@@ -1,5 +1,88 @@
 # Development Log
 
+## 2026-07-14 - Cycle 022: Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Fixed only the Content Pass 1 PIE issues reported after Cycle 021.
+- No new AI behavior, enemy type, weapon, combat balance, HUNTER logic, ADAM logic, Stage Clear flow, Player Death flow, Title/Pause/Settings/Game Over flow, flashlight, blackout, or major UI redesign was added.
+
+### Implemented
+
+- Research Log placement:
+  - Repositioned three Runtime Graybox Research Logs onto visible, reachable floor positions:
+    - Observation Lab: `EVA LEARNING NOTES`
+    - Containment Ward: `HUNTER CONTAINMENT REPORT`
+    - Data Core area: `ADAM EXPERIMENT RECORD`
+  - Increased the temporary research-log visual/readability so the logs are harder to miss in the graybox.
+  - Added duplicate runtime placement protection for facility interactables.
+  - Added `[ContentSpawn]` logs for interactable type, title, location, floor validity, navigation reachability, hidden state, collision state, and total Research Log count.
+- Observation Lab door blocking:
+  - Strengthened the locked door collision so the closed door blocks Pawn / Visibility / Camera / WorldStatic-style attack traces.
+  - Opened door disables collision and marks navigation dirty so movement can resume through the doorway.
+  - Added attack line-of-sight validation before zombie melee damage is applied.
+  - Added the same obstacle line check before ADAM charge damage starts, so closed doors/walls do not allow charge damage through geometry.
+- Enemy spawn presentation:
+  - Updated safe enemy spawn selection to prefer behind/side/occluded positions when presentation safety is requested.
+  - Rejects candidates that are too close, in front of the player, inside the camera cone, directly visible by Visibility trace, near interactables/checkpoints, off the RuntimeFloor, off NavMesh, or too close to other enemies.
+  - Added a subtle spawn cue plus a short AI prime delay for presentation-safe wave/adaptive/evolved-style spawns.
+  - Kept intentional visible/debug spawns such as initial visible setup and ADAM encounter paths from being forced into the presentation-safe filter.
+- Automation:
+  - Added Content Pass tests for Research Log placement state and Observation Lab door attack-trace blocking/opening.
+
+### Changed files
+
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Project Automation count is now 42 tests.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed:
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=EVA LEARNING NOTES ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=HUNTER CONTAINMENT REPORT ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=ADAM EXPERIMENT RECORD ... FloorValid=true Reachable=true`
+    - `[ContentSpawn] Context=NavigationReady DoorLockedCollision=true DoorOpen=false`
+    - `[ContentSpawn] Context=NavigationReady ResearchLogCount=3 RequiredResearchLogCount=3`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+- Include/build safety:
+  - Added includes for `Camera/PlayerCameraManager.h` and `NavigationSystem.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+
+### Not verified by Codex
+
+- PIE viewport confirmation that the logs are visually easy to find and read in the final camera path.
+- PIE viewport confirmation that locked Observation Lab door spacing feels natural while blocking both player and enemies.
+- PIE viewport confirmation that enemies no longer spawn in view during real combat pacing.
+- PIE viewport confirmation that the E-key prompt target and actual interact target feel identical in all angles.
+
+### Known risks / follow-up
+
+- Runtime smoke starts and exits quickly, so live combat spawn-presentation feel remains a PIE task.
+- The door open/closed collision is now covered by Automation trace checks, but full NavMesh doorway feel should still be verified manually in PIE.
+- Spawn rejection logs are most useful during actual gameplay/wave spawning; runtime smoke confirms startup content placement, not every combat spawn path.
+
 ## 2026-07-14 - Cycle 021: Content Pass 1 Research Facility Progression
 
 Branch: `feature/content-pass1`

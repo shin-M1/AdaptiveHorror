@@ -1,5 +1,34 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 022 status - Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+- [x] Continued on `feature/content-pass1`.
+- [x] Kept the fix scoped to Content Pass 1 placement, closed-door blocking, and enemy spawn presentation.
+- [x] Repositioned 3 required Research Logs onto reachable floor positions:
+  - `EVA LEARNING NOTES`
+  - `HUNTER CONTAINMENT REPORT`
+  - `ADAM EXPERIMENT RECORD`
+- [x] Added duplicate runtime placement protection for facility interactables.
+- [x] Added `[ContentSpawn]` diagnostics for Research Log placement, floor validity, reachability, collision, hidden state, and total Research Log count.
+- [x] Strengthened closed Observation Lab door collision against player/enemy passage, Visibility, Camera, and attack/charge trace paths.
+- [x] Added melee/charge line-of-sight checks so enemies do not apply damage through closed doors/walls.
+- [x] Updated presentation-safe enemy spawn selection to reject too-close, in-view, directly visible, front-of-player, near-interactable, near-checkpoint, non-floor, non-nav, and crowded candidates.
+- [x] Added subtle spawn cue and short delayed AI priming for presentation-safe spawns.
+- [x] Added Automation coverage for Research Log placement state and Observation Lab door blocking/opening trace behavior.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 42 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0 and confirmed Research Log count/reachability plus locked-door collision logs.
+- [x] `git diff --check` succeeded with no whitespace errors.
+
+### Next TODO
+
+- [ ] PIE-verify the three Research Logs are visible, reachable, and readable in the intended stage flow.
+- [ ] PIE-verify E-key prompt target and actual read/open/pickup target always match and cannot interact through walls.
+- [ ] PIE-verify the closed Observation Lab door blocks player movement, enemies, sight/attack damage, and opens cleanly after unlock.
+- [ ] PIE-verify enemies no longer pop into view during normal wave/adaptive/evolved/HUNTER/ADAM-summoned spawn situations.
+- [ ] PIE-verify the short delayed AI prime does not make spawned enemies feel passive.
+- [ ] PIE-verify the existing objective chain still reaches ADAM and Stage Clear without regression.
+
 ## Cycle 021 status - Content Pass 1 Research Facility Progression
 
 - [x] Created `feature/content-pass1` from latest `main`.

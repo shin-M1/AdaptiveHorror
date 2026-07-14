@@ -6,6 +6,7 @@
 #include "AI/EvaZombieAIController.h"
 #include "AI/EvaZombieCharacter.h"
 #include "Audio/EvaAudioFunctionLibrary.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Characters/EvaPlayerCharacter.h"
 #include "Characters/EvaPlayerController.h"
 #include "Components/BoxComponent.h"
@@ -56,6 +57,11 @@ namespace
     constexpr int32 SafeSpawnAttemptCount = 12;
     constexpr float DefaultEnemySeparation = 360.0f;
     constexpr float DefaultPlayerSeparation = 520.0f;
+    constexpr float PresentationSafePlayerSeparation = 760.0f;
+    constexpr float SpawnViewConeDotThreshold = 0.52f;
+    constexpr float SpawnFrontalConeDotThreshold = 0.25f;
+    constexpr float SpawnInteractionExclusionRadius = 300.0f;
+    constexpr float SpawnCheckpointExclusionRadius = 700.0f;
     constexpr float ExpectedRuntimeFloorSurfaceZ = 25.0f;
     constexpr float RuntimeFloorHeightTolerance = 45.0f;
     constexpr float RuntimeFloorNormalMinZ = 0.9f;
@@ -111,6 +117,25 @@ namespace
             return TEXT("DontSpawnIfColliding");
         default:
             return TEXT("Undefined");
+        }
+    }
+
+    FString FacilityInteractableTypeToText(const EEvaFacilityInteractableType Type)
+    {
+        switch (Type)
+        {
+        case EEvaFacilityInteractableType::Keycard:
+            return TEXT("Keycard");
+        case EEvaFacilityInteractableType::LockedDoor:
+            return TEXT("Door");
+        case EEvaFacilityInteractableType::PowerConsole:
+            return TEXT("PowerConsole");
+        case EEvaFacilityInteractableType::ResearchLog:
+            return TEXT("ResearchLog");
+        case EEvaFacilityInteractableType::DataCoreConsole:
+            return TEXT("DataCoreConsole");
+        default:
+            return TEXT("Unknown");
         }
     }
 
@@ -222,6 +247,53 @@ namespace
         const bool bWorldOverlap = World->OverlapBlockingTestByChannel(Location, FQuat::Identity, ECC_WorldStatic,
             CapsuleShape, QueryParams);
         return bPawnOverlap || bWorldOverlap;
+    }
+
+    bool IsNearEvaInteractable(UWorld* World, const FVector& Location, const float Radius)
+    {
+        if (!World)
+        {
+            return false;
+        }
+
+        const float RadiusSq = FMath::Square(Radius);
+        for (TActorIterator<AEvaFacilityInteractable> It(World); It; ++It)
+        {
+            const AEvaFacilityInteractable* Interactable = *It;
+            if (IsValid(Interactable) && !Interactable->IsHidden() &&
+                FVector::DistSquared(Location, Interactable->GetActorLocation()) <= RadiusSq)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool IsNavigationReachableAt(UWorld* World, const FVector& Location)
+    {
+        UNavigationSystemV1* NavigationSystem = World ? UNavigationSystemV1::GetCurrent(World) : nullptr;
+        if (!NavigationSystem)
+        {
+            return false;
+        }
+
+        FNavLocation ProjectedLocation;
+        return NavigationSystem->ProjectPointToNavigation(Location, ProjectedLocation,
+            FVector(240.0f, 240.0f, 420.0f));
+    }
+
+    bool IsFloorValidAt(UWorld* World, const FVector& Location)
+    {
+        if (!World)
+        {
+            return false;
+        }
+
+        FHitResult FloorHit;
+        const FVector TraceStart = Location + FVector(0.0f, 0.0f, 500.0f);
+        const FVector TraceEnd = Location - FVector(0.0f, 0.0f, 900.0f);
+        return World->LineTraceSingleByChannel(FloorHit, TraceStart, TraceEnd, ECC_WorldStatic) &&
+            IsAcceptableEvaFloorHit(FloorHit);
     }
 }
 
@@ -734,6 +806,7 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
 
     RuntimeFloorComponents.Reset();
     RuntimeFacilityBounds = FBox(EForceInit::ForceInit);
+    SpawnedFacilityInteractableKeys.Reset();
 
     BuildFacilityZone(ZoneCenters[0], TEXT("Entry Lobby"), 0);
     BuildFacilityZone(ZoneCenters[1], TEXT("Security Corridor"), 1);
@@ -777,18 +850,18 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         EEvaFacilityInteractableType::PowerConsole, TEXT("POWER CONSOLE"));
     SpawnFacilityInteractable(CurrentDirector, FVector(-2680.0f, -470.0f, 92.0f), FRotator::ZeroRotator,
         EEvaFacilityInteractableType::Keycard, TEXT("SECURITY KEYCARD"));
-    SpawnFacilityInteractable(CurrentDirector, FVector(-2100.0f, 0.0f, 185.0f), FRotator::ZeroRotator,
+    SpawnFacilityInteractable(CurrentDirector, FVector(-2100.0f, 0.0f, 170.0f), FRotator::ZeroRotator,
         EEvaFacilityInteractableType::LockedDoor, TEXT("OBSERVATION LAB LOCK"));
-    SpawnFacilityInteractable(CurrentDirector, FVector(-1450.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
+    SpawnFacilityInteractable(CurrentDirector, FVector(-1200.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
         EEvaFacilityInteractableType::ResearchLog, TEXT("EVA LEARNING NOTES"),
         FName(TEXT("CONTENT_LOG_EVA")), TEXT("EVA Learning Notes"),
         TEXT("EVA correlates repeated player choices with survival outcomes. It is already classifying you."));
-    SpawnFacilityInteractable(CurrentDirector, FVector(520.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
-        EEvaFacilityInteractableType::ResearchLog, TEXT("HUNTER REPORT"),
+    SpawnFacilityInteractable(CurrentDirector, FVector(600.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
+        EEvaFacilityInteractableType::ResearchLog, TEXT("HUNTER CONTAINMENT REPORT"),
         FName(TEXT("CONTENT_LOG_HUNTER")), TEXT("HUNTER Containment Report"),
         TEXT("HUNTER units record combat distance, hit bias, and escape routes with near-perfect fidelity."));
-    SpawnFacilityInteractable(CurrentDirector, FVector(2380.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
-        EEvaFacilityInteractableType::ResearchLog, TEXT("ADAM RECORD"),
+    SpawnFacilityInteractable(CurrentDirector, FVector(2400.0f, 585.0f, 82.0f), FRotator(0.0f, 180.0f, 0.0f),
+        EEvaFacilityInteractableType::ResearchLog, TEXT("ADAM EXPERIMENT RECORD"),
         FName(TEXT("CONTENT_LOG_ADAM")), TEXT("Adam Experiment Record"),
         TEXT("ADAM is not a subject. It is EVA's preferred answer when observation alone is insufficient."));
     SpawnFacilityInteractable(CurrentDirector, FVector(2560.0f, -480.0f, 105.0f), FRotator(0.0f, 90.0f, 0.0f),
@@ -1199,6 +1272,7 @@ void AEvaPrototypeGameMode::CheckRuntimeNavigationReady()
         GetWorldTimerManager().ClearTimer(NavigationReadinessTimer);
         ShowDebugStatusMessage(TEXT("NAV READY: representative floor projection succeeded."), 6.0f);
         LogNavigationStatus(TEXT("NavigationReady"));
+        LogFacilityInteractableSpawnStatus(TEXT("NavigationReady"));
         StartCombatSpawningAfterNavigationReady();
         return;
     }
@@ -1344,13 +1418,98 @@ AEvaFacilityInteractable* AEvaPrototypeGameMode::SpawnFacilityInteractable(AEvaR
         return nullptr;
     }
 
+    const FString TypeText = FacilityInteractableTypeToText(Type);
+    const FString EffectiveTitle = LogTitle.IsEmpty() ? DisplayName : LogTitle;
+    const FString KeyName = LogId.IsNone() ? DisplayName : LogId.ToString();
+    const FName SpawnKey(*FString::Printf(TEXT("%s_%s"), *TypeText, *KeyName));
+    if (SpawnedFacilityInteractableKeys.Contains(SpawnKey))
+    {
+        UE_LOG(LogAdaptiveHorror, Warning,
+            TEXT("[ContentSpawn] Type=%s Title=%s Location=%s Skipped=Duplicate Key=%s"),
+            *TypeText,
+            *EffectiveTitle,
+            *Location.ToCompactString(),
+            *SpawnKey.ToString());
+        return nullptr;
+    }
+
     AEvaFacilityInteractable* Interactable = GetWorld()->SpawnActor<AEvaFacilityInteractable>(
         AEvaFacilityInteractable::StaticClass(), Location, Rotation);
     if (Interactable)
     {
+        SpawnedFacilityInteractableKeys.Add(SpawnKey);
         Interactable->ConfigureInteractable(Type, Director, DisplayName, LogId, LogTitle, LogBody);
+
+        const bool bFloorValid = IsFloorValidAt(GetWorld(), Location);
+        const bool bReachable = IsNavigationReachableAt(GetWorld(), Location);
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ContentSpawn] Type=%s Title=%s Location=%s FloorValid=%s Reachable=%s Key=%s"),
+            *TypeText,
+            *EffectiveTitle,
+            *Location.ToCompactString(),
+            *BoolText(bFloorValid),
+            *BoolText(bReachable),
+            *SpawnKey.ToString());
+    }
+    else
+    {
+        UE_LOG(LogAdaptiveHorror, Warning,
+            TEXT("[ContentSpawn] Type=%s Title=%s Location=%s Failed=SpawnActorNull"),
+            *TypeText,
+            *EffectiveTitle,
+            *Location.ToCompactString());
     }
     return Interactable;
+}
+
+void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Context) const
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    int32 ResearchLogCount = 0;
+    for (TActorIterator<AEvaFacilityInteractable> It(GetWorld()); It; ++It)
+    {
+        const AEvaFacilityInteractable* Interactable = *It;
+        if (!IsValid(Interactable))
+        {
+            continue;
+        }
+
+        if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::ResearchLog)
+        {
+            ++ResearchLogCount;
+        }
+
+        const bool bFloorValid = IsFloorValidAt(GetWorld(), Interactable->GetActorLocation());
+        const bool bReachable = IsNavigationReachableAt(GetWorld(), Interactable->GetActorLocation());
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ContentSpawn] Context=%s Type=%s Title=%s Location=%s FloorValid=%s Reachable=%s Hidden=%s Collision=%s"),
+            *Context,
+            *FacilityInteractableTypeToText(Interactable->GetInteractableType()),
+            *Interactable->GetDisplayName(),
+            *Interactable->GetActorLocation().ToCompactString(),
+            *BoolText(bFloorValid),
+            *BoolText(bReachable),
+            *BoolText(Interactable->IsHidden()),
+            *BoolText(Interactable->GetActorEnableCollision()));
+        if (Interactable->GetInteractableType() == EEvaFacilityInteractableType::LockedDoor)
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[ContentSpawn] Context=%s DoorLockedCollision=%s DoorOpen=%s Location=%s"),
+                *Context,
+                *BoolText(Interactable->GetActorEnableCollision()),
+                CurrentDirector && CurrentDirector->IsObservationDoorOpen() ? TEXT("true") : TEXT("false"),
+                *Interactable->GetActorLocation().ToCompactString());
+        }
+    }
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ContentSpawn] Context=%s ResearchLogCount=%d RequiredResearchLogCount=3"),
+        *Context,
+        ResearchLogCount);
 }
 
 void AEvaPrototypeGameMode::SpawnStoryLog(AEvaResearchFacilityDirector* Director, const FName LogId,
@@ -1413,18 +1572,35 @@ void AEvaPrototypeGameMode::SpawnInitialZombie()
 }
 
 bool AEvaPrototypeGameMode::FindSafeEnemySpawnLocation(const FVector& Origin, const float MinRadius,
-    const float MaxRadius, const float MinEnemySeparation, const float MinPlayerDistance, FVector& OutLocation) const
+    const float MaxRadius, const float MinEnemySeparation, const float MinPlayerDistance, FVector& OutLocation,
+    const bool bAvoidPlayerView) const
 {
     UWorld* World = GetWorld();
     if (!World)
     {
         return false;
     }
+    if (GameFlowState != EEvaGameFlowState::Playing || bGameOver || bStageClear)
+    {
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[SpawnAttempt] Type=Enemy Reason=SafeSearch Skipped=InactiveFlow Flow=%s GameOver=%s StageClear=%s Origin=%s"),
+            *UEnum::GetValueAsString(GameFlowState),
+            *BoolText(bGameOver),
+            *BoolText(bStageClear),
+            *Origin.ToCompactString());
+        return false;
+    }
 
     APlayerController* PlayerController = World->GetFirstPlayerController();
     const APawn* PlayerPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
     const FVector PlayerLocation = PlayerPawn ? PlayerPawn->GetActorLocation() : Origin;
-    const FVector PlayerForward = PlayerPawn ? PlayerPawn->GetActorForwardVector().GetSafeNormal2D() : FVector::ForwardVector;
+    const APlayerCameraManager* CameraManager = PlayerController ? PlayerController->PlayerCameraManager : nullptr;
+    const FVector CameraLocation = CameraManager ? CameraManager->GetCameraLocation() :
+        (PlayerLocation + FVector(0.0f, 0.0f, 70.0f));
+    const FVector CameraForward = CameraManager ? CameraManager->GetActorForwardVector().GetSafeNormal() :
+        (PlayerPawn ? PlayerPawn->GetActorForwardVector().GetSafeNormal() : FVector::ForwardVector);
+    const FVector PlayerForward = PlayerPawn ? PlayerPawn->GetActorForwardVector().GetSafeNormal2D() :
+        CameraForward.GetSafeNormal2D();
     const FVector PlayerRight = PlayerPawn ? PlayerPawn->GetActorRightVector().GetSafeNormal2D() : FVector::RightVector;
     UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(World);
     if (!bRuntimeNavigationReady || bRuntimeNavigationFailed || !NavigationSystem)
@@ -1444,21 +1620,31 @@ bool AEvaPrototypeGameMode::FindSafeEnemySpawnLocation(const FVector& Origin, co
     const float RadiusMax = FMath::Max(RadiusMin + 1.0f, MaxRadius);
     const float EnemySeparation = FMath::Max(0.0f, MinEnemySeparation);
     const float PlayerSeparation = FMath::Max(0.0f, MinPlayerDistance);
+    const float EffectivePlayerSeparation = bAvoidPlayerView ?
+        FMath::Max(PlayerSeparation, PresentationSafePlayerSeparation) : PlayerSeparation;
 
     for (int32 AttemptIndex = 0; AttemptIndex < SafeSpawnAttemptCount; ++AttemptIndex)
     {
         FVector Candidate = Origin;
         if (AttemptIndex == 0 && PlayerPawn)
         {
-            Candidate = PlayerLocation + PlayerForward * FMath::Clamp((RadiusMin + RadiusMax) * 0.5f, 500.0f, 900.0f);
+            Candidate = PlayerLocation - PlayerForward * FMath::Clamp((RadiusMin + RadiusMax) * 0.5f, 520.0f, 900.0f);
         }
         else if (AttemptIndex == 1 && PlayerPawn)
         {
-            Candidate = PlayerLocation + PlayerForward * RadiusMin + PlayerRight * 260.0f;
+            Candidate = PlayerLocation - PlayerForward * RadiusMin + PlayerRight * 420.0f;
         }
         else if (AttemptIndex == 2 && PlayerPawn)
         {
-            Candidate = PlayerLocation + PlayerForward * RadiusMin - PlayerRight * 260.0f;
+            Candidate = PlayerLocation - PlayerForward * RadiusMin - PlayerRight * 420.0f;
+        }
+        else if (AttemptIndex == 3 && PlayerPawn)
+        {
+            Candidate = PlayerLocation + PlayerRight * FMath::Clamp((RadiusMin + RadiusMax) * 0.5f, 520.0f, 900.0f);
+        }
+        else if (AttemptIndex == 4 && PlayerPawn)
+        {
+            Candidate = PlayerLocation - PlayerRight * FMath::Clamp((RadiusMin + RadiusMax) * 0.5f, 520.0f, 900.0f);
         }
         else
         {
@@ -1487,11 +1673,42 @@ bool AEvaPrototypeGameMode::FindSafeEnemySpawnLocation(const FVector& Origin, co
         const float PlayerDistance = FVector::Dist(FinalLocation, PlayerLocation);
         const float NearestEnemyDistance = GetNearestEnemyDistance(World, FinalLocation);
         const bool bHasOverlap = HasBlockingSpawnOverlap(World, FinalLocation, CapsuleRadius, CapsuleHalfHeight);
-        const bool bPassesPlayerDistance = !PlayerPawn || PlayerDistance >= PlayerSeparation;
+        const bool bPassesPlayerDistance = !PlayerPawn || PlayerDistance >= EffectivePlayerSeparation;
         const bool bPassesEnemyDistance = NearestEnemyDistance >= EnemySeparation;
+        const bool bNearPlayerStart = FVector::DistSquared(FinalLocation, LastCheckpointTransform.GetLocation()) <=
+            FMath::Square(SpawnCheckpointExclusionRadius);
+        const bool bNearInteractable = IsNearEvaInteractable(World, FinalLocation, SpawnInteractionExclusionRadius);
+
+        bool bInCameraCone = false;
+        bool bInFrontalCone = false;
+        bool bDirectlyVisible = false;
+        FString VisibilityHitName = TEXT("None");
+        if (PlayerPawn && bAvoidPlayerView)
+        {
+            const FVector DirectionFromCamera = (FinalLocation + FVector(0.0f, 0.0f, 45.0f) -
+                CameraLocation).GetSafeNormal();
+            const float CameraDot = FVector::DotProduct(CameraForward, DirectionFromCamera);
+            const float PlayerForwardDot = FVector::DotProduct(PlayerForward,
+                (FinalLocation - PlayerLocation).GetSafeNormal2D());
+            bInCameraCone = CameraDot >= SpawnViewConeDotThreshold;
+            bInFrontalCone = PlayerForwardDot >= SpawnFrontalConeDotThreshold &&
+                PlayerDistance <= FMath::Max(1100.0f, RadiusMax + 240.0f);
+
+            FHitResult VisibilityHit;
+            FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaSpawnVisibility), false, PlayerPawn);
+            QueryParams.AddIgnoredActor(PlayerPawn);
+            const bool bVisibilityBlocked = World->LineTraceSingleByChannel(VisibilityHit, CameraLocation,
+                FinalLocation + FVector(0.0f, 0.0f, 60.0f), ECC_Visibility, QueryParams);
+            VisibilityHitName = VisibilityHit.GetActor() ? VisibilityHit.GetActor()->GetName() : TEXT("None");
+            bDirectlyVisible = !bVisibilityBlocked;
+        }
+        const bool bPassesPresentation = !bAvoidPlayerView ||
+            (!bInCameraCone && !bInFrontalCone && !bDirectlyVisible && !bNearInteractable && !bNearPlayerStart);
+        const bool bSpawnEligible = bNavProjected && bFloorAccepted && !bHasOverlap && bPassesPlayerDistance &&
+            bPassesEnemyDistance && bPassesPresentation;
 
         UE_LOG(LogAdaptiveHorror, Log,
-            TEXT("[SpawnAttempt] Type=Enemy Reason=SafeSearch Attempt=%d Requested=%s NavLocation=%s Final=%s NavProjected=%s FloorTrace=%s FloorAccepted=%s FloorActor=%s FloorComponent=%s FloorZ=%.1f NormalZ=%.2f Overlap=%s PlayerDistance=%.1f NearestEnemyDistance=%.1f"),
+            TEXT("[SpawnAttempt] Type=Enemy Reason=SafeSearch Attempt=%d Requested=%s NavLocation=%s Final=%s NavProjected=%s FloorTrace=%s FloorAccepted=%s FloorActor=%s FloorComponent=%s FloorZ=%.1f NormalZ=%.2f Overlap=%s PlayerDistance=%.1f MinPlayerDistance=%.1f TooClose=%s NearestEnemyDistance=%.1f InView=%s Frontal=%s Visible=%s VisibilityHit=%s NearInteractable=%s NearPlayerStart=%s AvoidView=%s SpawnEligible=%s"),
             AttemptIndex,
             *Candidate.ToCompactString(),
             bNavProjected ? *NavLocation.ToCompactString() : TEXT("None"),
@@ -1505,16 +1722,26 @@ bool AEvaPrototypeGameMode::FindSafeEnemySpawnLocation(const FVector& Origin, co
             FloorHit.bBlockingHit ? FloorHit.ImpactNormal.Z : 0.0f,
             *BoolText(bHasOverlap),
             PlayerDistance,
-            NearestEnemyDistance == TNumericLimits<float>::Max() ? -1.0f : NearestEnemyDistance);
+            EffectivePlayerSeparation,
+            *BoolText(!bPassesPlayerDistance),
+            NearestEnemyDistance == TNumericLimits<float>::Max() ? -1.0f : NearestEnemyDistance,
+            *BoolText(bInCameraCone),
+            *BoolText(bInFrontalCone),
+            *BoolText(bDirectlyVisible),
+            *VisibilityHitName,
+            *BoolText(bNearInteractable),
+            *BoolText(bNearPlayerStart),
+            *BoolText(bAvoidPlayerView),
+            *BoolText(bSpawnEligible));
 
 #if !UE_BUILD_SHIPPING
         DrawDebugSphere(World, FinalLocation, 42.0f, 12,
-            (bNavProjected && !bHasOverlap && bPassesPlayerDistance && bPassesEnemyDistance && bFloorAccepted) ?
+            bSpawnEligible ?
                 FColor::Green : FColor::Red,
             false, 4.0f);
 #endif
 
-        if (bNavProjected && bFloorAccepted && !bHasOverlap && bPassesPlayerDistance && bPassesEnemyDistance)
+        if (bSpawnEligible)
         {
             OutLocation = FinalLocation;
             return true;
@@ -1560,8 +1787,11 @@ AEvaZombieCharacter* AEvaPrototypeGameMode::SpawnEnemyNearLocation(TSubclassOf<A
     }
 
     FVector FinalLocation = FVector::ZeroVector;
+    const bool bAvoidPlayerView = SpawnReason != TEXT("InitialEntryLobby") &&
+        SpawnReason != TEXT("InitialVisibleZombie") &&
+        SpawnReason != TEXT("AdamEncounter");
     const bool bFoundSafeLocation = FindSafeEnemySpawnLocation(Origin, MinRadius, MaxRadius,
-        DefaultEnemySeparation, DefaultPlayerSeparation, FinalLocation);
+        DefaultEnemySeparation, DefaultPlayerSeparation, FinalLocation, bAvoidPlayerView);
     if (!bFoundSafeLocation)
     {
         LastSpawnLocation = Origin;
@@ -1604,14 +1834,31 @@ AEvaZombieCharacter* AEvaPrototypeGameMode::SpawnEnemyNearLocation(TSubclassOf<A
     {
         Enemy->SpawnDefaultController();
     }
-    PrimeEnemyForPlayer(Enemy);
+    if (bAvoidPlayerView)
+    {
+        UEvaAudioFunctionLibrary::PlayPrototypeToneAtLocation(this, FinalLocation, 46.0f, 0.35f, 0.10f);
+        TWeakObjectPtr<AEvaZombieCharacter> WeakEnemy = Enemy;
+        FTimerHandle DelayedPrimeHandle;
+        GetWorldTimerManager().SetTimer(DelayedPrimeHandle, FTimerDelegate::CreateWeakLambda(this,
+            [this, WeakEnemy]()
+            {
+                if (AEvaZombieCharacter* DelayedEnemy = WeakEnemy.Get())
+                {
+                    PrimeEnemyForPlayer(DelayedEnemy);
+                }
+            }), 0.35f, false);
+    }
+    else
+    {
+        PrimeEnemyForPlayer(Enemy);
+    }
 
     const bool bPostSpawnOverlap = HasBlockingSpawnOverlap(GetWorld(), Enemy->GetActorLocation(), 56.0f, 110.0f);
     if (bPostSpawnOverlap)
     {
         FVector RetryLocation;
         if (FindSafeEnemySpawnLocation(Origin, MinRadius, MaxRadius + 240.0f, DefaultEnemySeparation,
-            DefaultPlayerSeparation, RetryLocation))
+            DefaultPlayerSeparation, RetryLocation, bAvoidPlayerView))
         {
             Enemy->SetActorLocation(RetryLocation, false, nullptr, ETeleportType::TeleportPhysics);
             FinalLocation = RetryLocation;

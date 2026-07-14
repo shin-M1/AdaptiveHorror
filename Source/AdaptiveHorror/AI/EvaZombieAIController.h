@@ -68,6 +68,7 @@ protected:
 
     virtual bool CanAttackTarget() const;
     virtual void TryAttackTarget();
+    bool HasAttackLineOfSightToTarget() const;
     virtual bool TryHandleLearningAdaptation();
     virtual void ApplyAdaptivePerception();
     bool MoveToActorOrDirect(AActor* GoalActor, float AcceptanceRadius);

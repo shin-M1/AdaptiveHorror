@@ -110,6 +110,11 @@ bool AEvaAdamBossAIController::TryChargeAttack()
     {
         return false;
     }
+    if (!HasAttackLineOfSightToTarget())
+    {
+        SetAdamDebugState(TEXT("Chasing"), TEXT("Charge blocked by obstacle"));
+        return false;
+    }
 
     LastChargeTime = Now;
     SetAdamDebugState(TEXT("Charge"), TEXT("Charge started"));

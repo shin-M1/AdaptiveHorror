@@ -123,7 +123,8 @@ public:
     void ShowDebugStatusMessage(const FString& Message, float Duration = 4.0f);
 
     bool FindSafeEnemySpawnLocation(const FVector& Origin, float MinRadius, float MaxRadius,
-        float MinEnemySeparation, float MinPlayerDistance, FVector& OutLocation) const;
+        float MinEnemySeparation, float MinPlayerDistance, FVector& OutLocation,
+        bool bAvoidPlayerView = true) const;
 
     AEvaZombieCharacter* SpawnEnemyNearLocation(TSubclassOf<AEvaZombieCharacter> EnemyClass,
         const FVector& Origin, float MinRadius, float MaxRadius, const FString& EnemyType,
@@ -267,6 +268,7 @@ private:
         const FVector& Location, const FRotator& Rotation, EEvaFacilityInteractableType Type,
         const FString& DisplayName, FName LogId = NAME_None, const FString& LogTitle = TEXT(""),
         const FString& LogBody = TEXT(""));
+    void LogFacilityInteractableSpawnStatus(const FString& Context) const;
     void SpawnStoryLog(AEvaResearchFacilityDirector* Director, FName LogId, const FString& Title,
         const FString& Body, const FVector& Location);
     void ResetEnemyTargets();
@@ -351,6 +353,7 @@ private:
     bool bRuntimeNavigationFailed = false;
     int32 NavigationReadinessAttempts = 0;
     FBox RuntimeFacilityBounds = FBox(EForceInit::ForceInit);
+    TSet<FName> SpawnedFacilityInteractableKeys;
 
     UPROPERTY()
     TArray<TObjectPtr<UPrimitiveComponent>> RuntimeFloorComponents;

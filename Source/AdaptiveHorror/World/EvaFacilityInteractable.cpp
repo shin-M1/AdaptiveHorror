@@ -5,6 +5,7 @@
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
+#include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
 #include "World/EvaResearchFacilityDirector.h"
 
@@ -182,7 +183,15 @@ void AEvaFacilityInteractable::RefreshFromDirector()
         ApplyVisualState(true);
         if (Visual)
         {
-            Visual->SetRelativeScale3D(FVector(0.12f, 0.42f, 0.35f));
+            Visual->SetRelativeScale3D(FVector(0.28f, 0.12f, 0.55f));
+            Visual->SetRelativeLocation(FVector(0.0f, 0.0f, 8.0f));
+        }
+        if (Label)
+        {
+            Label->SetWorldSize(54.0f);
+            Label->SetRelativeLocation(FVector(0.0f, 0.0f, 125.0f));
+            Label->SetTextRenderColor(FColor(255, 210, 80));
+            Label->SetText(FText::FromString(DisplayName));
         }
         break;
     case EEvaFacilityInteractableType::DataCoreConsole:
@@ -225,24 +234,38 @@ void AEvaFacilityInteractable::ApplyVisualState(const bool bActive)
 void AEvaFacilityInteractable::ApplyDoorState(const bool bOpen)
 {
     SetActorHiddenInGame(false);
+    SetActorEnableCollision(!bOpen);
     if (Visual)
     {
-        Visual->SetRelativeScale3D(FVector(0.22f, 11.0f, 2.70f));
+        Visual->SetRelativeScale3D(FVector(0.26f, 13.0f, 3.40f));
         Visual->SetVisibility(true, true);
         Visual->SetHiddenInGame(false, true);
-        Visual->SetCanEverAffectNavigation(true);
+        Visual->SetCollisionObjectType(ECC_WorldStatic);
         if (bOpen)
         {
             SetActorLocation(InitialLocation + FVector(0.0f, 0.0f, 360.0f), false, nullptr,
                 ETeleportType::TeleportPhysics);
             Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Visual->SetCollisionResponseToAllChannels(ECR_Ignore);
+            Visual->SetCanEverAffectNavigation(false);
         }
         else
         {
             SetActorLocation(InitialLocation, false, nullptr, ETeleportType::TeleportPhysics);
+            Visual->SetCanEverAffectNavigation(true);
+            Visual->SetCollisionProfileName(TEXT("BlockAll"));
             Visual->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
             Visual->SetCollisionResponseToAllChannels(ECR_Block);
             Visual->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+            Visual->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
+            Visual->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        }
+        Visual->UpdateBounds();
+        UNavigationSystemV1::UpdateComponentInNavOctree(*Visual);
+        if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
+        {
+            NavigationSystem->AddDirtyArea(Visual->Bounds.GetBox().ExpandBy(120.0f),
+                ENavigationDirtyFlag::All, FName(TEXT("EvaObservationDoor")));
         }
     }
     if (Label)

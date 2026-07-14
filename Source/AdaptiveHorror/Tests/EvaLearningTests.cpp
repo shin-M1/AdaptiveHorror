@@ -41,6 +41,19 @@ namespace
         }
         return Floor;
     }
+
+    bool IsEvaTestFloorBelow(UWorld* World, const FVector& Location)
+    {
+        if (!World)
+        {
+            return false;
+        }
+
+        FHitResult FloorHit;
+        const bool bHit = World->LineTraceSingleByChannel(FloorHit, Location + FVector(0.0f, 0.0f, 240.0f),
+            Location - FVector(0.0f, 0.0f, 240.0f), ECC_WorldStatic);
+        return bHit && FloorHit.GetComponent() && FloorHit.GetComponent()->ComponentHasTag(TEXT("RuntimeFloor"));
+    }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaTelemetryClassificationTest,
@@ -1143,6 +1156,108 @@ bool FEvaContentPassInteractablePromptTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Door prompt changes after keycard"), Door->GetInteractionPrompt(Player),
         FString(TEXT("E - UNLOCK OBSERVATION LAB")));
     TestTrue(TEXT("Door interact succeeds after keycard"), Door->Interact(Player));
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassResearchLogPlacementStateTest,
+    "AdaptiveHorror.ContentPass.ResearchLogPlacementState",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassResearchLogPlacementStateTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    SpawnEvaTestFloor(World);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+
+    TestNotNull(TEXT("Director spawns for log placement test"), Director);
+    TestNotNull(TEXT("Player spawns for log placement test"), Player);
+    if (!Director || !Player)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    const FVector LogLocations[] =
+    {
+        FVector(-180.0f, 240.0f, 82.0f),
+        FVector(0.0f, 240.0f, 82.0f),
+        FVector(180.0f, 240.0f, 82.0f)
+    };
+    const TCHAR* LogTitles[] =
+    {
+        TEXT("EVA LEARNING NOTES"),
+        TEXT("HUNTER CONTAINMENT REPORT"),
+        TEXT("ADAM EXPERIMENT RECORD")
+    };
+
+    int32 SpawnedLogs = 0;
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        AEvaFacilityInteractable* Log = World->SpawnActor<AEvaFacilityInteractable>(
+            AEvaFacilityInteractable::StaticClass(), LogLocations[Index], FRotator::ZeroRotator);
+        TestNotNull(TEXT("Research log actor spawns"), Log);
+        if (!Log)
+        {
+            continue;
+        }
+
+        Log->ConfigureInteractable(EEvaFacilityInteractableType::ResearchLog, Director, LogTitles[Index],
+            FName(*FString::Printf(TEXT("AutomationResearchLog%d"), Index)),
+            LogTitles[Index], TEXT("Automation research text."));
+
+        TestEqual(TEXT("Research log uses read prompt"), Log->GetInteractionPrompt(Player),
+            FString(TEXT("E - READ LOG")));
+        TestTrue(TEXT("Research log actor is visible"), !Log->IsHidden());
+        TestTrue(TEXT("Research log has tagged floor below"), IsEvaTestFloorBelow(World, Log->GetActorLocation()));
+        ++SpawnedLogs;
+    }
+
+    TestEqual(TEXT("Three required research log interactables were created"), SpawnedLogs, 3);
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassDoorBlocksAttackTraceTest,
+    "AdaptiveHorror.ContentPass.DoorBlocksAttackTrace",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassDoorBlocksAttackTraceTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+    AEvaFacilityInteractable* Door = World->SpawnActor<AEvaFacilityInteractable>(
+        AEvaFacilityInteractable::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+
+    TestNotNull(TEXT("Director spawns for door trace test"), Director);
+    TestNotNull(TEXT("Player spawns for door trace test"), Player);
+    TestNotNull(TEXT("Door spawns for trace test"), Door);
+    if (!Director || !Player || !Door)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Door->ConfigureInteractable(EEvaFacilityInteractableType::LockedDoor, Director, TEXT("OBSERVATION LAB LOCK"));
+
+    FHitResult ClosedDoorHit;
+    const bool bClosedDoorBlocksAttackTrace = World->LineTraceSingleByChannel(ClosedDoorHit,
+        FVector(-320.0f, 0.0f, 80.0f), FVector(320.0f, 0.0f, 80.0f), ECC_WorldStatic);
+    TestTrue(TEXT("Closed observation door blocks enemy attack trace"), bClosedDoorBlocksAttackTrace);
+
+    Director->TryAcquireSecurityKeycard();
+    TestTrue(TEXT("Door interact opens after keycard"), Door->Interact(Player));
+
+    FHitResult OpenDoorHit;
+    const bool bOpenDoorStillBlocksAttackTrace = World->LineTraceSingleByChannel(OpenDoorHit,
+        FVector(-320.0f, 0.0f, 80.0f), FVector(320.0f, 0.0f, 80.0f), ECC_WorldStatic);
+    TestFalse(TEXT("Opened observation door no longer blocks the same passage trace"),
+        bOpenDoorStillBlocksAttackTrace && (OpenDoorHit.GetActor() == Door ||
+            (OpenDoorHit.GetComponent() && OpenDoorHit.GetComponent()->GetOwner() == Door)));
 
     World->DestroyWorld(false);
     return true;

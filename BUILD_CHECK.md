@@ -1,5 +1,50 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 022 execution result - Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+Date: 2026-07-14
+
+Branch: `feature/content-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Project Automation count: 42 tests.
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+- Latest runtime smoke log confirmed:
+  - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=EVA LEARNING NOTES ... FloorValid=true Reachable=true`
+  - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=HUNTER CONTAINMENT REPORT ... FloorValid=true Reachable=true`
+  - `[ContentSpawn] Context=NavigationReady Type=ResearchLog Title=ADAM EXPERIMENT RECORD ... FloorValid=true Reachable=true`
+  - `[ContentSpawn] Context=NavigationReady DoorLockedCollision=true DoorOpen=false`
+  - `[ContentSpawn] Context=NavigationReady ResearchLogCount=3 RequiredResearchLogCount=3`
+- Latest smoke log did not show project Fatal / Ensure / Assertion.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+Notes:
+
+- New includes for this fix:
+  - `Camera/PlayerCameraManager.h`
+  - `NavigationSystem.h`
+- Live Coding-free Development Editor build confirmed those includes compile in UE5.8.
+- Automation covers the new Research Log placement state and Observation Lab door closed/open trace behavior.
+- Runtime smoke confirms startup placement/collision diagnostics, but not PIE camera readability or live spawn-presentation feel.
+- Non-Win64 SDK validation warnings may still appear in engine output; Win64 build/automation succeeded.
+
 ## Cycle 021 execution result - Content Pass 1 Research Facility Progression
 
 Date: 2026-07-14

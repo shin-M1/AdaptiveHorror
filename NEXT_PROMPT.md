@@ -1,5 +1,96 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 022 Content Pass 1 Placement / Door / Spawn Presentation Fix
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 42 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed the three required Research Logs are spawned, visible to diagnostics, floor-valid, navigation-reachable after Runtime NavMesh readiness, and not duplicated.
+- Runtime smoke confirmed the Observation Lab door is closed with collision enabled at startup.
+- `git diff --check`: succeeded, no whitespace errors. CRLF conversion warnings only.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Repositioned three required Research Logs to reachable floor locations:
+  - Observation Lab: `EVA LEARNING NOTES`
+  - Containment Ward: `HUNTER CONTAINMENT REPORT`
+  - Data Core area: `ADAM EXPERIMENT RECORD`
+- Added `[ContentSpawn]` diagnostics for interactable placement, floor validity, reachability, hidden/collision state, door locked collision, and Research Log count.
+- Strengthened the closed Observation Lab door so it blocks player/enemy passage, sight/attack traces, and charge traces.
+- Opened door disables collision and updates Runtime NavMesh dirty state.
+- Added enemy melee and ADAM charge line-of-sight checks so closed doors/walls cannot apply damage through geometry.
+- Updated presentation-safe enemy spawns to reject candidates that are too close, in front of the player, in camera view, directly visible, near interactables/checkpoints, off floor, off NavMesh, or crowded.
+- Added a subtle spawn cue and short AI prime delay for presentation-safe spawns.
+- Added Automation coverage for Research Log placement state and closed/open door trace behavior.
+
+### Next highest-priority task
+
+Run PIE and verify only the fixed Content Pass 1 issues. Do not add new AI, enemies, weapons, maps, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game from the stable UI flow.
+2. Confirm objective reaches `Find Security Keycard` as before.
+3. Confirm the three Research Logs are physically present, on floor/reachable, and visually discoverable:
+   - `EVA LEARNING NOTES`
+   - `HUNTER CONTAINMENT REPORT`
+   - `ADAM EXPERIMENT RECORD`
+4. Confirm E-key prompt target and actual interacted object match.
+5. Confirm research log overlay opens with E, closes with E, restores input, first read counts, and reread does not duplicate progress.
+6. Confirm the closed Observation Lab door blocks:
+   - player movement,
+   - enemy movement,
+   - enemy melee damage,
+   - ADAM charge damage if tested against a closed obstacle,
+   - wall/door-through interaction.
+7. Confirm opening the Observation Lab door allows clean passage and does not permanently break enemy traversal.
+8. Confirm normal wave/adaptive/evolved/HUNTER/ADAM-summoned enemies no longer pop directly into the player view unless intentionally spawned by debug/encounter setup.
+9. Confirm existing regressions remain stable:
+   - objective chain,
+   - Gameplay Pass 1 adaptation/debug HUD,
+   - Runtime NavMesh,
+   - spawn floor safety,
+   - Zombie chase/attack,
+   - HUNTER,
+   - Adam,
+   - flashlight/blackout,
+   - Stage Clear,
+   - Death/Game Over,
+   - Title/Pause/Settings flow.
+
+If a problem is found:
+
+- Fix only Content Pass 1 placement, door blocking, interaction trace, or spawn-presentation issues.
+- Preserve Runtime NavMesh, Zombie/HUNTER/ADAM behavior, Stage Clear, Player Death, Title/Pause/Settings/Game Over, Visual/Audio/Horror presentation, Gameplay Pass adaptation, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaAdamBossAIController.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms in PIE that logs are visible/reachable/readable, the closed door blocks movement/damage/interactions, and enemies no longer spawn obviously in view.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 021 Content Pass 1 Research Facility Progression
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

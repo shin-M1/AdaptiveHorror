@@ -49,6 +49,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Interaction")
     EEvaFacilityInteractableType GetInteractableType() const { return InteractableType; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction")
+    FString GetDisplayName() const { return DisplayName; }
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EVA|Interaction")
     TObjectPtr<USceneComponent> SceneRoot;
