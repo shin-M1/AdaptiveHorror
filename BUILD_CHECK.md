@@ -1,5 +1,43 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 021 execution result - Content Pass 1 Research Facility Progression
+
+Date: 2026-07-14
+
+Branch: `feature/content-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Latest automation backup log confirmed 40 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime smoke exit code: 0.
+- Latest runtime smoke log confirmed Content startup logs:
+  - `[Content] ObjectiveStart Index=0 Objective=Restore Facility Power`
+  - `[Content] FacilityPowerState Online=false`
+  - `[Content] ProgressReset ObjectiveIndex=0`
+- Latest smoke log did not show project Fatal / Ensure / Assertion.
+
+Notes:
+
+- The Content Pass added includes for `World/EvaFacilityInteractable.h` and `World/EvaResearchFacilityDirector.h`; the Live Coding-free Development Editor build confirmed they compile in UE5.8.
+- Automation covers the Power / Keycard / Door / Research Log / Data Core / Stage Clear update-block / reset progression path.
+- Runtime smoke starts and exits without manual gameplay, so the full E-key interaction feel and traversal from Entry Lobby to Adam Arena still require PIE viewport confirmation.
+
 ## Cycle 020 execution result - Enemy Intent Display Consistency
 
 Date: 2026-07-14

@@ -16,6 +16,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "World/EvaFacilityInteractable.h"
 #include "World/EvaResearchFacilityDirector.h"
 
 namespace
@@ -160,7 +161,15 @@ bool FEvaDirectorProgressionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Director advances to Security Corridor"),
         Director->GetCurrentZone() == EEvaFacilityZone::SecurityCorridor);
 
+    TestTrue(TEXT("Power can be restored before lab progress"), Director->TryRestoreFacilityPower());
+    TestTrue(TEXT("Keycard can be acquired before lab progress"), Director->TryAcquireSecurityKeycard());
+    TestTrue(TEXT("Observation door can be opened after keycard"), Director->TryOpenObservationDoor());
     Director->NotifyZoneEntered(EEvaFacilityZone::ObservationLab);
+    TestTrue(TEXT("Director advances to Observation Lab after door opens"),
+        Director->GetCurrentZone() == EEvaFacilityZone::ObservationLab);
+    TestTrue(TEXT("Required research log can be read before containment"),
+        Director->TryReadResearchLog(FName(TEXT("EVA_LOG_03")), TEXT("Automation Log"), TEXT("Body")));
+    Director->CloseResearchLog();
     Director->NotifyZoneEntered(EEvaFacilityZone::ContainmentWard);
     TestTrue(TEXT("Containment Ward unlocks evolution"),
         Director->IsEvolutionUnlocked());
@@ -1015,6 +1024,125 @@ bool FEvaEnemyIntentControllerFallbackTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Debug OFF hides refreshed intent label"), IntentLabel->IsVisible());
         TestFalse(TEXT("Refreshed intent label stores text"), IntentLabel->Text.ToString().IsEmpty());
     }
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassObjectiveProgressionTest,
+    "AdaptiveHorror.ContentPass.ObjectiveProgression",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassObjectiveProgressionTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    TestNotNull(TEXT("Director spawns for content objective test"), Director);
+    if (!Director)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Director->ResetForNewGame();
+    TestEqual(TEXT("New Game starts at objective 0"), Director->GetObjectiveIndex(), 0);
+    TestTrue(TEXT("Power restore succeeds once"), Director->TryRestoreFacilityPower());
+    TestEqual(TEXT("Power advances objective to keycard"), Director->GetObjectiveIndex(), 1);
+    TestFalse(TEXT("Power restore cannot run twice"), Director->TryRestoreFacilityPower());
+    TestTrue(TEXT("Keycard pickup succeeds once"), Director->TryAcquireSecurityKeycard());
+    TestEqual(TEXT("Keycard advances objective to door"), Director->GetObjectiveIndex(), 2);
+    TestFalse(TEXT("Keycard cannot be collected twice"), Director->TryAcquireSecurityKeycard());
+
+    Director->CompleteStage();
+    const int32 StageClearObjective = Director->GetObjectiveIndex();
+    TestFalse(TEXT("Stage Clear blocks late keycard progress"), Director->TryAcquireSecurityKeycard());
+    TestEqual(TEXT("Stage Clear objective remains unchanged"), Director->GetObjectiveIndex(), StageClearObjective);
+
+    Director->ResetForNewGame();
+    TestFalse(TEXT("New Game reset clears power"), Director->IsFacilityPowerOnline());
+    TestFalse(TEXT("New Game reset clears keycard"), Director->HasSecurityKeycard());
+    TestEqual(TEXT("New Game reset restores objective 0"), Director->GetObjectiveIndex(), 0);
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassDoorAndDataCoreTest,
+    "AdaptiveHorror.ContentPass.DoorAndDataCore",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassDoorAndDataCoreTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    TestNotNull(TEXT("Director spawns for content door/data core test"), Director);
+    if (!Director)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Director->ResetForNewGame();
+    TestFalse(TEXT("Door rejects without keycard"), Director->TryOpenObservationDoor());
+    TestFalse(TEXT("Door remains locked without keycard"), Director->IsObservationDoorOpen());
+    Director->TryAcquireSecurityKeycard();
+    TestTrue(TEXT("Door opens after keycard"), Director->TryOpenObservationDoor());
+    TestFalse(TEXT("Door cannot open twice"), Director->TryOpenObservationDoor());
+    TestTrue(TEXT("Observation door state persists"), Director->IsObservationDoorOpen());
+
+    TestFalse(TEXT("Data Core rejects before a research log"), Director->TryAccessDataCore());
+    TestTrue(TEXT("First research log read succeeds"), Director->TryReadResearchLog(
+        FName(TEXT("AutomationLog")), TEXT("Automation Log"), TEXT("Automation body.")));
+    TestEqual(TEXT("First log increments collection"), Director->GetCollectedStoryLogCount(), 1);
+    Director->CloseResearchLog();
+    TestTrue(TEXT("Research log can be reread"), Director->TryReadResearchLog(
+        FName(TEXT("AutomationLog")), TEXT("Automation Log"), TEXT("Automation body.")));
+    TestEqual(TEXT("Reread does not double-count"), Director->GetCollectedStoryLogCount(), 1);
+    Director->CloseResearchLog();
+
+    TestTrue(TEXT("Data Core succeeds after log"), Director->TryAccessDataCore());
+    TestTrue(TEXT("Adam Arena unlocks after Data Core"), Director->IsAdamArenaUnlocked());
+    TestFalse(TEXT("Data Core cannot complete twice"), Director->TryAccessDataCore());
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaContentPassInteractablePromptTest,
+    "AdaptiveHorror.ContentPass.InteractablePrompt",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaContentPassInteractablePromptTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaResearchFacilityDirector* Director = World->SpawnActor<AEvaResearchFacilityDirector>();
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>();
+    AEvaFacilityInteractable* Keycard = World->SpawnActor<AEvaFacilityInteractable>();
+    AEvaFacilityInteractable* Door = World->SpawnActor<AEvaFacilityInteractable>();
+
+    TestNotNull(TEXT("Director spawns for prompt test"), Director);
+    TestNotNull(TEXT("Player spawns for prompt test"), Player);
+    TestNotNull(TEXT("Keycard interactable spawns"), Keycard);
+    TestNotNull(TEXT("Door interactable spawns"), Door);
+    if (!Director || !Player || !Keycard || !Door)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Director->ResetForNewGame();
+    Keycard->ConfigureInteractable(EEvaFacilityInteractableType::Keycard, Director, TEXT("SECURITY KEYCARD"));
+    Door->ConfigureInteractable(EEvaFacilityInteractableType::LockedDoor, Director, TEXT("OBSERVATION LAB LOCK"));
+
+    TestEqual(TEXT("Keycard prompt is explicit"), Keycard->GetInteractionPrompt(Player),
+        FString(TEXT("E - PICK UP KEYCARD")));
+    TestEqual(TEXT("Locked door prompt reports missing keycard"), Door->GetInteractionPrompt(Player),
+        FString(TEXT("E - KEYCARD REQUIRED")));
+    TestTrue(TEXT("Keycard interact succeeds"), Keycard->Interact(Player));
+    TestEqual(TEXT("Collected keycard hides prompt"), Keycard->GetInteractionPrompt(Player), FString(TEXT("")));
+    TestEqual(TEXT("Door prompt changes after keycard"), Door->GetInteractionPrompt(Player),
+        FString(TEXT("E - UNLOCK OBSERVATION LAB")));
+    TestTrue(TEXT("Door interact succeeds after keycard"), Door->Interact(Player));
 
     World->DestroyWorld(false);
     return true;

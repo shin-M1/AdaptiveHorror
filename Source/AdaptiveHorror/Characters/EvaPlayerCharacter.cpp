@@ -24,6 +24,8 @@
 #include "Perception/AISense_Sight.h"
 #include "Weapons/EvaHitscanWeapon.h"
 #include "Weapons/EvaWeaponBase.h"
+#include "World/EvaFacilityInteractable.h"
+#include "World/EvaResearchFacilityDirector.h"
 
 AEvaPlayerCharacter::AEvaPlayerCharacter()
 {
@@ -106,6 +108,7 @@ void AEvaPlayerCharacter::Tick(const float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
+    UpdateFocusedInteractable();
     UpdateFlashlightVisibility();
     if (!FirstPersonCamera)
     {
@@ -201,6 +204,10 @@ void AEvaPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
         {
             EnhancedInput->BindAction(FlashlightAction, ETriggerEvent::Started, this,
                 &AEvaPlayerCharacter::ToggleFlashlightInput);
+        }
+        if (InteractAction)
+        {
+            EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AEvaPlayerCharacter::Interact);
         }
 #if !UE_BUILD_SHIPPING
         if (DebugIncreaseAnalysisAction)
@@ -426,6 +433,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     FireAction = NewObject<UInputAction>(this, TEXT("IA_Fire"));
     ReloadAction = NewObject<UInputAction>(this, TEXT("IA_Reload"));
     FlashlightAction = NewObject<UInputAction>(this, TEXT("IA_Flashlight"));
+    InteractAction = NewObject<UInputAction>(this, TEXT("IA_Interact"));
 #if !UE_BUILD_SHIPPING
     DebugIncreaseAnalysisAction = NewObject<UInputAction>(this, TEXT("IA_Debug_EVAAnalysis"));
     DebugForceHunterAction = NewObject<UInputAction>(this, TEXT("IA_Debug_Hunter"));
@@ -444,6 +452,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     FireAction->ValueType = EInputActionValueType::Boolean;
     ReloadAction->ValueType = EInputActionValueType::Boolean;
     FlashlightAction->ValueType = EInputActionValueType::Boolean;
+    InteractAction->ValueType = EInputActionValueType::Boolean;
 #if !UE_BUILD_SHIPPING
     DebugIncreaseAnalysisAction->ValueType = EInputActionValueType::Boolean;
     DebugForceHunterAction->ValueType = EInputActionValueType::Boolean;
@@ -481,6 +490,7 @@ void AEvaPlayerCharacter::BuildRuntimeInputMapping()
     RuntimeMappingContext->MapKey(FireAction, EKeys::LeftMouseButton);
     RuntimeMappingContext->MapKey(ReloadAction, EKeys::R);
     RuntimeMappingContext->MapKey(FlashlightAction, EKeys::F);
+    RuntimeMappingContext->MapKey(InteractAction, EKeys::E);
 #if !UE_BUILD_SHIPPING
     RuntimeMappingContext->MapKey(DebugIncreaseAnalysisAction, EKeys::F1);
     RuntimeMappingContext->MapKey(DebugForceHunterAction, EKeys::F2);
@@ -600,6 +610,78 @@ void AEvaPlayerCharacter::ToggleFlashlightInput()
     }
 }
 
+void AEvaPlayerCharacter::Interact()
+{
+    AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
+    if (Director && Director->IsResearchLogOpen())
+    {
+        Director->CloseResearchLog();
+        if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+        {
+            PlayerController->SetInputMode(FInputModeGameOnly());
+            PlayerController->bShowMouseCursor = false;
+        }
+        return;
+    }
+
+    if (!IsGameplayInputAllowed())
+    {
+        return;
+    }
+
+    UpdateFocusedInteractable();
+    if (FocusedInteractable.IsValid())
+    {
+        FocusedInteractable->Interact(this);
+    }
+}
+
+void AEvaPlayerCharacter::UpdateFocusedInteractable()
+{
+    FocusedInteractable.Reset();
+    FocusedInteractionPrompt.Empty();
+
+    AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
+    if (Director && Director->IsResearchLogOpen())
+    {
+        FocusedInteractionPrompt = TEXT("E - CLOSE LOG");
+        return;
+    }
+
+    if (!FirstPersonCamera || !IsGameplayInputAllowed())
+    {
+        return;
+    }
+
+    const FVector TraceStart = FirstPersonCamera->GetComponentLocation();
+    const FVector TraceEnd = TraceStart + FirstPersonCamera->GetForwardVector() * InteractionTraceDistance;
+    FHitResult Hit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaInteractTrace), false, this);
+    if (!GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+    {
+        return;
+    }
+
+    AEvaFacilityInteractable* Interactable = Cast<AEvaFacilityInteractable>(Hit.GetActor());
+    if (!Interactable)
+    {
+        Interactable = Hit.GetComponent() ? Cast<AEvaFacilityInteractable>(Hit.GetComponent()->GetOwner()) : nullptr;
+    }
+    if (!Interactable)
+    {
+        return;
+    }
+
+    const FString Prompt = Interactable->GetInteractionPrompt(this);
+    if (!Prompt.IsEmpty())
+    {
+        FocusedInteractable = Interactable;
+        FocusedInteractionPrompt = Prompt;
+    }
+}
+
 void AEvaPlayerCharacter::SpawnStarterWeapon()
 {
     if (CurrentWeapon || !StarterWeaponClass || !GetWorld())
@@ -662,7 +744,8 @@ bool AEvaPlayerCharacter::IsGameplayInputAllowed() const
     }
 
     const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
-    return !GameMode || GameMode->IsGameplayActive();
+    const AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
+    return (!GameMode || GameMode->IsGameplayActive()) && (!Director || !Director->IsResearchLogOpen());
 }
 
 bool AEvaPlayerCharacter::IsLookInputAllowed() const

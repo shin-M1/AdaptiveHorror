@@ -1,5 +1,48 @@
 # Adaptive Horror FPS Demo
 
+## Content Pass 1 progression controls - Cycle 021
+
+Current branch: `feature/content-pass1`.
+
+The Runtime Graybox research facility now has a simple E-key content progression layer on top of the existing combat loop:
+
+1. Restore Facility Power.
+2. Find Security Keycard.
+3. Unlock Observation Lab.
+4. Search Containment Records.
+5. Access Data Core.
+6. Reach Adam Arena.
+7. Defeat Adam.
+
+Interaction:
+
+- `E`: interact with the focused Power Console, Keycard, locked Door, Research Log, or Data Core Console.
+- `E`: close the active Research Log overlay.
+
+Normal HUD additions:
+
+- Current Objective.
+- Compact progress line for logs, keycard, and power.
+- Crosshair-area interaction prompt.
+- Research Log overlay while reading.
+
+Debug HUD page 3 now also exposes content state:
+
+- Objective Index.
+- Power.
+- Keycard.
+- Door.
+- Logs.
+- Data Core.
+- Arena.
+
+Content gates:
+
+- Observation Lab requires the door to be opened.
+- Containment Ward requires at least one research log.
+- Adam Arena requires Data Core access.
+- F4 remains the ADAM debug-start path and intentionally bypasses these gates for verification.
+
 ## Gameplay Pass 1 Polish debug controls - Cycle 019
 
 Current branch: `feature/gameplay-pass1`.

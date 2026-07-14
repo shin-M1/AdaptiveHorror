@@ -7,6 +7,7 @@
 #include "EvaPlayerCharacter.generated.h"
 
 class AEvaWeaponBase;
+class AEvaFacilityInteractable;
 class UCameraComponent;
 class UEvaHealthComponent;
 class UEvaPlayerTelemetryComponent;
@@ -75,6 +76,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Light")
     bool IsFlashlightEnabled() const { return bFlashlightEnabled; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Interaction")
+    FString GetInteractionPrompt() const { return FocusedInteractionPrompt; }
+
 protected:
     virtual void PostInitializeComponents() override;
     virtual void BeginPlay() override;
@@ -93,7 +97,9 @@ protected:
     void FireWeapon();
     void ReloadWeapon();
     void ToggleFlashlightInput();
+    void Interact();
     void SpawnStarterWeapon();
+    void UpdateFocusedInteractable();
     void UpdateFlashlightVisibility();
     void ResetHorrorFeedback();
     void PlayBreathingPulse();
@@ -174,6 +180,9 @@ private:
     TObjectPtr<UInputAction> FlashlightAction;
 
     UPROPERTY(Transient)
+    TObjectPtr<UInputAction> InteractAction;
+
+    UPROPERTY(Transient)
     TObjectPtr<UInputAction> DebugIncreaseAnalysisAction;
 
     UPROPERTY(Transient)
@@ -207,4 +216,7 @@ private:
     float DamageFeedbackDuration = 0.75f;
     float LastDamageFeedbackScale = 0.0f;
     FTimerHandle BreathingTimer;
+    TWeakObjectPtr<AEvaFacilityInteractable> FocusedInteractable;
+    FString FocusedInteractionPrompt;
+    float InteractionTraceDistance = 360.0f;
 };

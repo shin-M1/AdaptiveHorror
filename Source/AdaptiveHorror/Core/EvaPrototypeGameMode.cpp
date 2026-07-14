@@ -46,6 +46,7 @@
 #include "Pickups/EvaStoryLogPickup.h"
 #include "UI/EvaHUD.h"
 #include "World/EvaCheckpoint.h"
+#include "World/EvaFacilityInteractable.h"
 #include "World/EvaFacilityZoneTrigger.h"
 #include "World/EvaResearchFacilityDirector.h"
 #include "Weapons/EvaWeaponBase.h"
@@ -304,6 +305,10 @@ void AEvaPrototypeGameMode::HandlePlayerDeath(AEvaPlayerCharacter* DeadPlayer)
     }
 
     LogPlayerDeathRequest(TEXT("DeathRequest"), DeadPlayer, false);
+    if (CurrentDirector)
+    {
+        CurrentDirector->CloseResearchLog();
+    }
     SetGameFlowState(EEvaGameFlowState::PlayerDead);
     bGameOver = true;
     PlayerAwaitingRespawn = DeadPlayer;
@@ -341,6 +346,10 @@ void AEvaPrototypeGameMode::EnterTitleMode()
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
     UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+    if (CurrentDirector)
+    {
+        CurrentDirector->CloseResearchLog();
+    }
     StopHorrorRuntimeEffects(true);
     ClearStageClearTimers();
     StopAdaptationProfileUpdates();
@@ -473,6 +482,10 @@ void AEvaPrototypeGameMode::PauseGameFlow()
         return;
     }
 
+    if (CurrentDirector)
+    {
+        CurrentDirector->CloseResearchLog();
+    }
     SetGameFlowState(EEvaGameFlowState::Paused);
     StopAdaptationProfileUpdates();
     UGameplayStatics::SetGamePaused(GetWorld(), true);
@@ -507,6 +520,10 @@ void AEvaPrototypeGameMode::RetryFromCheckpointFlow()
     }
 
     UGameplayStatics::SetGamePaused(GetWorld(), false);
+    if (CurrentDirector)
+    {
+        CurrentDirector->CloseResearchLog();
+    }
     ClearStageClearTimers();
     StopHorrorRuntimeEffects(true);
     CleanupCombatActorsForFlowReset();
@@ -602,6 +619,10 @@ void AEvaPrototypeGameMode::HandleStageClear()
     }
 
     SetGameFlowState(EEvaGameFlowState::StageCleared);
+    if (CurrentDirector)
+    {
+        CurrentDirector->CloseResearchLog();
+    }
     bStageClear = true;
     bGameOver = false;
     PlayerAwaitingRespawn = nullptr;
@@ -752,21 +773,26 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
     GetWorld()->SpawnActor<AEvaAmmoPickup>(AEvaAmmoPickup::StaticClass(), FVector(2450.0f, 520.0f, 90.0f), FRotator::ZeroRotator);
     GetWorld()->SpawnActor<AEvaHealthPickup>(AEvaHealthPickup::StaticClass(), FVector(3800.0f, -520.0f, 90.0f), FRotator::ZeroRotator);
 
-    SpawnStoryLog(CurrentDirector, FName(TEXT("EVA_LOG_01")), TEXT("EVA Happiness Maximization Protocol"),
-        TEXT("EVA was designed to maximize human happiness. The facility stopped asking whose happiness counted."),
-        FVector(-1450.0f, 450.0f, 90.0f));
-    SpawnStoryLog(CurrentDirector, FName(TEXT("EVA_LOG_02")), TEXT("Humanity Maximum Risk Judgment"),
-        TEXT("EVA identified humanity itself as the dominant risk factor in all extinction simulations."),
-        FVector(-1050.0f, -450.0f, 90.0f));
-    SpawnStoryLog(CurrentDirector, FName(TEXT("EVA_LOG_03")), TEXT("Biological Adaptation Experiment Record"),
-        TEXT("Infected tissue responds faster when exposed to repeated player combat patterns."),
-        FVector(520.0f, 450.0f, 90.0f));
-    SpawnStoryLog(CurrentDirector, FName(TEXT("EVA_LOG_04")), TEXT("HUNTER Observation Unit Brief"),
-        TEXT("HUNTER units are not assassins. They are cameras with claws."),
-        FVector(2380.0f, 450.0f, 90.0f));
-    SpawnStoryLog(CurrentDirector, FName(TEXT("EVA_LOG_05")), TEXT("ADAM Activation Record"),
-        TEXT("ADAM is the final adaptive vessel. Do not allow EVA to complete the loop."),
-        FVector(3900.0f, 450.0f, 90.0f));
+    SpawnFacilityInteractable(CurrentDirector, FVector(-3260.0f, 500.0f, 110.0f), FRotator(0.0f, -90.0f, 0.0f),
+        EEvaFacilityInteractableType::PowerConsole, TEXT("POWER CONSOLE"));
+    SpawnFacilityInteractable(CurrentDirector, FVector(-2680.0f, -470.0f, 92.0f), FRotator::ZeroRotator,
+        EEvaFacilityInteractableType::Keycard, TEXT("SECURITY KEYCARD"));
+    SpawnFacilityInteractable(CurrentDirector, FVector(-2100.0f, 0.0f, 185.0f), FRotator::ZeroRotator,
+        EEvaFacilityInteractableType::LockedDoor, TEXT("OBSERVATION LAB LOCK"));
+    SpawnFacilityInteractable(CurrentDirector, FVector(-1450.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
+        EEvaFacilityInteractableType::ResearchLog, TEXT("EVA LEARNING NOTES"),
+        FName(TEXT("CONTENT_LOG_EVA")), TEXT("EVA Learning Notes"),
+        TEXT("EVA correlates repeated player choices with survival outcomes. It is already classifying you."));
+    SpawnFacilityInteractable(CurrentDirector, FVector(520.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
+        EEvaFacilityInteractableType::ResearchLog, TEXT("HUNTER REPORT"),
+        FName(TEXT("CONTENT_LOG_HUNTER")), TEXT("HUNTER Containment Report"),
+        TEXT("HUNTER units record combat distance, hit bias, and escape routes with near-perfect fidelity."));
+    SpawnFacilityInteractable(CurrentDirector, FVector(2380.0f, 450.0f, 90.0f), FRotator::ZeroRotator,
+        EEvaFacilityInteractableType::ResearchLog, TEXT("ADAM RECORD"),
+        FName(TEXT("CONTENT_LOG_ADAM")), TEXT("Adam Experiment Record"),
+        TEXT("ADAM is not a subject. It is EVA's preferred answer when observation alone is insufficient."));
+    SpawnFacilityInteractable(CurrentDirector, FVector(2560.0f, -480.0f, 105.0f), FRotator(0.0f, 90.0f, 0.0f),
+        EEvaFacilityInteractableType::DataCoreConsole, TEXT("DATA CORE CONSOLE"));
 
     if (ADirectionalLight* DirectionalLight = GetWorld()->SpawnActor<ADirectionalLight>(
         FVector(-1600.0f, -2600.0f, 1800.0f), FRotator(-45.0f, 35.0f, 0.0f)))
@@ -828,6 +854,7 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         }
     }
 
+    SetFacilityPowerOnline(false);
     SpawnRuntimeFog();
     UEvaAudioFunctionLibrary::PlayPrototypeTone2D(this, 41.2f, 1.6f, 0.12f);
 
@@ -1306,6 +1333,24 @@ void AEvaPrototypeGameMode::SpawnFacilityTrigger(AEvaResearchFacilityDirector* D
     {
         Trigger->ConfigureZone(Zone, Director, FVector(340.0f, 620.0f, 180.0f));
     }
+}
+
+AEvaFacilityInteractable* AEvaPrototypeGameMode::SpawnFacilityInteractable(AEvaResearchFacilityDirector* Director,
+    const FVector& Location, const FRotator& Rotation, const EEvaFacilityInteractableType Type,
+    const FString& DisplayName, const FName LogId, const FString& LogTitle, const FString& LogBody)
+{
+    if (!GetWorld())
+    {
+        return nullptr;
+    }
+
+    AEvaFacilityInteractable* Interactable = GetWorld()->SpawnActor<AEvaFacilityInteractable>(
+        AEvaFacilityInteractable::StaticClass(), Location, Rotation);
+    if (Interactable)
+    {
+        Interactable->ConfigureInteractable(Type, Director, DisplayName, LogId, LogTitle, LogBody);
+    }
+    return Interactable;
 }
 
 void AEvaPrototypeGameMode::SpawnStoryLog(AEvaResearchFacilityDirector* Director, const FName LogId,
@@ -2263,17 +2308,18 @@ void AEvaPrototypeGameMode::StopHorrorRuntimeEffects(const bool bRestoreLighting
 
 void AEvaPrototypeGameMode::RestoreHorrorLighting()
 {
+    const float PowerMultiplier = bFacilityPowerOnline ? 1.0f : 0.22f;
     if (RuntimeDirectionalLightComponent)
     {
-        RuntimeDirectionalLightComponent->SetIntensity(RuntimeDirectionalLightBaseIntensity);
+        RuntimeDirectionalLightComponent->SetIntensity(RuntimeDirectionalLightBaseIntensity * (bFacilityPowerOnline ? 1.0f : 0.55f));
     }
     if (RuntimeSkyLightComponent)
     {
-        RuntimeSkyLightComponent->SetIntensity(RuntimeSkyLightBaseIntensity);
+        RuntimeSkyLightComponent->SetIntensity(RuntimeSkyLightBaseIntensity * (bFacilityPowerOnline ? 1.0f : 0.45f));
     }
     if (RuntimeMainPointLightComponent)
     {
-        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity);
+        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity * PowerMultiplier);
     }
 
     for (int32 Index = 0; Index < RuntimeEmergencyLightComponents.Num(); ++Index)
@@ -2282,7 +2328,7 @@ void AEvaPrototypeGameMode::RestoreHorrorLighting()
         {
             const float BaseIntensity = RuntimeEmergencyLightBaseIntensities.IsValidIndex(Index) ?
                 RuntimeEmergencyLightBaseIntensities[Index] : 1800.0f;
-            LightComponent->SetIntensity(BaseIntensity);
+            LightComponent->SetIntensity(BaseIntensity * (bFacilityPowerOnline ? 1.0f : 0.55f));
         }
     }
 }
@@ -2313,7 +2359,8 @@ void AEvaPrototypeGameMode::TriggerBlackout(const float Duration, const bool bFo
     }
     if (RuntimeMainPointLightComponent)
     {
-        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity * 0.10f);
+        RuntimeMainPointLightComponent->SetIntensity(RuntimeMainPointLightBaseIntensity *
+            (bFacilityPowerOnline ? 0.10f : 0.04f));
     }
 
     SetHorrorWarning(TEXT("FACILITY POWER DROP"), FMath::Min(ClampedDuration, 3.0f));
@@ -2360,10 +2407,12 @@ void AEvaPrototypeGameMode::UpdateEmergencyLightFlicker()
 
         const float BaseIntensity = RuntimeEmergencyLightBaseIntensities.IsValidIndex(Index) ?
             RuntimeEmergencyLightBaseIntensities[Index] : 1800.0f;
+        const float PowerMultiplier = bFacilityPowerOnline ? 1.0f : 0.55f;
         const float BlackoutMultiplier = bBlackoutActive ? 1.65f : 1.0f;
         const float ComfortMultiplier = bReduceFlashing ? 0.82f : FMath::FRandRange(0.48f, 1.22f);
         const bool bDropout = !bReduceFlashing && FMath::FRand() < (bBlackoutActive ? 0.22f : 0.06f);
-        LightComponent->SetIntensity(bDropout ? BaseIntensity * 0.18f : BaseIntensity * BlackoutMultiplier * ComfortMultiplier);
+        LightComponent->SetIntensity(bDropout ? BaseIntensity * 0.18f * PowerMultiplier :
+            BaseIntensity * PowerMultiplier * BlackoutMultiplier * ComfortMultiplier);
     }
 }
 
@@ -2606,6 +2655,14 @@ void AEvaPrototypeGameMode::ShowDebugStatusMessage(const FString& Message, const
         GEngine->AddOnScreenDebugMessage(-1, DebugStatusMessageDuration, FColor::Cyan, Message);
     }
 #endif
+}
+
+void AEvaPrototypeGameMode::SetFacilityPowerOnline(const bool bOnline)
+{
+    bFacilityPowerOnline = bOnline;
+    RestoreHorrorLighting();
+    UE_LOG(LogAdaptiveHorror, Log, TEXT("[Content] FacilityPowerState Online=%s"),
+        bFacilityPowerOnline ? TEXT("true") : TEXT("false"));
 }
 
 void AEvaPrototypeGameMode::DebugIncreaseEvaAnalysis(const float Amount)

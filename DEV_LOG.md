@@ -1,5 +1,107 @@
 # Development Log
 
+## 2026-07-14 - Cycle 021: Content Pass 1 Research Facility Progression
+
+Branch: `feature/content-pass1`
+
+### Scope
+
+- Added a lightweight exploration/progression layer to the existing Runtime Graybox research facility.
+- Did not add new maps, weapons, enemies, AI balance changes, NavMesh rewrites, ADAM behavior changes, HUNTER behavior changes, Stage Clear changes, horror presentation changes, or UI flow rewrites.
+
+### Implemented
+
+- Objective progression:
+  - Added explicit objective index/state in `AEvaResearchFacilityDirector`.
+  - Objective chain: Restore Facility Power -> Find Security Keycard -> Unlock Observation Lab -> Search Containment Records -> Access Data Core -> Reach Adam Arena -> Defeat Adam.
+  - Objective advances only forward, rejects duplicate/late updates, stops after Stage Clear, resets on New Game / Return to Title, and persists during Retry.
+- Interaction:
+  - Added `AEvaFacilityInteractable` for Runtime Graybox content interactables.
+  - Added E-key camera trace interaction to `AEvaPlayerCharacter`.
+  - Trace is distance-limited, uses the first Visibility hit, and does not interact through blocking geometry.
+  - Added prompts for Keycard, locked door, power console, research logs, and Data Core console.
+- Content objects:
+  - Security Keycard in Security Corridor.
+  - Observation Lab locked door.
+  - Power Console in Security Corridor.
+  - Three E-key Research Logs: EVA Learning Notes, HUNTER Containment Report, Adam Experiment Record.
+  - Data Core Console.
+- Progression gates:
+  - Observation Lab requires door unlock.
+  - Containment Ward requires at least one research log.
+  - Adam Arena requires Data Core access.
+  - F4 ADAM debug path remains available because it directly starts the encounter after warp.
+- HUD:
+  - Normal HUD now shows Current Objective plus compact progress: Logs, Keycard, Power.
+  - HUD shows E-key interaction prompt near the crosshair.
+  - Research log reading displays a short overlay and blocks movement/shooting until E closes it.
+  - Debug HUD page 3 now shows Objective Index, Power, Keycard, Door, Logs, Data Core, and Arena state.
+- Lighting:
+  - Facility power state is separate from blackout state.
+  - Power OFF keeps facility lighting dim.
+  - Power restoration brings lighting back without breaking blackout restore.
+- Automation:
+  - Added Content Pass tests for objective duplicate prevention, keycard duplicate prevention, door rejection/opening, power one-shot behavior, log first-read counting/reread, Data Core unlock, Stage Clear update block, New Game reset, and interactable prompt changes.
+
+### Changed files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+- `BUILD_CHECK.md`
+- `README.md`
+
+### Verification
+
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunBuildCheck.ps1`
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Latest automation backup log confirmed 40 successful project tests and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- Runtime smoke:
+  - `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code 0.
+  - Latest runtime smoke log confirmed Content startup logs:
+    - `[Content] ObjectiveStart Index=0 Objective=Restore Facility Power`
+    - `[Content] FacilityPowerState Online=false`
+    - `[Content] ProgressReset ObjectiveIndex=0`
+  - Latest runtime smoke log showed no project Fatal / Ensure / Assertion.
+- Content progression event logs were verified through Automation logs:
+  - Power restored.
+  - Keycard acquired.
+  - Door unlocked.
+  - Research log read/re-read.
+  - Data Core complete.
+  - Arena unlocked.
+- Include/build safety:
+  - Added includes for `World/EvaFacilityInteractable.h` and `World/EvaResearchFacilityDirector.h` where required.
+  - Live Coding-free Development Editor build confirmed no compile errors.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- PIE visual confirmation of actual E-key trace feel.
+- PIE confirmation that the door blocks/opens with comfortable spacing for player and enemies.
+- PIE confirmation that logs can be read/closed during combat without input confusion.
+- PIE one-lap confirmation from Entry Lobby to Adam Arena using only player interaction.
+
+### Known risks / follow-up
+
+- Runtime smoke starts and exits without manual gameplay, so full Content Pass flow remains PIE work.
+- Door/NavMesh behavior should be watched in PIE; the door disables collision after opening and should not permanently split NavMesh, but visual confirmation is still required.
+- The normal Runtime smoke log only confirms startup content state; full Power/Keycard/Door/Log/DataCore event logs are currently verified by Automation.
+
 ## 2026-07-14 - Cycle 020: Enemy Intent Display Consistency Fix
 
 Branch: `feature/gameplay-pass1`

@@ -1,5 +1,29 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 021 status - Content Pass 1 Research Facility Progression
+
+- [x] Created `feature/content-pass1` from latest `main`.
+- [x] Added explicit objective chain: Restore Facility Power -> Find Security Keycard -> Unlock Observation Lab -> Search Containment Records -> Access Data Core -> Reach Adam Arena -> Defeat Adam.
+- [x] Added E-key interaction for power console, security keycard, locked door, research logs, and Data Core console.
+- [x] Added HUD objective progress, interaction prompt, research log overlay, and Debug HUD content-state readout.
+- [x] Added progression gates for Observation Lab, Containment Ward, and Adam Arena.
+- [x] Kept F4 ADAM debug path available without changing ADAM combat behavior.
+- [x] Kept existing Title / New Game / Pause / Settings / Game Over / Stage Clear, Runtime NavMesh, Zombie, HUNTER, ADAM, Boss HUD, Horror, Visual / Audio, and Gameplay Pass systems intact.
+- [x] Added Automation coverage for Content Pass objective progression and interactable prompt/state changes.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 40 project tests, exit code 0.
+- [x] Runtime smoke succeeded with exit code 0.
+
+### Next TODO
+
+- [ ] PIE-verify one full content lap from Entry Lobby to Adam Arena with E-key interactions only.
+- [ ] PIE-verify the Observation Lab door blocks before keycard/power and opens cleanly after unlock.
+- [ ] PIE-verify research log open/close input does not confuse combat input.
+- [ ] PIE-verify Data Core access unlocks Adam Arena and objective text updates clearly.
+- [ ] PIE-verify Runtime Graybox traversal remains comfortable for player and enemies after the locked door opens.
+- [ ] PIE-verify F4 ADAM debug start still starts ADAM encounter and does not require content gates.
+- [ ] Add final UI polish for objective prompt readability only after PIE confirms the interaction flow.
+
 ## Cycle 020 status - Enemy Intent Display Consistency
 
 - [x] Fixed blank/unsynced overhead Intent for existing enemies when Debug HUD is toggled ON.

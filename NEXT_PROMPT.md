@@ -1,5 +1,105 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-14 Cycle 021 Content Pass 1 Research Facility Progression
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/content-pass1`.
+
+Do not merge this branch into `main` until the user confirms Content Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 40 project tests succeeded, 0 project test failures.
+- Runtime smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime smoke confirmed startup content state logs only.
+- Full content event flow is covered by Automation, not by Codex PIE viewport confirmation.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent implementation
+
+- Added explicit objective progression:
+  1. Restore Facility Power.
+  2. Find Security Keycard.
+  3. Unlock Observation Lab.
+  4. Search Containment Records.
+  5. Access Data Core.
+  6. Reach Adam Arena.
+  7. Defeat Adam.
+- Added E-key interaction through `AEvaFacilityInteractable` for:
+  - Power Console.
+  - Security Keycard.
+  - Observation Lab locked door.
+  - Research Logs.
+  - Data Core Console.
+- Added content-state management in `AEvaResearchFacilityDirector`:
+  - Objective index.
+  - Facility power.
+  - Keycard.
+  - Observation door.
+  - Research log count/open state.
+  - Data Core access.
+  - Adam Arena unlock.
+- Added progression gates:
+  - Observation Lab requires the door to be opened.
+  - Containment Ward requires at least one research log.
+  - Adam Arena requires Data Core access.
+- HUD now displays:
+  - Current Objective.
+  - Compact objective progress.
+  - E-key interaction prompt.
+  - Research log overlay.
+  - Debug HUD page 3 content state.
+- Facility power now affects runtime lighting separately from blackout state.
+
+### Next highest-priority task
+
+Run PIE and verify only the Content Pass 1 flow. Do not add new enemies, weapons, maps, AI behavior, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game from the stable UI flow.
+2. Confirm the objective starts at `Restore Facility Power`.
+3. Press E on the Power Console and confirm lighting/objective update.
+4. Pick up the Security Keycard with E.
+5. Confirm the Observation Lab door prompt changes from blocked/required to unlock/open.
+6. Unlock/open the Observation Lab door and confirm it does not trap the player or enemies.
+7. Read at least one Research Log and close it with E.
+8. Confirm movement/shooting are blocked while the log is open, then restored after closing.
+9. Reach Containment Ward only after the log gate is satisfied.
+10. Access the Data Core Console and confirm Adam Arena unlock/objective update.
+11. Reach Adam Arena and confirm Adam encounter still starts.
+12. Defeat Adam and confirm Stage Clear still works.
+13. Confirm F4 ADAM debug start still works independently of content gates.
+14. Confirm Pause, Retry, Game Over, and Return to Title do not leave research log/input/prompt state stuck.
+
+If a problem is found:
+
+- Fix only Content Pass 1 interaction/progression/HUD issues.
+- Preserve Runtime NavMesh, Zombie/HUNTER/ADAM behavior, Stage Clear, Player Death, Title/Pause/Settings/Game Over, Visual/Audio/Horror presentation, Gameplay Pass adaptation, and Boss HUD.
+
+### Important files
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.h`
+- `Source/AdaptiveHorror/Characters/EvaPlayerCharacter.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+
+### Completion condition for next pass
+
+- User confirms the E-key content progression can be completed in PIE.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 020 Enemy Intent Display Consistency
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

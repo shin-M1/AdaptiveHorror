@@ -10,6 +10,7 @@
 class AEvaPlayerCharacter;
 class AEvaHunterCharacter;
 class AEvaAdamBossCharacter;
+class AEvaFacilityInteractable;
 class AEvaResearchFacilityDirector;
 class AEvaZombieCharacter;
 class UDirectionalLightComponent;
@@ -18,6 +19,7 @@ class UPrimitiveComponent;
 class UPointLightComponent;
 class USkyLightComponent;
 class UStaticMesh;
+enum class EEvaFacilityInteractableType : uint8;
 
 UCLASS(Blueprintable)
 class ADAPTIVEHORROR_API AEvaPrototypeGameMode : public AGameModeBase
@@ -86,6 +88,12 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     AEvaResearchFacilityDirector* GetResearchDirector() const { return CurrentDirector; }
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    void SetFacilityPowerOnline(bool bOnline);
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsFacilityPowerOnlineForDebug() const { return bFacilityPowerOnline; }
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Debug")
     void DebugIncreaseEvaAnalysis(float Amount = 20.0f);
@@ -255,6 +263,10 @@ private:
     void LogRuntimeClassBindings() const;
     void StartCombatSpawningAfterNavigationReady();
     void SpawnFacilityTrigger(AEvaResearchFacilityDirector* Director, EEvaFacilityZone Zone, const FVector& Location);
+    AEvaFacilityInteractable* SpawnFacilityInteractable(AEvaResearchFacilityDirector* Director,
+        const FVector& Location, const FRotator& Rotation, EEvaFacilityInteractableType Type,
+        const FString& DisplayName, FName LogId = NAME_None, const FString& LogTitle = TEXT(""),
+        const FString& LogBody = TEXT(""));
     void SpawnStoryLog(AEvaResearchFacilityDirector* Director, FName LogId, const FString& Title,
         const FString& Body, const FVector& Location);
     void ResetEnemyTargets();
@@ -362,6 +374,7 @@ private:
     float RuntimeDirectionalLightBaseIntensity = 1.35f;
     float RuntimeSkyLightBaseIntensity = 0.28f;
     float RuntimeMainPointLightBaseIntensity = 4200.0f;
+    bool bFacilityPowerOnline = false;
     float AdaptationProfileUpdateInterval = 4.0f;
     FTimerHandle EmergencyLightFlickerTimer;
     FTimerHandle BlackoutTimer;

@@ -6,6 +6,7 @@
 #include "EvaResearchFacilityDirector.generated.h"
 
 class AEvaAdamBossCharacter;
+class AEvaFacilityInteractable;
 class AEvaHunterCharacter;
 class AEvaZombieCharacter;
 class AEvaAmmoPickup;
@@ -24,6 +25,24 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
     void NotifyStoryLogCollected(FName LogId, const FString& Title, const FString& Body);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    bool TryRestoreFacilityPower();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    bool TryAcquireSecurityKeycard();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    bool TryOpenObservationDoor();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    bool TryReadResearchLog(FName LogId, const FString& Title, const FString& Body);
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    bool TryAccessDataCore();
+
+    UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
+    void CloseResearchLog();
 
     UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
     void NotifyAdamDefeated(AEvaAdamBossCharacter* Adam);
@@ -47,6 +66,12 @@ public:
     FString GetObjectiveText() const { return CurrentObjective; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    int32 GetObjectiveIndex() const { return ObjectiveIndex; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    FString GetObjectiveProgressText() const;
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     int32 GetCollectedStoryLogCount() const { return CollectedStoryLogs.Num(); }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
@@ -60,6 +85,24 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     bool IsAdamEncounterActive() const { return bAdamEncounterActive; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsFacilityPowerOnline() const { return bFacilityPowerOnline; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool HasSecurityKeycard() const { return bSecurityKeycardAcquired; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsObservationDoorOpen() const { return bObservationDoorOpen; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsDataCoreAccessed() const { return bDataCoreAccessed; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsAdamArenaUnlocked() const { return bAdamArenaUnlocked; }
+
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    bool IsResearchLogOpen() const { return bResearchLogOpen; }
 
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     bool IsEvolutionUnlocked() const { return bEvolutionUnlocked; }
@@ -105,7 +148,10 @@ private:
     AEvaZombieCharacter* SpawnZombieAt(const FVector& Location, EEvaEvolutionType EvolutionType = EEvaEvolutionType::None,
         const FString& SpawnReason = TEXT("ZoneEncounter"));
     void SpawnSupportPickupsForZone(EEvaFacilityZone Zone);
-    void SetObjectiveForZone(EEvaFacilityZone Zone);
+    void SetObjectiveFromIndex();
+    bool AdvanceObjectiveTo(int32 NewObjectiveIndex, const FString& Reason);
+    bool IsZoneEntryAllowed(EEvaFacilityZone NewZone, FString& OutReason) const;
+    void RefreshFacilityInteractables() const;
     AEvaAdamBossCharacter* FindExistingLivingAdam() const;
     int32 CountExistingLivingAdam() const;
     void LogAdamEncounterState(const FString& Context, bool bSpawnAttempted, AEvaAdamBossCharacter* SpawnResult,
@@ -115,7 +161,28 @@ private:
     EEvaFacilityZone CurrentZone = EEvaFacilityZone::EntryLobby;
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    int32 ObjectiveIndex = 0;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
     bool bEvaLogAcquired = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bFacilityPowerOnline = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bSecurityKeycardAcquired = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bObservationDoorOpen = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bDataCoreAccessed = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bAdamArenaUnlocked = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
+    bool bResearchLogOpen = false;
 
     UPROPERTY(VisibleAnywhere, Category = "EVA|Facility")
     bool bHunterEventTriggered = false;
