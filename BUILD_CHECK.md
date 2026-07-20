@@ -1,5 +1,53 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 024 execution result - Autonomous Development Kit
+
+Date: 2026-07-21 JST
+
+Branch: `chore/autonomous-development-kit`
+
+Commit: recorded in final completion report after commit creation.
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Document reference existence check: PASS.
+- Static source sanity: PASS.
+- Tool discovery:
+  - `UnrealEditor.exe`: found under `C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
+  - `UnrealBuildTool.exe`: found.
+  - `MSBuild.exe`: found.
+  - `cl.exe`: found.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests.
+- Automation backup log:
+  - `Saved\Logs\AdaptiveHorror-backup-2026.07.20-20.35.15.log`
+- Runtime Smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+```
+
+- Runtime Smoke exit code: 0.
+- Log scan: PASS.
+  - No current-run blocking `Fatal error`, ensure failure, assertion failure, `EXCEPTION`, stack overflow, access violation, `NavReady=false`, or automation failure pattern.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+Notes:
+
+- New script: `Scripts/RunCodexValidation.ps1`.
+- `RunCodexValidation.ps1` wraps the existing `RunBuildCheck.ps1` rather than duplicating build/automation logic.
+- The log scan intentionally avoids false-positive matches for normal context strings such as `AfterEnsurePrototypePlayer`.
+- PIE visual/feel validation was not performed by Codex.
+- UE5.8 command output still reports non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 build/automation succeeded.
+
 ## Cycle 023 execution result - Content Interactable Visibility and Pickup Fix
 
 Date: 2026-07-14

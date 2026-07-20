@@ -1,5 +1,31 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 024 status - Autonomous Development Kit
+
+- [x] Created `chore/autonomous-development-kit` from latest clean `main`.
+- [x] Added `AGENTS.md` with Codex source-of-truth order, work rules, autonomous fix loop, stop conditions, Git rules, and final report format.
+- [x] Added `REQUIREMENTS.md` with current product requirements and `Implemented` / `Partial` / `Planned` / `TBD` status labels.
+- [x] Added `ROADMAP.md` with Completed / In progress / Planned / Blocked / Deferred milestones.
+- [x] Added `TEST_PLAN.md` with real build, automation, runtime smoke, log scan, diff check, and status commands.
+- [x] Added `TASKS/field-pass-1.md` as the next executable autonomous task spec.
+- [x] Added `Scripts/RunCodexValidation.ps1` to run build/automation, runtime smoke, log scan, `git diff --check`, and `git status`.
+- [x] Updated `README.md` with the reusable short launch prompt and document role map.
+- [x] Preserved `GAME_DESIGN.md` and `TECH_SPEC.md` as historical/detail references instead of duplicating or deleting them.
+- [x] Ran `Scripts/RunCodexValidation.ps1 -MaxParallelActions 4` successfully.
+
+### Next TODO
+
+- [ ] Use `TASKS/field-pass-1.md` once to validate the autonomous workflow in a real implementation pass.
+- [ ] Human PIE-verify Content Pass 1 Keycard / Research Log visibility and pickup feel after the latest `main` merge.
+- [ ] Human PIE-verify Field Pass 1 visual/readability criteria after that task is implemented.
+- [ ] Fill `REQUIREMENTS.md` TBDs only when confirmed by code, assets, or user decision:
+  - final packaged performance target,
+  - final art/audio plan,
+  - full save data format,
+  - gamepad support,
+  - final 30-60 minute balancing numbers.
+- [ ] If `RunCodexValidation.ps1` produces false-positive log-scan results in future tasks, refine patterns in `TEST_PLAN.md` and the script together.
+
 ## Cycle 023 status - Content Interactable Visibility and Pickup Fix
 
 - [x] Continued on `feature/content-pass1`.

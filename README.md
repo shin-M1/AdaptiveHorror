@@ -1,5 +1,46 @@
 # Adaptive Horror FPS Demo
 
+## Autonomous development workflow
+
+For future Codex work, start with:
+
+```text
+feature/field-pass1としてTASKS/field-pass-1.mdを実装してください。
+
+最初にAGENTS.mdを読み、
+REQUIREMENTS.md、TEST_PLAN.md、ROADMAP.mdの関連箇所を確認してください。
+
+自動検証可能な受け入れ条件を満たすまで、
+実装、Build、Automation、Runtime Smoke、ログ確認、原因修正を繰り返してください。
+
+条件を満たした場合のみcommitし、
+origin/feature/field-pass1へpushしてください。
+
+人間のPIE確認が必要な項目は成功扱いにせず、
+最終報告へPIE未確認として残してください。
+
+途中報告や質問は、作業継続不能な場合を除いて不要です。
+```
+
+Current source-of-truth document roles:
+
+- `AGENTS.md`: persistent Codex rules, Git rules, autonomous fix loop, final report format.
+- `REQUIREMENTS.md`: product requirements and status labels (`Implemented`, `Partial`, `Planned`, `TBD`).
+- `ROADMAP.md`: milestone order.
+- `TEST_PLAN.md`: real build/automation/runtime smoke/log-scan commands.
+- `TASKS/field-pass-1.md`: next executable task specification.
+- `DEV_LOG.md`: development history.
+- `TODO.md`: open work and manual verification.
+- `BUILD_CHECK.md`: recorded verification results and troubleshooting.
+
+Recommended one-command validation:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+`GAME_DESIGN.md` and `TECH_SPEC.md` remain historical/detail references. New work should avoid duplicating their content and should update the source-of-truth files above when requirements, roadmap, or verification rules change.
+
 ## Content Pass 1 progression controls - Cycle 021
 
 Current branch: `feature/content-pass1`.

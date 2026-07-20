@@ -1,5 +1,78 @@
 # Development Log
 
+## 2026-07-21 - Cycle 024: Autonomous Development Kit
+
+Branch: `chore/autonomous-development-kit`
+
+### Scope
+
+- Added repository-specific autonomous development workflow documents and validation tooling.
+- Did not change gameplay code, AI behavior, map generation, combat, UI runtime behavior, HUNTER, ADAM, Stage Clear, Player Death, or Content Pass logic.
+- Started from clean `main`, pulled latest main with fast-forward only, and created `chore/autonomous-development-kit`.
+
+### Investigated facts
+
+- Current `main` includes Content Pass 1 through commit history ending at `018c391 Merge branch 'feature/content-pass1'`.
+- Current project target is `AdaptiveHorrorEditor` / Win64 / Development with UE5.8-compatible target settings (`BuildSettingsVersion.V7`, latest include order).
+- Current module is a single runtime module `AdaptiveHorror` with dependencies including Enhanced Input, AIModule, NavigationSystem, GameplayTasks, GameplayTags, UMG, Slate, and SlateCore.
+- `Scripts/RunBuildCheck.ps1` is the existing build/automation entrypoint.
+- Runtime Smoke has been repeatedly verified with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`.
+- Current Automation count remains 43 tests.
+- PIE visual/feel verification remains human-only and must not be marked as passed by Codex.
+
+### Created / organized
+
+- `AGENTS.md`
+  - Persistent Codex rules, source-of-truth order, autonomous fix loop, Git rules, stopping conditions, final report format, and standard short launch prompt.
+- `REQUIREMENTS.md`
+  - Product requirements with explicit `Implemented`, `Partial`, `Planned`, and `TBD` status labels.
+- `ROADMAP.md`
+  - Completed/current/planned/blocked/deferred milestone order.
+- `TEST_PLAN.md`
+  - Real commands, success conditions, logs, timeout guides, and manual PIE boundary.
+- `TASKS/field-pass-1.md`
+  - Next executable task with scope, constraints, acceptance criteria, automated verification, human PIE verification, and regression requirements.
+- `Scripts/RunCodexValidation.ps1`
+  - Wrapper around existing `RunBuildCheck.ps1` plus Runtime Smoke, log scan, `git diff --check`, and `git status`.
+- `README.md`
+  - Added current document roles and the reusable short launch prompt.
+
+### Document integration
+
+- Existing `GAME_DESIGN.md` and `TECH_SPEC.md` were kept as historical/detail references, not deleted or duplicated.
+- New source-of-truth split:
+  - Requirements: `REQUIREMENTS.md`
+  - Codex rules: `AGENTS.md`
+  - Testing: `TEST_PLAN.md`
+  - Roadmap: `ROADMAP.md`
+  - Executable current task: `TASKS/field-pass-1.md`
+  - History/open work/results: `DEV_LOG.md`, `TODO.md`, `BUILD_CHECK.md`
+
+### Verification
+
+- Document reference existence check: PASS.
+- `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`: PASS.
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: Succeeded.
+  - Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.20-20.35.15.log`
+  - Automation count: 43 tests.
+  - Runtime Smoke: exit code 0.
+  - Runtime log scan: PASS; no blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / Automation failure patterns.
+  - `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+### Not verified by Codex
+
+- Human PIE checks for visual readability, interaction feel, horror/audio feel, and full New Game to Stage Clear playthrough.
+- Whether Field Pass 1 task wording is sufficient for the next autonomous implementation until it is used once in practice.
+
+### Known issues / TBD
+
+- `REQUIREMENTS.md` intentionally leaves final packaged performance target, final art/audio plan, full save data, and gamepad support as TBD.
+- Runtime Smoke cannot replace PIE visual confirmation.
+- UE5.8 command output still reports non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 build/automation succeeded.
+
 ## 2026-07-14 - Cycle 023: Content Interactable Visibility and Pickup Fix
 
 Branch: `feature/content-pass1`
