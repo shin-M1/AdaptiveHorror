@@ -163,7 +163,27 @@ Success conditions at handoff:
 - Clean working tree after commit.
 - Branch pushed to origin when the task requires it.
 
-## 7. One-command Codex validation
+## 7. Markdown/document validation
+
+Use this for documentation-only tasks when the task does not require a full UE build.
+
+Commands:
+
+```powershell
+git diff --check
+git diff --name-only
+```
+
+Minimum checks:
+
+- No whitespace errors from `git diff --check`.
+- No game source/config files changed when the task is documentation-only.
+- Markdown fenced code blocks are balanced in edited `.md` files.
+- No leftover citation artifact markers from copied assistant output.
+
+If a dedicated Markdown linter is introduced later, record the real command here before requiring it in tasks.
+
+## 8. One-command Codex validation
 
 Command:
 
@@ -193,7 +213,7 @@ Success conditions:
 - Script exit code 0.
 - Any skipped item is reported as skipped, not passed.
 
-## 8. Human PIE verification
+## 9. Human PIE verification
 
 Human-only checks include:
 

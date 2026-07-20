@@ -6,7 +6,9 @@ This file tracks development order only. Put product requirements in `REQUIREMEN
 
 ### Field Pass 1
 
-Status: Planned / next implementation candidate.
+Status: Planned.
+
+Next implementation candidate: yes.
 
 Goal: turn the runtime research facility from a functional graybox into a readable playable field pass without adding new major systems. See `TASKS/field-pass-1.md`.
 
@@ -38,7 +40,8 @@ Goal: turn the runtime research facility from a functional graybox into a readab
 - Content Pass 1 PIE confirmation
   - Human validation still required for interactable visibility/feel and full content flow after latest fixes.
 - Autonomous workflow hardening
-  - First use of `TASKS/field-pass-1.md` should validate that the workflow is sufficient.
+  - Documentation review pass is in progress on `chore/autonomous-development-review`.
+  - First real implementation use of `TASKS/field-pass-1.md` should validate that the workflow is sufficient.
 
 ## Planned
 

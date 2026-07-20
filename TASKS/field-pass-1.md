@@ -1,40 +1,51 @@
 # TASKS/field-pass-1.md — Field Pass 1
 
+## Branch
+
+- Start point: latest clean `main`.
+- Branch: `feature/field-pass1`.
+- Push target: `origin/feature/field-pass1`.
+- Do not merge to `main`.
+
 ## Goal
 
-Make the existing runtime research facility easier to read and play as a field, without adding new major game systems. The result should be a completion candidate that Codex can build, test, runtime-smoke, log-scan, commit, and push to `feature/field-pass1`.
+Make the existing runtime research facility easier to read and play as a field, without adding new major game systems. The result should be a completion candidate that Codex can build, test, runtime-smoke, log-scan, commit, and push.
 
 ## Background
 
-The current `main` contains the core game loop, Runtime Graybox, Content Pass 1 progression, Gameplay Pass 1 adaptation, Visual Pass 1, Horror Immersion Pass, HUNTER, ADAM, UI flow, and 43 Automation tests. Content Pass interactables were recently fixed so Keycard and Research Logs have visible bodies and interaction collision, but human PIE confirmation remains required.
+Current `main` contains the core game loop, Runtime Graybox, Content Pass 1 progression, Gameplay Pass 1 adaptation, Visual Pass 1, Horror Immersion Pass, HUNTER, ADAM, UI flow, and 43 Automation tests. Content Pass interactables have visible bodies and interaction collision, but human PIE confirmation remains required.
 
-## In scope
+## Scope
+
+### In scope
 
 - Improve readability of the six existing runtime zones:
-  - Entry Lobby
-  - Security Corridor
-  - Observation Lab
-  - Containment Ward
-  - Data Core Room
-  - Adam Arena
+  - Entry Lobby.
+  - Security Corridor.
+  - Observation Lab.
+  - Containment Ward.
+  - Data Core Room.
+  - Adam Arena.
 - Add or adjust lightweight graybox dressing using engine standard primitives/components only.
 - Add simple landmarks, signs, floor markings, lighting color accents, or non-blocking guide geometry.
-- Keep interactables visible and reachable:
-  - Power Console
-  - Security Keycard
-  - Locked Door
-  - Research Logs
-  - Data Core Console
-- Keep route from New Game to Adam Arena readable.
+- Keep required interactables visible and reachable:
+  - Power Console.
+  - Security Keycard.
+  - Locked Observation Lab Door.
+  - `EVA LEARNING NOTES`.
+  - `HUNTER CONTAINMENT REPORT`.
+  - `ADAM EXPERIMENT RECORD`.
+  - Data Core Console.
+- Keep the route from New Game to Adam Arena readable.
 - Improve debug/log coverage for generated field structure if needed.
 - Add or update Automation for structural checks where practical.
-- Update docs with verified and unverified items.
+- Update required documents with verified and unverified items.
 
-## Out of scope
+### Out of scope
 
 - New weapons.
 - New enemy classes.
-- New maps.
+- New maps or saved `.umap` conversion.
 - New combat rules.
 - New AI behavior or NavMesh algorithm changes.
 - HUNTER or ADAM behavior changes.
@@ -45,43 +56,80 @@ The current `main` contains the core game loop, Runtime Graybox, Content Pass 1 
 
 ## Dependencies
 
-- `AGENTS.md`
-- `REQUIREMENTS.md`
-- `TEST_PLAN.md`
-- `ROADMAP.md`
+- `AGENTS.md`.
+- `REQUIREMENTS.md`.
+- `ROADMAP.md`.
+- `TEST_PLAN.md`.
 - Existing runtime facility generation in `AEvaPrototypeGameMode`.
 - Existing content progression in `AEvaResearchFacilityDirector` and `AEvaFacilityInteractable`.
 
-## Relevant files
+## File scope
 
-- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
-- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
-- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`
-- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`
-- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`
-- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`
-- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
-- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
-- `Config/DefaultEngine.ini`
-- `Scripts/RunBuildCheck.ps1`
-- `Scripts/RunCodexValidation.ps1`
-- `DEV_LOG.md`
-- `TODO.md`
-- `BUILD_CHECK.md`
-- `NEXT_PROMPT.md`
+### Primary files
 
-## Constraints
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`.
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`.
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.h`.
+- `Source/AdaptiveHorror/World/EvaResearchFacilityDirector.cpp`.
 
-- Start from latest `main`.
-- Create `feature/field-pass1`.
-- Do not edit `main` directly.
-- Do not rebase/cherry-pick/rewrite history.
-- Keep changes minimal and field-readability focused.
-- Do not break current 43 Automation tests.
-- Do not claim PIE visual success unless the user provides PIE results.
-- Runtime Smoke is not a substitute for human visual confirmation.
+### Secondary files
 
-## Acceptance criteria — automated
+Modify only if directly required by the chosen implementation:
+
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.h`.
+- `Source/AdaptiveHorror/World/EvaFacilityInteractable.cpp`.
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`.
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`.
+- `Config/DefaultEngine.ini`.
+- `DEV_LOG.md`.
+- `TODO.md`.
+- `BUILD_CHECK.md`.
+- `NEXT_PROMPT.md`.
+
+### Protected systems
+
+Do not modify unless required to fix a demonstrated regression:
+
+- Player combat and weapons.
+- EVA Learning/adaptation math.
+- Zombie AI behavior.
+- HUNTER behavior.
+- ADAM behavior.
+- Save/settings.
+- Title, Pause, Game Over, and Stage Clear flow.
+- `Scripts/RunBuildCheck.ps1`.
+- `Scripts/RunCodexValidation.ps1`.
+
+## Architectural constraints
+
+- Keep the runtime-generated facility model.
+- Keep Runtime NavMesh behavior intact.
+- Keep the current objective order from `REQUIREMENTS.md`.
+- Preserve ADAM defeat as the Stage Clear trigger.
+- Preserve debug-only controls as non-Shipping features.
+- Do not rely on Live Coding for verification.
+
+## Expected change scope
+
+Expected scale:
+
+- Primary implementation files: 2-6.
+- Test files: 0-2.
+- Documentation files: 2-4.
+- New production classes: 0.
+- New major systems: 0.
+
+Stop and report before continuing if the implementation would exceed any of these limits:
+
+- More than 12 source/config files changed.
+- More than 2 new production files.
+- More than 800 net new production lines.
+- A protected system must be modified.
+- A public interface must be changed across multiple systems.
+
+## Acceptance criteria
+
+### Automated
 
 Codex must verify:
 
@@ -93,16 +141,16 @@ Codex must verify:
 - Runtime facility still creates six zones.
 - Required interactables still exist and are not duplicated.
 - Required interactables remain visible/enabled by component-state logs or Automation:
-  - Power Console
-  - Security Keycard
-  - Locked Door
-  - three Research Logs
-  - Data Core Console
+  - Power Console.
+  - Security Keycard.
+  - Locked Observation Lab Door.
+  - Three Research Logs.
+  - Data Core Console.
 - Runtime NavMesh readiness is not regressed.
 - Spawn safety tests remain green.
 - Stage Clear tests remain green.
 
-## Acceptance criteria — human PIE
+### Human PIE/manual
 
 These are not automatically confirmable by Codex:
 
@@ -116,7 +164,9 @@ These are not automatically confirmable by Codex:
 
 Codex may commit and push a completion candidate if all automated criteria pass. Human PIE criteria must be listed as `Not verified by Codex`. Merge to `main` should wait for human PIE acceptance.
 
-## Automated verification
+## Verification
+
+### Commands
 
 Preferred:
 
@@ -133,6 +183,20 @@ git diff --check
 git status --short --branch
 ```
 
+### Evidence required
+
+For every automated acceptance criterion, the final report must include evidence.
+
+Minimum evidence:
+
+- Build command, exit code, result summary, and relevant log path.
+- Automation command, total tests, passed tests, failed tests, and report/log path.
+- Runtime Smoke command, exit code, runtime duration if available, and log path.
+- Log scan file, blocking patterns checked, and match count.
+- Structural requirement evidence from an Automation test name, runtime log line, or code assertion.
+
+Do not use statements such as `looks correct`, `should work`, or `appears fixed` as verification evidence.
+
 ## Regression requirements
 
 Preserve:
@@ -148,6 +212,36 @@ Preserve:
 - ADAM encounter and Boss HUD.
 - Content Pass progression and interactables.
 - Debug HUD and debug keys.
+
+## Documentation updates
+
+Update only documents needed to record the work:
+
+- `DEV_LOG.md`.
+- `TODO.md`.
+- `BUILD_CHECK.md` if verification results or troubleshooting notes change.
+- `NEXT_PROMPT.md` if the next task changes.
+
+## Commit and push conditions
+
+Commit only when:
+
+- Automated acceptance criteria pass, or any impossible verification is explicitly documented as `Not verified`.
+- No game-code changes outside the task scope remain unexplained.
+- `git diff --check` succeeds.
+- The final `git status --short --branch` is clean after commit.
+
+Push `feature/field-pass1` to origin. Do not merge to `main`.
+
+## Stop conditions
+
+Stop and report instead of guessing when:
+
+- A protected system must change without demonstrated regression evidence.
+- Human PIE confirmation is required to choose the next correction.
+- Toolchain or environment issues prevent required automated verification.
+- Requirements conflict.
+- The autonomous fix loop reaches the limits in `AGENTS.md`.
 
 ## Completion report
 

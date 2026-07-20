@@ -1,5 +1,79 @@
 # Development Log
 
+## 2026-07-21 - Cycle 025: Autonomous Documentation Review
+
+Branch: `chore/autonomous-development-review`
+
+### Scope
+
+- Reviewed and hardened the autonomous development documentation set.
+- Documentation-only change.
+- Did not change gameplay code, AI, navigation, Stage Clear, Game Flow, Player Death, Boss behavior, UI runtime code, build scripts, Automation tests, Runtime Smoke logic, or Unreal configuration.
+
+### Initial Git state
+
+- Required initial checks were run:
+  - `git status --short --branch`
+  - `git branch --show-current`
+  - `git log --oneline -5`
+- Initial branch was `main`.
+- Initial working tree was not clean. Existing uncommitted documentation changes were present in:
+  - `AGENTS.md`
+  - `REQUIREMENTS.md`
+  - `TASKS/field-pass-1.md`
+  - `TASKS/TEMPLATE.md`
+- Because the changes were in the requested documentation scope, `chore/autonomous-development-review` was created before continuing so `main` would not receive direct commits.
+
+### Review result
+
+- `AGENTS.md`
+  - Removed Field Pass file scope and task-specific content.
+  - Removed a broken copied citation artifact.
+  - Removed the standard launch prompt from persistent rules.
+  - Kept only persistent source-of-truth, inspection, stop, fix-loop, Git, and final-report rules.
+- `REQUIREMENTS.md`
+  - Added explicit one-status-label rule.
+  - Replaced compound status usage with single `Partial` labels plus explanatory text.
+  - Kept architectural invariants as product constraints.
+- `TASKS/`
+  - Added a reusable `TASKS/TEMPLATE.md` with Branch, Scope, Acceptance, Verification, Evidence, Commit, Push, Stop, and Completion sections.
+  - Reworked `TASKS/field-pass-1.md` to use `Primary files`, `Secondary files`, `Protected systems`, `Expected change scope`, `Verification evidence`, commit conditions, and stop conditions.
+- `README.md`
+  - Reduced the file to a project entrypoint instead of a mixed history/task log.
+  - Added the current document role map, autonomous launch prompt, quick validation command, debug key list, and manual PIE boundary.
+- `TODO.md`
+  - Reduced to current open work, manual PIE checks, next implementation candidate, product TBDs, and deferred Version 0.1+ items.
+  - Moved completed-history responsibility back to `DEV_LOG.md`.
+- `TEST_PLAN.md`
+  - Added documentation-only validation guidance for Markdown structure, whitespace, source/config exclusion, and stale citation artifacts.
+- `ROADMAP.md`
+  - Split the compound milestone status into `Status: Planned` plus a separate next-candidate marker.
+- `BUILD_CHECK.md`
+  - Added this documentation-review result section and clarified that full UE build evidence remains from Cycle 024 unless a docs-only task requires otherwise.
+
+### Verification
+
+- Markdown fenced-code balance check:
+  - PASS for edited Markdown files.
+- Stale artifact search:
+  - PASS; no remaining matches for compound status/citation leftovers or old task headings.
+- `git diff --check`:
+  - PASS; CRLF conversion warnings only.
+- Game-code/config/script diff exclusion check:
+  - PASS; no `Source/`, `Config/`, `Scripts/`, `Content/`, or `.uproject` diffs.
+- `git status --short --branch`:
+  - Pending final clean check after commit/push.
+
+### Not verified by Codex
+
+- No PIE/manual gameplay checks were run because this task is documentation-only.
+- No Development Editor build, Automation, or Runtime Smoke was run because this task changed documentation only.
+
+### Known issues / TBD
+
+- A real Markdown linter is not yet part of the repository toolchain.
+- `TASKS/field-pass-1.md` still needs to be used in a real implementation pass to validate the autonomous workflow end to end.
+
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
 
 Branch: `chore/autonomous-development-kit`

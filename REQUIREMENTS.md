@@ -9,6 +9,8 @@ Status labels:
 - `Planned`: Desired but not implemented.
 - `TBD`: Unknown; do not invent values.
 
+Each section or item uses exactly one status label. When a feature has an implemented baseline plus remaining work, mark it `Partial` and describe both facts in the body.
+
 ## Product overview
 
 - Status: Partial.
@@ -38,7 +40,7 @@ Status labels:
 
 ## Combat, weapons, HP, death, checkpoints
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Health component: `UEvaHealthComponent`.
 - Weapon base: `AEvaWeaponBase`; handgun hitscan implementation: `AEvaHitscanWeapon`.
 - Current handgun baseline from existing docs/code history: damage 25, headshot x2, magazine 12, reserve 60, reload 1.5s, range 5000 cm.
@@ -49,7 +51,7 @@ Status labels:
 
 ## EVA Learning
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Player telemetry component: `UEvaPlayerTelemetryComponent`.
 - Learning subsystem: `UEvaLearningSubsystem`.
 - Tracked concepts include shot count, hit count, headshot count, weapon use, average combat distance, kills, death cause, escape route, and hide spot.
@@ -61,27 +63,27 @@ Status labels:
 
 ## Enemies and adaptation
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Base zombie: `AEvaZombieCharacter` with `AEvaZombieAIController`.
 - Enemy variants:
   - Zombie: Implemented.
-  - FAST: Implemented/Partial; visual and feel require PIE confirmation.
-  - ARMORED: Implemented/Partial; visual and feel require PIE confirmation.
-  - LONG ARM: Implemented/Partial; visual and feel require PIE confirmation.
-  - COMPOSITE: Implemented/Partial; 80% EVA analysis variant, bounded hybrid behavior.
+  - FAST: Partial; baseline exists, visual and feel require PIE confirmation.
+  - ARMORED: Partial; baseline exists, visual and feel require PIE confirmation.
+  - LONG ARM: Partial; baseline exists, visual and feel require PIE confirmation.
+  - COMPOSITE: Partial; 80% EVA analysis variant with bounded hybrid behavior.
 - HUNTER: `AEvaHunterCharacter` plus `AEvaHunterAIController`.
-  - Status: Implemented/Partial.
+  - Status: Partial.
   - Spawn triggers include kill threshold/time.
   - Defeat drops analysis/core concept and reduces learning multiplier.
   - Reinsertion increases tier and restores multiplier.
 - ADAM boss: `AEvaAdamBossCharacter` plus `AEvaAdamBossAIController`.
-  - Status: Implemented/Partial.
+  - Status: Partial.
   - Has chase, melee attack, charge, roar summon, Phase 2, Boss HUD, and Stage Clear on defeat.
   - Visual, balance, and full fight feel remain PIE-driven.
 
 ## AI tracking, navigation, and spawn safety
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Runtime Graybox uses dynamic Runtime NavMesh behavior configured in `Config/DefaultEngine.ini`.
 - `AEvaPrototypeGameMode` owns runtime arena generation, RuntimeFloor tracking, safe enemy spawn search, spawn logs, and game flow gating.
 - Path following is primary. Direct fallback is only a recovery path and must not override valid NavMesh following.
@@ -90,7 +92,7 @@ Status labels:
 
 ## Research facility content
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Runtime facility has six zones:
   1. Entry Lobby.
   2. Security Corridor.
@@ -121,7 +123,7 @@ Status labels:
 
 ## UI and HUD
 
-- Status: Implemented/Partial.
+- Status: Partial.
 - Title, Pause, Settings, Game Over, and Stage Clear widgets are implemented in C++ menu widgets.
 - Normal HUD includes HP, ammo, crosshair, EVA analysis/stage, HUNTER state, objective/progress, and interaction prompt.
 - Debug HUD has three pages and is toggled with F9/N in non-Shipping builds.
@@ -170,6 +172,30 @@ Do not regress:
 - ADAM spawn/fight/defeat/Stage Clear.
 - Content Pass keycard/door/log/data-core progression.
 - Debug HUD availability in non-Shipping builds.
+
+## Architectural invariants
+
+These constraints must remain true unless a dedicated architecture task explicitly changes them.
+
+- The current version remains a solo FPS.
+- The research facility remains runtime-generated.
+- Runtime NavMesh remains required for generated gameplay space.
+- `AEvaPrototypeGameMode` remains the owner of top-level runtime facility generation and game-flow gating until a dedicated refactor task approves migration.
+- Content progression remains ordered:
+
+  1. Restore Facility Power.
+  2. Find Security Keycard.
+  3. Unlock Observation Lab.
+  4. Search Containment Records.
+  5. Access Data Core.
+  6. Reach Adam Arena.
+  7. Defeat Adam.
+
+- ADAM defeat remains the trigger for Stage Clear.
+- Stage Clear must remain idempotent.
+- Human visual confirmation is required before visual/content passes merge to `main`.
+- Development and test support must not depend on Live Coding.
+- Debug-only controls and displays must remain unavailable in Shipping builds.
 
 ## TBD
 
