@@ -1,5 +1,95 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-21 Cycle 025 Field Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/field-pass1`.
+
+Do not merge this branch into `main` until the user confirms Field Pass 1 in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 project tests succeeded, 0 failed.
+- Runtime Smoke with `UnrealEditor-Cmd.exe -game -NullRHI -NoSound -ExecCmds="Quit"`: exit code 0.
+- Runtime log scan found 0 blocking patterns.
+- Runtime Smoke confirmed:
+  - six runtime zones exist,
+  - each zone has Field Pass guide actors,
+  - required interactables exist with no duplicates,
+  - Runtime NavMesh readiness is true,
+  - existing Spawn safety and Stage Clear Automation tests remain green.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent implementation
+
+- Added non-blocking, runtime-generated field dressing in `AEvaPrototypeGameMode`:
+  - color-coded floor route stripes,
+  - route chevrons,
+  - wall signs with zone number/name,
+  - zone-specific cube/text landmarks for Entry, Security, Observation, Containment, Data Core, and Adam Arena.
+- Added `[FieldPass]` logs:
+  - `ZoneGuide`
+  - `ZoneBuilt`
+  - `Summary`
+- Added required interactable summary logs:
+  - Power Console,
+  - Security Keycard,
+  - Locked Door,
+  - three Research Logs,
+  - Data Core Console,
+  - duplicate-safe count.
+
+### Next highest-priority task
+
+Run PIE and verify Field Pass 1 readability only. Do not add new AI, enemies, weapons, maps, combat balance, or major UI redesign.
+
+PIE checklist:
+
+1. Start New Game from Title.
+2. Confirm each zone is visually distinguishable:
+   - Entry Lobby,
+   - Security Corridor,
+   - Observation Lab,
+   - Containment Ward,
+   - Data Core Room,
+   - Adam Arena.
+3. Confirm floor stripes/chevrons make the left-to-right route easier to follow.
+4. Confirm wall signs are visible/readable enough during normal movement.
+5. Confirm zone landmarks do not block movement, shots, enemies, or pickups.
+6. Confirm Keycard and all three Research Logs remain easy to notice and interact with.
+7. Confirm Navigation/AI still works:
+   - initial zombie,
+   - zone waves,
+   - HUNTER,
+   - Adam Arena.
+8. Confirm New Game to Stage Clear can still be completed.
+
+If a problem is found:
+
+- Fix only Field Pass presentation values, visibility, placement, or non-blocking guide dressing.
+- Preserve AI, HUNTER, ADAM, Stage Clear, Death/Game Over, UI flow, horror presentation, Runtime NavMesh algorithm, and gameplay balance.
+
+### Important files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Completion condition for next pass
+
+- User confirms in PIE that all six zones are distinguishable.
+- User confirms route guidance helps without interfering with combat.
+- User confirms interactables remain visible/reachable.
+- Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 023 Content Interactable Visibility and Pickup Fix
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

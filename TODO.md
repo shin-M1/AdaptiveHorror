@@ -1,5 +1,42 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 025 status - Field Pass 1
+
+- [x] Created `feature/field-pass1` from latest `main`.
+- [x] Added non-blocking Field Pass dressing for all six runtime zones.
+- [x] Added color-coded route floor stripes and route chevrons.
+- [x] Added visible wall signs with zone number/name.
+- [x] Added simple zone-specific landmarks:
+  - Entry Lobby reception marker,
+  - Security Corridor checkpoint marker,
+  - Observation Lab glass marker,
+  - Containment Ward cell marker,
+  - Data Core tower marker,
+  - Adam Arena warning marker.
+- [x] Added `[FieldPass]` runtime logs for zone guide generation and summary.
+- [x] Added required interactable summary logs with duplicate check.
+- [x] Development Editor / Win64 build without Live Coding succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+- [x] `git diff --check` succeeded with CRLF warnings only.
+
+### Next TODO
+
+- [ ] PIE-verify each zone is visually distinguishable:
+  - Entry Lobby,
+  - Security Corridor,
+  - Observation Lab,
+  - Containment Ward,
+  - Data Core Room,
+  - Adam Arena.
+- [ ] PIE-verify the route from New Game to Adam Arena is understandable without reading source.
+- [ ] PIE-verify floor stripes/signs/landmarks do not distract from combat.
+- [ ] PIE-verify Keycard and Research Logs are easy to notice in normal play.
+- [ ] PIE-verify enemies do not visibly pop in front of the player.
+- [ ] PIE-verify New Game to Stage Clear can be completed.
+- [ ] If Field Pass signage colors/materials do not show clearly in PIE, adjust only presentation values and keep collision/NavMesh disabled for guide dressing.
+
 ## Cycle 024 status - Autonomous Development Kit
 
 - [x] Created `chore/autonomous-development-kit` from latest clean `main`.

@@ -6,9 +6,9 @@ This file tracks development order only. Put product requirements in `REQUIREMEN
 
 ### Field Pass 1
 
-Status: Planned / next implementation candidate.
+Status: Completion candidate on `feature/field-pass1`.
 
-Goal: turn the runtime research facility from a functional graybox into a readable playable field pass without adding new major systems. See `TASKS/field-pass-1.md`.
+Goal: turn the runtime research facility from a functional graybox into a readable playable field pass without adding new major systems. Automated verification has passed; human PIE confirmation is still required before main merge.
 
 ## Completed
 
@@ -39,11 +39,11 @@ Goal: turn the runtime research facility from a functional graybox into a readab
   - Human validation still required for interactable visibility/feel and full content flow after latest fixes.
 - Autonomous workflow hardening
   - First use of `TASKS/field-pass-1.md` should validate that the workflow is sufficient.
+- Field Pass 1 PIE confirmation
+  - Human validation required for zone readability, route guidance, interactable noticeability, and full New Game to Stage Clear playthrough.
 
 ## Planned
 
-- Field Pass 1
-  - Readable zone dressing, landmarking, navigation cues, encounter-space layout polish using existing systems only.
 - Weapon Pass 1
   - Improve handgun feedback and consider one additional weapon only if required by demo pacing.
 - Enemy Pass 2

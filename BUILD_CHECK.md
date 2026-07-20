@@ -1,5 +1,65 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 025 execution result - Field Pass 1
+
+Date: 2026-07-21 JST
+
+Branch: `feature/field-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+First attempt:
+
+- Result: failed before build due sandbox/environment permission.
+- Cause: UBT attempted to delete `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.36.uba` and received `System.UnauthorizedAccessException`.
+- Action: reran the same command with permission for UBT to use `%LOCALAPPDATA%\UnrealBuildTool`.
+
+Final result:
+
+- Script exit code: 0.
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count:
+  - total: 43
+  - passed: 43
+  - failed: 0
+- Automation log:
+  - `Saved\Logs\AdaptiveHorror-backup-2026.07.20-21.42.27.log`
+- Automation completion:
+  - `**** TEST COMPLETE. EXIT CODE: 0 ****`
+- Runtime Smoke:
+  - exit code: 0
+  - log: `Saved\Logs\AdaptiveHorror.log`
+  - observed log time window: `Starting Game` at `21.42.34:282`, `Exiting` at `21.42.35:541`
+- Log scan:
+  - target: `Saved\Logs\AdaptiveHorror.log`
+  - blocking pattern:
+    - `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - matches: 0
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+Field Pass structural evidence from Runtime Smoke:
+
+- Six runtime zones and guide actors:
+  - `[FieldPass] Summary Context=AfterRuntimeZoneDressing ZoneFloorCount=6 FieldGuideActors=61 RouteGuideActors=18 LandmarkActors=25 Zone0=9 Zone1=9 Zone2=11 Zone3=13 Zone4=9 Zone5=10 AllZonesHaveGuides=true`
+- Required interactables and no duplicates:
+  - `[ContentSpawn] Context=NavigationReady RequiredInteractables PowerConsole=1 Keycard=1 LockedDoor=1 ResearchLogs=3 DataCoreConsole=1 RegisteredTotal=7 NoDuplicates=true`
+- Runtime NavMesh readiness:
+  - `[Navigation] Readiness Attempt=1 Ready=true ... PlayerProjected=true RepresentativeProjected=true`
+- Spawn safety and Stage Clear:
+  - Existing `AdaptiveHorror.Spawn.*` and `AdaptiveHorror.StageClear.*` Automation tests remained green.
+
+Notes:
+
+- UE5.8 still reports non-Win64 SDK warnings for platforms such as LinuxArm64/VisionOS during validation. Win64 build/automation/runtime commands succeeded.
+- Runtime Smoke does not verify human readability; PIE confirmation remains required.
+
 ## Cycle 024 execution result - Autonomous Development Kit
 
 Date: 2026-07-21 JST

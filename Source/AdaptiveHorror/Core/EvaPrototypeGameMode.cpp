@@ -17,6 +17,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Components/EvaHealthComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
 #include "DrawDebugHelpers.h"
@@ -37,6 +38,8 @@
 #include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "NavigationData.h"
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
@@ -70,6 +73,38 @@ namespace
 
     const FName RuntimeFloorTag(TEXT("RuntimeFloor"));
     const FName EvaNavigableFloorTag(TEXT("EvaNavigableFloor"));
+    const FName EvaFieldPassTag(TEXT("EvaFieldPass"));
+    const FName EvaFieldGuideTag(TEXT("EvaFieldGuide"));
+    const FName EvaRouteGuideTag(TEXT("EvaRouteGuide"));
+    const FName EvaLandmarkTag(TEXT("EvaFieldLandmark"));
+
+    FLinearColor GetFieldPassZoneColor(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return FLinearColor(0.20f, 0.72f, 1.00f);
+        case 1: return FLinearColor(1.00f, 0.76f, 0.18f);
+        case 2: return FLinearColor(0.30f, 1.00f, 0.78f);
+        case 3: return FLinearColor(1.00f, 0.24f, 0.18f);
+        case 4: return FLinearColor(0.58f, 0.40f, 1.00f);
+        case 5: return FLinearColor(1.00f, 0.05f, 0.03f);
+        default: return FLinearColor::White;
+        }
+    }
+
+    FString GetFieldPassZoneCode(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return TEXT("ENTRY");
+        case 1: return TEXT("SECURITY");
+        case 2: return TEXT("OBS LAB");
+        case 3: return TEXT("CONTAIN");
+        case 4: return TEXT("DATA CORE");
+        case 5: return TEXT("ADAM");
+        default: return TEXT("ZONE");
+        }
+    }
 
     bool IsLivingEvaEnemy(const AEvaZombieCharacter* Enemy)
     {
@@ -873,6 +908,7 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         SpawnTaggedArenaBox(FVector(GateX, -620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f), FName(TEXT("EvaGate")));
         SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f), FName(TEXT("EvaGate")));
     }
+    LogFieldPassFacilitySummary(TEXT("AfterRuntimeZoneDressing"));
 
     CurrentDirector = GetWorld()->SpawnActor<AEvaResearchFacilityDirector>(AEvaResearchFacilityDirector::StaticClass(),
         FVector::ZeroVector, FRotator::ZeroRotator);
@@ -1436,6 +1472,8 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
         SpawnArenaBox(FVector(Center.X + 880.0f, 0.0f, 180.0f), FVector(0.35f, 14.0f, 3.6f));
     }
 
+    const int32 FieldGuideActors = BuildFieldPassZoneDressing(Center, Label, ZoneIndex);
+
     AActor* LabelMarker = SpawnArenaBox(FVector(Center.X, 0.0f, 25.0f), FVector(0.35f, 0.35f, 0.08f));
     if (LabelMarker)
     {
@@ -1443,6 +1481,284 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
         LabelMarker->SetActorHiddenInGame(true);
         LabelMarker->SetActorEnableCollision(false);
     }
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[FieldPass] ZoneBuilt Index=%d Label=\"%s\" Center=%s GuideActors=%d FloorTag=EvaZone_%d"),
+        ZoneIndex,
+        *Label,
+        *Center.ToCompactString(),
+        FieldGuideActors,
+        ZoneIndex);
+}
+
+int32 AEvaPrototypeGameMode::BuildFieldPassZoneDressing(const FVector& Center, const FString& Label,
+    const int32 ZoneIndex)
+{
+    const FLinearColor ZoneColor = GetFieldPassZoneColor(ZoneIndex);
+    const FName ZoneTag(*FString::Printf(TEXT("EvaFieldPassZone_%d"), ZoneIndex));
+    const FString ZoneCode = GetFieldPassZoneCode(ZoneIndex);
+    int32 SpawnedGuideActors = 0;
+
+    auto CountIfSpawned = [&SpawnedGuideActors, ZoneTag](AActor* Actor)
+    {
+        if (Actor)
+        {
+            Actor->Tags.AddUnique(ZoneTag);
+            ++SpawnedGuideActors;
+        }
+    };
+
+    // Floor runway: a thin, non-blocking line that teaches the left-to-right route without affecting NavMesh.
+    CountIfSpawned(SpawnFieldPassBox(FVector(Center.X, 0.0f, 32.0f), FVector(7.2f, 0.045f, 0.018f),
+        ZoneColor, EvaRouteGuideTag));
+    CountIfSpawned(SpawnFieldPassBox(FVector(Center.X + 620.0f, 78.0f, 34.0f), FVector(1.15f, 0.045f, 0.018f),
+        ZoneColor, EvaRouteGuideTag, FRotator(0.0f, -32.0f, 0.0f)));
+    CountIfSpawned(SpawnFieldPassBox(FVector(Center.X + 620.0f, -78.0f, 34.0f), FVector(1.15f, 0.045f, 0.018f),
+        ZoneColor, EvaRouteGuideTag, FRotator(0.0f, 32.0f, 0.0f)));
+
+    // Wall sign: readable zone identity from the main route.
+    CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 520.0f, -718.0f, 275.0f), FVector(2.7f, 0.055f, 0.72f),
+        ZoneColor, EvaFieldGuideTag));
+    CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 520.0f, -724.0f, 305.0f),
+        FRotator(0.0f, 90.0f, 0.0f), FString::Printf(TEXT("%02d  %s"), ZoneIndex + 1, *ZoneCode),
+        FLinearColor::White, EvaFieldGuideTag, 74.0f));
+    CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 520.0f, 724.0f, 305.0f),
+        FRotator(0.0f, -90.0f, 0.0f), Label, ZoneColor, EvaFieldGuideTag, 64.0f));
+
+    // Zone-specific silhouette landmark. All pieces are non-colliding so combat/NavMesh remains unchanged.
+    switch (ZoneIndex)
+    {
+    case 0:
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 180.0f, 480.0f, 85.0f), FVector(2.4f, 0.32f, 0.55f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 180.0f, 500.0f, 145.0f), FVector(1.2f, 0.18f, 0.22f),
+            FLinearColor(0.06f, 0.12f, 0.18f), EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 180.0f, 526.0f, 185.0f),
+            FRotator(0.0f, -90.0f, 0.0f), TEXT("RECEPTION"), ZoneColor, EvaLandmarkTag, 48.0f));
+        break;
+    case 1:
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 80.0f, 0.0f, 142.0f), FVector(0.12f, 2.7f, 1.95f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 80.0f, 0.0f, 320.0f), FVector(0.18f, 2.7f, 0.16f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 82.0f, -270.0f, 355.0f),
+            FRotator(0.0f, 90.0f, 0.0f), TEXT("SECURITY CHECK"), ZoneColor, EvaLandmarkTag, 45.0f));
+        break;
+    case 2:
+        for (int32 PanelIndex = 0; PanelIndex < 4; ++PanelIndex)
+        {
+            CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 360.0f + PanelIndex * 240.0f, 704.0f, 210.0f),
+                FVector(0.72f, 0.045f, 1.15f), ZoneColor, EvaLandmarkTag));
+        }
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X + 90.0f, 720.0f, 355.0f),
+            FRotator(0.0f, -90.0f, 0.0f), TEXT("OBSERVATION GLASS"), ZoneColor, EvaLandmarkTag, 42.0f));
+        break;
+    case 3:
+        for (int32 CellIndex = 0; CellIndex < 3; ++CellIndex)
+        {
+            CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 420.0f + CellIndex * 330.0f, -704.0f, 190.0f),
+                FVector(0.08f, 0.055f, 2.15f), ZoneColor, EvaLandmarkTag));
+            CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 310.0f + CellIndex * 330.0f, -704.0f, 190.0f),
+                FVector(0.08f, 0.055f, 2.15f), ZoneColor, EvaLandmarkTag));
+        }
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 40.0f, -724.0f, 360.0f),
+            FRotator(0.0f, 90.0f, 0.0f), TEXT("CONTAINMENT"), ZoneColor, EvaLandmarkTag, 48.0f));
+        break;
+    case 4:
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X, 360.0f, 220.0f), FVector(0.55f, 0.55f, 2.6f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X, 360.0f, 488.0f), FVector(1.35f, 1.35f, 0.18f),
+            ZoneColor, EvaLandmarkTag, FRotator(0.0f, 45.0f, 0.0f)));
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X, 530.0f, 360.0f),
+            FRotator(0.0f, -90.0f, 0.0f), TEXT("DATA CORE"), ZoneColor, EvaLandmarkTag, 58.0f));
+        break;
+    case 5:
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 520.0f, 0.0f, 350.0f), FVector(0.18f, 4.4f, 0.24f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 520.0f, 360.0f, 190.0f), FVector(0.28f, 0.24f, 2.45f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassBox(FVector(Center.X - 520.0f, -360.0f, 190.0f), FVector(0.28f, 0.24f, 2.45f),
+            ZoneColor, EvaLandmarkTag));
+        CountIfSpawned(SpawnFieldPassText(FVector(Center.X - 535.0f, 0.0f, 415.0f),
+            FRotator(0.0f, 90.0f, 0.0f), TEXT("ADAM ARENA"), FLinearColor::White, EvaLandmarkTag, 68.0f));
+        break;
+    default:
+        break;
+    }
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[FieldPass] ZoneGuide Index=%d Label=\"%s\" Code=%s Color=(%.2f,%.2f,%.2f) Actors=%d RouteMarkers=3"),
+        ZoneIndex,
+        *Label,
+        *ZoneCode,
+        ZoneColor.R,
+        ZoneColor.G,
+        ZoneColor.B,
+        SpawnedGuideActors);
+
+    return SpawnedGuideActors;
+}
+
+AActor* AEvaPrototypeGameMode::SpawnFieldPassBox(const FVector& Location, const FVector& Scale,
+    const FLinearColor& Color, const FName PrimaryTag, const FRotator& Rotation, const bool bNoCollision)
+{
+    AActor* Box = SpawnArenaBox(Location, Scale, Rotation);
+    if (!Box)
+    {
+        return nullptr;
+    }
+
+    Box->Tags.AddUnique(EvaFieldPassTag);
+    if (!PrimaryTag.IsNone())
+    {
+        Box->Tags.AddUnique(PrimaryTag);
+    }
+    ApplyFieldPassVisualStyle(Box, Color, bNoCollision);
+    return Box;
+}
+
+AActor* AEvaPrototypeGameMode::SpawnFieldPassText(const FVector& Location, const FRotator& Rotation,
+    const FString& Text, const FLinearColor& Color, const FName PrimaryTag, const float WorldSize)
+{
+    if (!GetWorld())
+    {
+        return nullptr;
+    }
+
+    AActor* TextActor = GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), Location, Rotation);
+    if (!TextActor)
+    {
+        return nullptr;
+    }
+
+    TextActor->Tags.AddUnique(EvaFieldPassTag);
+    TextActor->Tags.AddUnique(EvaFieldGuideTag);
+    if (!PrimaryTag.IsNone())
+    {
+        TextActor->Tags.AddUnique(PrimaryTag);
+    }
+    TextActor->SetActorEnableCollision(false);
+
+    UTextRenderComponent* TextComponent = NewObject<UTextRenderComponent>(TextActor, TEXT("FieldPassText"));
+    if (!TextComponent)
+    {
+        return TextActor;
+    }
+
+    TextActor->SetRootComponent(TextComponent);
+    TextComponent->SetMobility(EComponentMobility::Movable);
+    TextComponent->SetText(FText::FromString(Text));
+    TextComponent->SetHorizontalAlignment(EHTA_Center);
+    TextComponent->SetVerticalAlignment(EVRTA_TextCenter);
+    TextComponent->SetWorldSize(WorldSize);
+    TextComponent->SetTextRenderColor(Color.ToFColor(true));
+    TextComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TextComponent->SetCanEverAffectNavigation(false);
+    TextComponent->RegisterComponent();
+    TextComponent->SetMobility(EComponentMobility::Static);
+
+    return TextActor;
+}
+
+void AEvaPrototypeGameMode::ApplyFieldPassVisualStyle(AActor* Actor, const FLinearColor& Color,
+    const bool bNoCollision) const
+{
+    if (!Actor)
+    {
+        return;
+    }
+
+    UStaticMeshComponent* MeshComponent = Cast<UStaticMeshComponent>(
+        Actor->GetComponentByClass(UStaticMeshComponent::StaticClass()));
+    if (!MeshComponent)
+    {
+        return;
+    }
+
+    if (UMaterialInterface* BaseMaterial = MeshComponent->GetMaterial(0))
+    {
+        if (UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, MeshComponent))
+        {
+            DynamicMaterial->SetVectorParameterValue(TEXT("Color"), Color);
+            DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Color);
+            DynamicMaterial->SetVectorParameterValue(TEXT("Tint"), Color);
+            MeshComponent->SetMaterial(0, DynamicMaterial);
+        }
+    }
+
+    if (bNoCollision)
+    {
+        MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        MeshComponent->SetGenerateOverlapEvents(false);
+        MeshComponent->SetCanEverAffectNavigation(false);
+        Actor->SetActorEnableCollision(false);
+    }
+}
+
+void AEvaPrototypeGameMode::LogFieldPassFacilitySummary(const FString& Context) const
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    int32 ZoneFloorCount = 0;
+    int32 FieldGuideActorCount = 0;
+    int32 RouteGuideActorCount = 0;
+    int32 LandmarkActorCount = 0;
+    int32 ZoneGuideCounts[6] = { 0, 0, 0, 0, 0, 0 };
+
+    for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+    {
+        const AActor* Actor = *It;
+        if (!IsValid(Actor))
+        {
+            continue;
+        }
+
+        for (int32 ZoneIndex = 0; ZoneIndex < 6; ++ZoneIndex)
+        {
+            if (Actor->Tags.Contains(FName(*FString::Printf(TEXT("EvaZone_%d"), ZoneIndex))))
+            {
+                ++ZoneFloorCount;
+            }
+            if (Actor->Tags.Contains(FName(*FString::Printf(TEXT("EvaFieldPassZone_%d"), ZoneIndex))))
+            {
+                ++ZoneGuideCounts[ZoneIndex];
+            }
+        }
+        if (Actor->Tags.Contains(EvaFieldPassTag))
+        {
+            ++FieldGuideActorCount;
+        }
+        if (Actor->Tags.Contains(EvaRouteGuideTag))
+        {
+            ++RouteGuideActorCount;
+        }
+        if (Actor->Tags.Contains(EvaLandmarkTag))
+        {
+            ++LandmarkActorCount;
+        }
+    }
+
+    const bool bAllZonesHaveGuides =
+        ZoneGuideCounts[0] > 0 && ZoneGuideCounts[1] > 0 && ZoneGuideCounts[2] > 0 &&
+        ZoneGuideCounts[3] > 0 && ZoneGuideCounts[4] > 0 && ZoneGuideCounts[5] > 0;
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[FieldPass] Summary Context=%s ZoneFloorCount=%d FieldGuideActors=%d RouteGuideActors=%d LandmarkActors=%d Zone0=%d Zone1=%d Zone2=%d Zone3=%d Zone4=%d Zone5=%d AllZonesHaveGuides=%s"),
+        *Context,
+        ZoneFloorCount,
+        FieldGuideActorCount,
+        RouteGuideActorCount,
+        LandmarkActorCount,
+        ZoneGuideCounts[0],
+        ZoneGuideCounts[1],
+        ZoneGuideCounts[2],
+        ZoneGuideCounts[3],
+        ZoneGuideCounts[4],
+        ZoneGuideCounts[5],
+        *BoolText(bAllZonesHaveGuides));
 }
 
 void AEvaPrototypeGameMode::SpawnFacilityTrigger(AEvaResearchFacilityDirector* Director,
@@ -1523,6 +1839,10 @@ void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Co
 
     int32 ResearchLogCount = 0;
     int32 RegisteredCount = 0;
+    int32 PowerConsoleCount = 0;
+    int32 KeycardCount = 0;
+    int32 LockedDoorCount = 0;
+    int32 DataCoreConsoleCount = 0;
     for (TActorIterator<AEvaFacilityInteractable> It(GetWorld()); It; ++It)
     {
         const AEvaFacilityInteractable* Interactable = *It;
@@ -1531,6 +1851,23 @@ void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Co
             continue;
         }
         ++RegisteredCount;
+        switch (Interactable->GetInteractableType())
+        {
+        case EEvaFacilityInteractableType::PowerConsole:
+            ++PowerConsoleCount;
+            break;
+        case EEvaFacilityInteractableType::Keycard:
+            ++KeycardCount;
+            break;
+        case EEvaFacilityInteractableType::LockedDoor:
+            ++LockedDoorCount;
+            break;
+        case EEvaFacilityInteractableType::DataCoreConsole:
+            ++DataCoreConsoleCount;
+            break;
+        default:
+            break;
+        }
     }
 
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
@@ -1650,6 +1987,17 @@ void AEvaPrototypeGameMode::LogFacilityInteractableSpawnStatus(const FString& Co
         TEXT("[ContentSpawn] Context=%s ResearchLogCount=%d RequiredResearchLogCount=3"),
         *Context,
         ResearchLogCount);
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ContentSpawn] Context=%s RequiredInteractables PowerConsole=%d Keycard=%d LockedDoor=%d ResearchLogs=%d DataCoreConsole=%d RegisteredTotal=%d NoDuplicates=%s"),
+        *Context,
+        PowerConsoleCount,
+        KeycardCount,
+        LockedDoorCount,
+        ResearchLogCount,
+        DataCoreConsoleCount,
+        RegisteredCount,
+        *BoolText(PowerConsoleCount == 1 && KeycardCount == 1 && LockedDoorCount == 1 &&
+            ResearchLogCount == 3 && DataCoreConsoleCount == 1));
 }
 
 void AEvaPrototypeGameMode::SpawnStoryLog(AEvaResearchFacilityDirector* Director, const FName LogId,

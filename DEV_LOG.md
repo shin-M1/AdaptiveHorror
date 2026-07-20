@@ -1,5 +1,123 @@
 # Development Log
 
+## 2026-07-21 - Cycle 025: Field Pass 1
+
+Branch: `feature/field-pass1`
+
+### Scope
+
+- Implemented Field Pass 1 for the runtime-generated research facility.
+- Kept the change focused on zone readability and route guidance.
+- Did not change weapons, enemy classes, combat rules, AI behavior, HUNTER, ADAM, Stage Clear, Player Death, Title/Pause/Settings/Game Over flow, or Runtime NavMesh algorithms.
+
+### Initial Git state
+
+- `git status --short --branch`: clean on `chore/autonomous-development-review`.
+- `git branch --show-current`: `chore/autonomous-development-review`.
+- `git log --oneline -5`: latest local commits included `128c3ca Review and harden autonomous development documentation` and `426a8bb Merge branch 'chore/autonomous-development-kit'`.
+- Switched to `main`.
+- `git pull --ff-only`: already up to date.
+- Created `feature/field-pass1` from latest `main`.
+
+### Implemented
+
+- Added non-blocking Field Pass dressing inside `AEvaPrototypeGameMode` runtime generation:
+  - color-coded route floor stripes for each zone,
+  - wall signs with zone numbers/names,
+  - simple zone-specific silhouette landmarks using engine cube/text components only,
+  - route chevrons pointing toward the next facility section.
+- Added tags and logs for structural verification:
+  - `[FieldPass] ZoneGuide`
+  - `[FieldPass] ZoneBuilt`
+  - `[FieldPass] Summary`
+- Added interactable summary logs for required content objects:
+  - Power Console,
+  - Security Keycard,
+  - Locked Door,
+  - three Research Logs,
+  - Data Core Console.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Verification
+
+- First validation attempt:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Result: failed before build due environment permission, not code.
+  - Error: `System.UnauthorizedAccessException` deleting `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.36.uba`.
+- Final validation:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Exit code: 0.
+  - Runtime: about 105 seconds.
+- Build:
+  - Static source sanity: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - UBT log: `%LOCALAPPDATA%\UnrealBuildTool\Log.txt`
+  - GPF log: `%LOCALAPPDATA%\UnrealBuildTool\Log_GPF.txt`
+- Automation:
+  - `Automation RunTests AdaptiveHorror`: Succeeded.
+  - Total tests: 43.
+  - Passed: 43.
+  - Failed: 0.
+  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.20-21.42.27.log`
+  - Completion line: `**** TEST COMPLETE. EXIT CODE: 0 ****`
+- Runtime Smoke:
+  - Command run by validation script:
+    - `UnrealEditor-Cmd.exe AdaptiveHorror.uproject -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log`
+  - Exit code: 0.
+  - Runtime log: `Saved\Logs\AdaptiveHorror.log`
+  - Log timing: `Starting Game` at `21.42.34:282`, `Exiting` at `21.42.35:541`.
+- Log scan:
+  - Target: `Saved\Logs\AdaptiveHorror.log`
+  - Blocking pattern:
+    - `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- Structure evidence:
+  - Six zones / guide summary:
+    - `[FieldPass] Summary Context=AfterRuntimeZoneDressing ZoneFloorCount=6 FieldGuideActors=61 RouteGuideActors=18 LandmarkActors=25 Zone0=9 Zone1=9 Zone2=11 Zone3=13 Zone4=9 Zone5=10 AllZonesHaveGuides=true`
+  - Required interactables:
+    - `[ContentSpawn] Context=NavigationReady RequiredInteractables PowerConsole=1 Keycard=1 LockedDoor=1 ResearchLogs=3 DataCoreConsole=1 RegisteredTotal=7 NoDuplicates=true`
+  - Runtime NavMesh readiness:
+    - `[Navigation] Readiness Attempt=1 Ready=true ... PlayerProjected=true RepresentativeProjected=true`
+  - Spawn safety:
+    - Existing `AdaptiveHorror.Spawn.*` Automation tests remained green.
+  - Stage Clear regression:
+    - Existing `AdaptiveHorror.StageClear.*` Automation tests remained green.
+- `git diff --check`: PASS, CRLF conversion warnings only.
+
+### Expected change scope
+
+- Source/config files changed before documentation: 2.
+- New production files: 0.
+- Net production line increase: about 355 lines.
+- Protected systems changed: no.
+- Public interfaces across multiple systems changed: no.
+- Within `TASKS/field-pass-1.md` expected change scope.
+
+### Not verified by Codex
+
+- Each zone is visually distinguishable in PIE.
+- Navigation from one zone to the next is understandable without reading source code.
+- Lighting is readable and not too dark in the viewport.
+- Keycard and Research Logs are easy to notice in normal play.
+- Combat spaces are not too narrow or confusing in live play.
+- Enemies do not visibly pop in front of the player.
+- New Game to Stage Clear can be completed in PIE.
+
+### Known issues / TBD
+
+- Field Pass visual quality still requires human PIE confirmation before main merge.
+- Runtime Smoke confirms spawned structures and logs, not human readability.
+- The first validation attempt can fail under sandboxed LocalAppData permissions; rerun with permission to let UBT manage `%LOCALAPPDATA%\UnrealBuildTool`.
+
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
 
 Branch: `chore/autonomous-development-kit`

@@ -258,6 +258,13 @@ private:
     AActor* SpawnTaggedArenaBox(const FVector& Location, const FVector& Scale, const FName Tag,
         const FRotator& Rotation = FRotator::ZeroRotator);
     void BuildFacilityZone(const FVector& Center, const FString& Label, const int32 ZoneIndex);
+    int32 BuildFieldPassZoneDressing(const FVector& Center, const FString& Label, const int32 ZoneIndex);
+    AActor* SpawnFieldPassBox(const FVector& Location, const FVector& Scale, const FLinearColor& Color,
+        const FName PrimaryTag, const FRotator& Rotation = FRotator::ZeroRotator, bool bNoCollision = true);
+    AActor* SpawnFieldPassText(const FVector& Location, const FRotator& Rotation, const FString& Text,
+        const FLinearColor& Color, const FName PrimaryTag, float WorldSize = 88.0f);
+    void ApplyFieldPassVisualStyle(AActor* Actor, const FLinearColor& Color, bool bNoCollision) const;
+    void LogFieldPassFacilitySummary(const FString& Context) const;
     void RegisterRuntimeFloorComponent(UPrimitiveComponent* FloorComponent);
     FBox CalculateRuntimeFacilityBounds() const;
     bool ValidateNavigationProjection(const FString& Context, const FVector& Location, FVector* OutProjectedLocation = nullptr) const;
