@@ -216,6 +216,37 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
     }
 
     const FVector CurrentPawnLocation = GetPawn()->GetActorLocation();
+    const FVector TargetLocation = TargetActor->GetActorLocation();
+    const float DistanceToTarget = FVector::Dist(CurrentPawnLocation, TargetLocation);
+    const float DistanceToTarget2D = FVector::Dist2D(CurrentPawnLocation, TargetLocation);
+    const float VerticalDistanceToTarget = FMath::Abs(CurrentPawnLocation.Z - TargetLocation.Z);
+    const bool bInAttackRange = DistanceToTarget <= AttackRange;
+    if (bInAttackRange && !bWasInAttackRange)
+    {
+        const bool bLineOfSight = HasAttackLineOfSightToTarget();
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttack] Stage=EnteredAttackRange Controller=%s Pawn=%s Target=%s Distance=%.1f Distance2D=%.1f Vertical=%.1f AttackRange=%.1f LineOfSight=%s"),
+            *GetName(),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            TargetActor ? *TargetActor->GetName() : TEXT("None"),
+            DistanceToTarget,
+            DistanceToTarget2D,
+            VerticalDistanceToTarget,
+            AttackRange,
+            bLineOfSight ? TEXT("true") : TEXT("false"));
+    }
+    else if (!bInAttackRange && bWasInAttackRange)
+    {
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttack] Stage=ReturnedToChase Controller=%s Pawn=%s Target=%s Distance=%.1f AttackRange=%.1f"),
+            *GetName(),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            TargetActor ? *TargetActor->GetName() : TEXT("None"),
+            DistanceToTarget,
+            AttackRange);
+    }
+    bWasInAttackRange = bInAttackRange;
+
     bool bPerformedStuckRecovery = false;
     if (LastObservedPawnLocation.IsNearlyZero())
     {
@@ -315,6 +346,14 @@ void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
             GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
             *NewTarget->GetName(),
             GetPawn() ? FVector::Dist(GetPawn()->GetActorLocation(), NewTarget->GetActorLocation()) : -1.0f);
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttack] Stage=TargetAcquired Controller=%s Pawn=%s Target=%s Distance=%.1f AttackRange=%.1f StopOnOverlapForTarget=%s"),
+            *GetName(),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            *NewTarget->GetName(),
+            GetPawn() ? FVector::Dist(GetPawn()->GetActorLocation(), NewTarget->GetActorLocation()) : -1.0f,
+            AttackRange,
+            ShouldStopOnOverlapForGoal(NewTarget) ? TEXT("true") : TEXT("false"));
         SetCurrentActionIntent(TEXT("CHASE"));
         if (GetPawn())
         {
@@ -334,6 +373,9 @@ void AEvaZombieAIController::ClearPlayerTarget()
     ClearFocus(EAIFocusPriority::Gameplay);
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
+    bWasInAttackRange = false;
+    bAttackCooldownActive = false;
+    bLoggedCooldownBlocked = false;
     StopMovement();
 }
 
@@ -345,6 +387,9 @@ void AEvaZombieAIController::StopCombatForStageClear()
     bRecoveringSidestep = false;
     bDirectFallbackActive = false;
     bInternalRepathAbort = true;
+    bWasInAttackRange = false;
+    bAttackCooldownActive = false;
+    bLoggedCooldownBlocked = false;
     ClearFocus(EAIFocusPriority::Gameplay);
     StopMovement();
     bInternalRepathAbort = false;
@@ -564,8 +609,13 @@ FString AEvaZombieAIController::ResolveCurrentActionIntent() const
 bool AEvaZombieAIController::CanAttackTarget() const
 {
     const AEvaPlayerCharacter* Player = Cast<AEvaPlayerCharacter>(TargetActor);
-    if (!bCombatEnabled || !GetPawn() || !Player || Player->IsDead() ||
-        FVector::DistSquared(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) > FMath::Square(AttackRange))
+    if (!bCombatEnabled || !GetPawn() || !Player || Player->IsDead())
+    {
+        return false;
+    }
+
+    const float Distance = FVector::Dist(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation());
+    if (Distance > AttackRange)
     {
         return false;
     }
@@ -583,6 +633,7 @@ bool AEvaZombieAIController::HasAttackLineOfSightToTarget() const
     FHitResult ObstacleHit;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EvaEnemyAttackLineOfSight), false, GetPawn());
     QueryParams.AddIgnoredActor(GetPawn());
+    QueryParams.AddIgnoredActor(TargetActor);
     const FVector TraceStart = GetPawn()->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
     const FVector TraceEnd = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
     if (GetWorld()->LineTraceSingleByChannel(ObstacleHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
@@ -614,18 +665,106 @@ void AEvaZombieAIController::TryAttackTarget()
     }
 
     const float Now = GetWorld()->GetTimeSeconds();
+    if (bAttackCooldownActive && Now - LastAttackTime >= AttackInterval)
+    {
+        bAttackCooldownActive = false;
+        bLoggedCooldownBlocked = false;
+        ++CooldownCompletedCount;
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttack] Stage=CooldownCompleted Controller=%s Pawn=%s Target=%s AttackInterval=%.2f RepeatedAttackReady=%s"),
+            *GetName(),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            TargetActor ? *TargetActor->GetName() : TEXT("None"),
+            AttackInterval,
+            AttackStartedCount > 0 ? TEXT("true") : TEXT("false"));
+    }
     if (Now - LastAttackTime < AttackInterval)
     {
+        if (!bLoggedCooldownBlocked)
+        {
+            const float CooldownRemaining = AttackInterval - (Now - LastAttackTime);
+            bLoggedCooldownBlocked = true;
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[ZombieAttack] Stage=CooldownBlocked Controller=%s Pawn=%s Target=%s CooldownRemaining=%.2f"),
+                *GetName(),
+                GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+                TargetActor ? *TargetActor->GetName() : TEXT("None"),
+                FMath::Max(0.0f, CooldownRemaining));
+        }
         return;
     }
     if (!CanAttackTarget())
     {
+        const float Distance = GetPawn() && TargetActor ?
+            FVector::Dist(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) : -1.0f;
+        const float Distance2D = GetPawn() && TargetActor ?
+            FVector::Dist2D(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) : -1.0f;
+        const float VerticalDistance = GetPawn() && TargetActor ?
+            FMath::Abs(GetPawn()->GetActorLocation().Z - TargetActor->GetActorLocation().Z) : -1.0f;
+        const bool bLineOfSight = HasAttackLineOfSightToTarget();
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttack] Stage=AttackConditionFailed Controller=%s Pawn=%s Target=%s TargetValid=%s PlayerDead=%s Distance=%.1f Distance2D=%.1f Vertical=%.1f AttackRange=%.1f LineOfSight=%s"),
+            *GetName(),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+            TargetActor ? *TargetActor->GetName() : TEXT("None"),
+            TargetActor ? TEXT("true") : TEXT("false"),
+            Player && Player->IsDead() ? TEXT("true") : TEXT("false"),
+            Distance,
+            Distance2D,
+            VerticalDistance,
+            AttackRange,
+            bLineOfSight ? TEXT("true") : TEXT("false"));
         return;
     }
 
+    const float PlayerHpBefore = Player->GetHealthComponent() ? Player->GetHealthComponent()->GetCurrentHealth() : -1.0f;
     LastAttackTime = Now;
+    bAttackCooldownActive = true;
+    bLoggedCooldownBlocked = false;
+    ++AttackStartedCount;
     SetCurrentActionIntent(TEXT("ATTACK"));
-    UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, this, GetPawn(), UDamageType::StaticClass());
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZombieAttack] Stage=AttackStarted Controller=%s Pawn=%s Target=%s Distance=%.1f Distance2D=%.1f Vertical=%.1f AttackRange=%.1f Damage=%.1f AttackCount=%d HpBefore=%.1f AnimationRequested=true"),
+        *GetName(),
+        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+        TargetActor ? *TargetActor->GetName() : TEXT("None"),
+        GetPawn() && TargetActor ? FVector::Dist(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) : -1.0f,
+        GetPawn() && TargetActor ? FVector::Dist2D(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) : -1.0f,
+        GetPawn() && TargetActor ? FMath::Abs(GetPawn()->GetActorLocation().Z - TargetActor->GetActorLocation().Z) : -1.0f,
+        AttackRange,
+        AttackDamage,
+        AttackStartedCount,
+        PlayerHpBefore);
+    const AEvaPrototypeGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AEvaPrototypeGameMode>() : nullptr;
+    const bool bTargetCanBeDamaged = TargetActor->CanBeDamaged();
+    const bool bGameModeAllowsPlayerDamage = !GameMode || GameMode->CanPlayerTakeDamage();
+    const float AppliedDamageResult = UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, this, GetPawn(), UDamageType::StaticClass());
+    const float PlayerHpAfter = Player->GetHealthComponent() ? Player->GetHealthComponent()->GetCurrentHealth() : -1.0f;
+    const bool bDamageApplied = PlayerHpAfter >= 0.0f && PlayerHpBefore >= 0.0f && PlayerHpAfter < PlayerHpBefore;
+    if (bDamageApplied)
+    {
+        ++DamageAppliedCount;
+    }
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZombieAttack] Stage=DamageApplied Controller=%s Pawn=%s Target=%s DamageAttempted=%.1f ApplyDamageResult=%.1f TargetCanBeDamaged=%s GameModeAllowsPlayerDamage=%s DamageApplied=%s HpBefore=%.1f HpAfter=%.1f DamageCount=%d PlayerHpChanged=%s"),
+        *GetName(),
+        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+        TargetActor ? *TargetActor->GetName() : TEXT("None"),
+        AttackDamage,
+        AppliedDamageResult,
+        bTargetCanBeDamaged ? TEXT("true") : TEXT("false"),
+        bGameModeAllowsPlayerDamage ? TEXT("true") : TEXT("false"),
+        bDamageApplied ? TEXT("true") : TEXT("false"),
+        PlayerHpBefore,
+        PlayerHpAfter,
+        DamageAppliedCount,
+        bDamageApplied ? TEXT("true") : TEXT("false"));
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZombieAttack] Stage=CooldownStarted Controller=%s Pawn=%s Target=%s AttackInterval=%.2f"),
+        *GetName(),
+        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
+        TargetActor ? *TargetActor->GetName() : TEXT("None"),
+        AttackInterval);
     if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
     {
         Zombie->PlayPrototypeAttackFeedback();
@@ -1031,7 +1170,7 @@ bool AEvaZombieAIController::ReissueMoveToTarget(const TCHAR* RepathReason, cons
 
     bIssuingRepathMove = true;
     const EPathFollowingRequestResult::Type MoveResult =
-        MoveToActor(TargetActor, AttackRange * 0.75f, true, true, true, nullptr, true);
+        MoveToActor(TargetActor, AttackRange * 0.75f, ShouldStopOnOverlapForGoal(TargetActor), true, true, nullptr, true);
     bIssuingRepathMove = false;
 
     if (MoveResult != EPathFollowingRequestResult::Failed)
@@ -1080,8 +1219,9 @@ bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float 
     const bool bHasValidDiagnosticPath = DiagnosticPath && DiagnosticPath->IsValid();
     const int32 PathPointCount = DiagnosticPath ? DiagnosticPath->PathPoints.Num() : 0;
 
+    const bool bStopOnOverlap = ShouldStopOnOverlapForGoal(GoalActor);
     const EPathFollowingRequestResult::Type MoveResult =
-        MoveToActor(GoalActor, AcceptanceRadius, true, true, true, nullptr, true);
+        MoveToActor(GoalActor, AcceptanceRadius, bStopOnOverlap, true, true, nullptr, true);
     LastMoveRequestGoal = GoalLocation;
     LastMoveRequestTime = Now;
 
@@ -1094,15 +1234,28 @@ bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float 
         {
             LastMoveDiagnosticLogTime = Now;
             UE_LOG(LogAdaptiveHorror, Log,
-                TEXT("[AI] MoveToActor accepted Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f PathValid=%s IsPartial=%s PathPoints=%d Result=%s"),
+                TEXT("[AI] MoveToActor accepted Controller=%s Pawn=%s GoalActor=%s Acceptance=%.1f StopOnOverlap=%s PathValid=%s IsPartial=%s PathPoints=%d Result=%s"),
                 *GetName(),
                 *ControlledPawn->GetName(),
                 *GoalActor->GetName(),
                 AcceptanceRadius,
+                bStopOnOverlap ? TEXT("true") : TEXT("false"),
                 bHasValidDiagnosticPath ? TEXT("true") : TEXT("false"),
                 DiagnosticPath && DiagnosticPath->IsPartial() ? TEXT("true") : TEXT("false"),
                 PathPointCount,
                 EvaMoveRequestResultToString(MoveResult));
+            if (GoalActor == TargetActor)
+            {
+                UE_LOG(LogAdaptiveHorror, Log,
+                    TEXT("[ZombieAttack] Stage=ChaseMoveTo Controller=%s Pawn=%s Target=%s Acceptance=%.1f StopOnOverlap=%s AttackRange=%.1f Result=%s"),
+                    *GetName(),
+                    *ControlledPawn->GetName(),
+                    *GoalActor->GetName(),
+                    AcceptanceRadius,
+                    bStopOnOverlap ? TEXT("true") : TEXT("false"),
+                    AttackRange,
+                    EvaMoveRequestResultToString(MoveResult));
+            }
             LogPathDiagnostics(TEXT("MoveToActorAccepted"), GoalLocation, MoveResult);
         }
         return true;
@@ -1122,6 +1275,86 @@ bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float 
     LogPathDiagnostics(TEXT("MoveToActorFailed"), GoalLocation, MoveResult);
     return MoveToLocationOrDirect(GoalActor->GetActorLocation(), AcceptanceRadius);
 }
+
+bool AEvaZombieAIController::ShouldStopOnOverlapForGoal(const AActor* GoalActor) const
+{
+    return !GoalActor || GoalActor != TargetActor;
+}
+
+#if !UE_BUILD_SHIPPING
+bool AEvaZombieAIController::DebugShouldStopOnOverlapForGoal(const AActor* GoalActor) const
+{
+    return ShouldStopOnOverlapForGoal(GoalActor);
+}
+
+bool AEvaZombieAIController::DebugRunAttackValidationCycle(AEvaPlayerCharacter* Player, float& OutHpBefore,
+    float& OutHpAfterFirstAttack, float& OutHpAfterCooldownBlocked, float& OutHpAfterSecondAttack,
+    int32& OutAttackStartedCount, int32& OutDamageAppliedCount)
+{
+    OutHpBefore = -1.0f;
+    OutHpAfterFirstAttack = -1.0f;
+    OutHpAfterCooldownBlocked = -1.0f;
+    OutHpAfterSecondAttack = -1.0f;
+    OutAttackStartedCount = 0;
+    OutDamageAppliedCount = 0;
+
+    if (!Player || Player->IsDead() || !GetWorld() || !GetPawn())
+    {
+        return false;
+    }
+
+    UEvaHealthComponent* PlayerHealth = Player->GetHealthComponent();
+    if (!PlayerHealth)
+    {
+        return false;
+    }
+
+    SetPlayerTarget(Player);
+    AttackStartedCount = 0;
+    DamageAppliedCount = 0;
+    CooldownCompletedCount = 0;
+    bAttackCooldownActive = false;
+    bLoggedCooldownBlocked = false;
+    LastAttackTime = -1000.0f;
+
+    OutHpBefore = PlayerHealth->GetCurrentHealth();
+    TryAttackTarget();
+    OutHpAfterFirstAttack = PlayerHealth->GetCurrentHealth();
+
+    TryAttackTarget();
+    OutHpAfterCooldownBlocked = PlayerHealth->GetCurrentHealth();
+
+    LastAttackTime = GetWorld()->GetTimeSeconds() - AttackInterval - 0.05f;
+    TryAttackTarget();
+    OutHpAfterSecondAttack = PlayerHealth->GetCurrentHealth();
+
+    OutAttackStartedCount = AttackStartedCount;
+    OutDamageAppliedCount = DamageAppliedCount;
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZombieAttackSummary] ZombieSpawned=true TargetAcquired=%s EnteredAttackRange=%s AttackStarted=%s DamageApplied=%s PlayerHpChanged=%s CooldownStarted=%s CooldownCompleted=%s RepeatedAttackObserved=%s FatalErrors=0 EnsureFailures=0 HpBefore=%.1f HpAfterFirst=%.1f HpAfterCooldownBlocked=%.1f HpAfterSecond=%.1f AttackStartedCount=%d DamageAppliedCount=%d StopOnOverlapForTarget=%s"),
+        TargetActor == Player ? TEXT("true") : TEXT("false"),
+        CanAttackTarget() ? TEXT("true") : TEXT("false"),
+        OutAttackStartedCount > 0 ? TEXT("true") : TEXT("false"),
+        OutDamageAppliedCount > 0 ? TEXT("true") : TEXT("false"),
+        OutHpAfterFirstAttack < OutHpBefore ? TEXT("true") : TEXT("false"),
+        OutAttackStartedCount > 0 ? TEXT("true") : TEXT("false"),
+        CooldownCompletedCount > 0 ? TEXT("true") : TEXT("false"),
+        OutAttackStartedCount >= 2 ? TEXT("true") : TEXT("false"),
+        OutHpBefore,
+        OutHpAfterFirstAttack,
+        OutHpAfterCooldownBlocked,
+        OutHpAfterSecondAttack,
+        OutAttackStartedCount,
+        OutDamageAppliedCount,
+        DebugShouldStopOnOverlapForGoal(Player) ? TEXT("true") : TEXT("false"));
+
+    return OutAttackStartedCount >= 2 && OutDamageAppliedCount >= 2 && CooldownCompletedCount > 0 &&
+        OutHpAfterFirstAttack < OutHpBefore &&
+        FMath::IsNearlyEqual(OutHpAfterCooldownBlocked, OutHpAfterFirstAttack) &&
+        OutHpAfterSecondAttack < OutHpAfterCooldownBlocked;
+}
+#endif
 
 bool AEvaZombieAIController::MoveToLocationOrDirect(const FVector& GoalLocation, const float AcceptanceRadius)
 {

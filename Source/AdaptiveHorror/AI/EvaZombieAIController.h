@@ -59,6 +59,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EVA|Adaptation")
     void EnsureCurrentActionIntent();
 
+#if !UE_BUILD_SHIPPING
+    bool DebugShouldStopOnOverlapForGoal(const AActor* GoalActor) const;
+    bool DebugRunAttackValidationCycle(class AEvaPlayerCharacter* Player, float& OutHpBefore,
+        float& OutHpAfterFirstAttack, float& OutHpAfterCooldownBlocked, float& OutHpAfterSecondAttack,
+        int32& OutAttackStartedCount, int32& OutDamageAppliedCount);
+#endif
+
 protected:
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
@@ -73,6 +80,7 @@ protected:
     virtual void ApplyAdaptivePerception();
     bool MoveToActorOrDirect(AActor* GoalActor, float AcceptanceRadius);
     bool MoveToLocationOrDirect(const FVector& GoalLocation, float AcceptanceRadius);
+    bool ShouldStopOnOverlapForGoal(const AActor* GoalActor) const;
     bool TrySidestepAroundObstacle(const FVector& GoalLocation);
     bool ApplyDirectFallbackMovement(const FVector& DesiredDirection, const FColor& DebugColor);
     bool CanUseDirectFallback(const FVector& DesiredDirection, float TraceDistance, FString& OutReason) const;
@@ -143,4 +151,10 @@ private:
     bool bCombatEnabled = true;
     bool bHasLockedCompositeTuning = false;
     float LastCompositeHybridLockTime = -1000.0f;
+    bool bWasInAttackRange = false;
+    bool bAttackCooldownActive = false;
+    bool bLoggedCooldownBlocked = false;
+    int32 AttackStartedCount = 0;
+    int32 DamageAppliedCount = 0;
+    int32 CooldownCompletedCount = 0;
 };

@@ -99,7 +99,7 @@ if (-not $SkipRuntimeSmoke) {
     }
 
     Invoke-CheckedCommand "Runtime Smoke" {
-        & $EditorCmd $ResolvedProject.Path -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds="Quit" -log
+        & $EditorCmd $ResolvedProject.Path -game -Unattended -NullRHI -NoSound -NoSplash -EvaValidateZombieAttackSmoke -log
     }
 } else {
     Write-Step "Runtime Smoke"
@@ -114,11 +114,17 @@ if (-not $SkipLogScan) {
         exit 1
     }
 
-    $Pattern = "Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed"
+    $Pattern = "Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed|ZombieAttackSummary.*RuntimeSmokeResult=FAIL"
     $Matches = @(Select-String -Path $LogPath -Pattern $Pattern -CaseSensitive:$false)
     if ($Matches.Count -gt 0) {
         Write-Host "FAIL: log scan found blocking pattern(s)." -ForegroundColor Red
         $Matches | Select-Object -Last 80 | ForEach-Object { Write-Host $_.Line }
+        exit 1
+    }
+    $ZombieAttackSummary = @(Select-String -Path $LogPath -Pattern "ZombieAttackSummary.*RuntimeSmokeResult=PASS")
+    if ($ZombieAttackSummary.Count -lt 1) {
+        Write-Host "FAIL: missing ZombieAttackSummary RuntimeSmokeResult=PASS in current runtime log." -ForegroundColor Red
+        Select-String -Path $LogPath -Pattern "ZombieAttackSummary|ZombieAttack" | Select-Object -Last 80 | ForEach-Object { Write-Host $_.Line }
         exit 1
     }
     Write-Host "PASS: no blocking runtime log patterns found in $LogPath"

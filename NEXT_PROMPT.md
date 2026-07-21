@@ -1,5 +1,57 @@
 # Next Codex Prompt
 
+## Latest Handoff - 2026-07-22 Zombie attack regression fix
+
+Current branch/work:
+
+- `main` includes PR #3 `Fix zone boundaries and location tracking`.
+- `fix/zombie-attack-regression` contains the Zombie attack regression fix.
+- Automated validation on the fix branch passed:
+  - Development Editor / Win64 build without Live Coding: PASS.
+  - Automation RunTests `AdaptiveHorror`: 45/45 PASS.
+  - Runtime Smoke: PASS.
+  - Log Scan: PASS.
+  - `git diff --check`: PASS.
+
+Important fix summary:
+
+- Normal Zombie player-target `MoveToActor` now uses `bStopOnOverlap=false` so capsule overlap does not stop chase before explicit `AttackRange`.
+- Zombie attack LoS ignores both the Zombie pawn and the target actor.
+- Runtime Smoke uses `-EvaValidateZombieAttackSmoke` and requires `[ZombieAttackSummary] RuntimeSmokeResult=PASS`.
+- Runtime evidence:
+  - `HpBefore=100.0`
+  - `HpAfterFirst=90.0`
+  - `HpAfterCooldownBlocked=90.0`
+  - `HpAfterSecond=80.0`
+  - `AttackStartedCount=2`
+  - `DamageAppliedCount=2`
+
+Next required steps:
+
+1. If the PR has not yet been created, create PR from `fix/zombie-attack-regression` into `main`.
+2. Review the PR using `TASKS/review-pr.md` / `REVIEW.md`.
+3. If GitHub checks and local validation pass, merge with a normal Merge Commit only.
+4. Pull latest `main` and rerun:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Human PIE verification required:
+
+1. Entry Lobby -> Security Corridor wall has no fall gap.
+2. Security Corridor -> Observation Lab wall has no fall gap.
+3. ZONE display updates in both forward and backward movement.
+4. Normal Zombie enters visible attack behavior after approaching.
+5. Player HP decreases on attack.
+6. Attack damage is not applied every frame.
+7. Zombie attacks again after cooldown.
+8. Zombie returns to chase if the player moves away.
+9. Player death/respawn remains normal.
+10. HUNTER, ADAM, and Stage Clear show no visible regression.
+
+Do not proceed to Encounter Pass, Director Pass, Lighting Pass, new AI, new enemies, or new weapons until the Zombie fix PR is reviewed/merged or explicitly deferred.
+
 ## Latest handoff - 2026-07-22 Zone Identity Hotfix 1 integration
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
