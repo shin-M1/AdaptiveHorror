@@ -28,7 +28,10 @@ Current source-of-truth document roles:
 - `REQUIREMENTS.md`: product requirements and status labels (`Implemented`, `Partial`, `Planned`, `TBD`).
 - `ROADMAP.md`: milestone order.
 - `TEST_PLAN.md`: real build/automation/runtime smoke/log-scan commands.
-- `TASKS/field-pass-1.md`: next executable task specification.
+- `TASKS/*.md`: executable task specifications.
+- `TASKS/TEMPLATE.md`: reusable task template including branch dependencies and PR verification fields.
+- `REVIEW.md`: reusable Pull Request review checklist.
+- `TASKS/review-pr.md`: reusable Pull Request review, merge, and post-merge validation task.
 - `DEV_LOG.md`: development history.
 - `TODO.md`: open work and manual verification.
 - `BUILD_CHECK.md`: recorded verification results and troubleshooting.
