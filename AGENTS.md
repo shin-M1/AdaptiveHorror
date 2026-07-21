@@ -59,6 +59,124 @@ When stopping, report cause, attempts, evidence, remaining work, and the next sa
 - End with a clean working tree.
 - Do not leave generated solution/workspace files staged unless they are intentional task outputs.
 
+## GitHub Pull Request workflow
+
+Use GitHub Pull Requests as the standard merge path when `gh` is available and authenticated. Do not merge or push directly to `main` as a substitute for a PR.
+
+- Create or update work on a feature, fix, or chore branch.
+- Confirm the PR base and compare branches before review.
+- Review the PR diff and changed-file scope before merging.
+- Confirm GitHub checks with `gh pr checks` when checks are configured.
+- Merge only when the user or current task explicitly requests a merge.
+- Use a normal Merge Commit.
+- Do not use squash merge.
+- Do not use rebase merge.
+- After merge, checkout `main`, pull with `--ff-only`, and rerun required validation on `main`.
+- Do not continue new development on `main` after merge validation.
+- Stop after validation and report the merge result.
+
+Standard commands:
+
+```powershell
+gh auth status
+gh pr view <number> --repo <owner/repo>
+gh pr checks <number> --repo <owner/repo>
+gh pr merge <number> --repo <owner/repo> --merge
+```
+
+If `gh` is unavailable, unauthenticated, lacks permission, is blocked by branch protection, is waiting for approval, or reports failed checks, stop and report the blocker. Do not work around this by local direct merge/push to `main`.
+
+## Pull Request review requirements
+
+Before merging a PR, confirm at minimum:
+
+- Task scope match.
+- Changed files.
+- Production changed files and expected change scope.
+- No unrelated protected-system changes.
+- Documentation consistency.
+- Build result.
+- Automation result.
+- Runtime Smoke result.
+- Current-run Log Scan result.
+- `git diff --check`.
+- Working tree clean.
+- GitHub checks state.
+- No unresolved conflicts.
+- Human-only verification items are clearly labeled.
+
+Stop without merging if any of these are present:
+
+- Unrelated production changes.
+- Protected-system changes outside the task.
+- Material mismatch between documentation and implementation.
+- Build, Automation, Runtime Smoke, Log Scan, or required GitHub checks fail.
+- Unresolved conflicts.
+- PR base/compare mismatch.
+- Missing expected dependency branch or commit.
+- Authentication, permission, or approval blocker.
+
+## Post-merge validation
+
+After a PR merge, run verification on `main`:
+
+- Update `main` with `git pull --ff-only origin main`.
+- Confirm expected commits are ancestors of `main` when the task names them.
+- Run Generate Project Files as part of the standard validation script.
+- Run Development Editor / Win64 build.
+- Run Automation.
+- Run Runtime Smoke.
+- Run current-run Log Scan.
+- Run `git diff --check`.
+- Confirm `git status` is clean.
+
+If post-merge validation fails, do not commit directly to `main`. Investigate the cause and report whether a new fix branch is needed. Do not automatically start the next task.
+
+## Branch dependency rule
+
+Create new task branches from latest `main` by default. If a task explicitly depends on an unmerged branch:
+
+- Branch from the dependency branch instead of `main` only when the task says to do so.
+- Record the dependency in the task document and final report.
+- Use this format:
+
+```text
+Depends on:
+feature/example-branch
+```
+
+- State the required merge order.
+- Do not merge the child branch to `main` before its dependency is merged.
+- Stop and report when an expected dependency is missing.
+
+## Human verification rule
+
+Codex can claim only checks it actually ran, such as:
+
+- Build.
+- Automation.
+- Runtime Smoke.
+- Structural logs.
+- Static diff review.
+- Log Scan.
+
+Codex must not claim human-only checks as newly verified, including:
+
+- PIE visual confirmation.
+- Visual quality.
+- Control feel.
+- Level readability.
+- Presentation quality.
+- Subjective gameplay feel.
+
+Use clear labels such as:
+
+- `Human verification required`.
+- `Human PIE not verified`.
+- `Previously human-verified`.
+
+Do not use claims like `gameplay visually verified` unless the user supplied that human result.
+
 ## Standard short launch prompt
 
 ```text
