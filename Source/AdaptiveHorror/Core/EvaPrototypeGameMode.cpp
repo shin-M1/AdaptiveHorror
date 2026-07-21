@@ -72,7 +72,25 @@ namespace
     const FName EvaNavigableFloorTag(TEXT("EvaNavigableFloor"));
 
     constexpr int32 FacilityZoneCount = 6;
-    constexpr float FacilityConnectionGateOuterY = 760.0f;
+    constexpr float FacilityGateWallCenterY = 620.0f;
+    constexpr float FacilityGateWallScaleY = 1.4f;
+    constexpr float FacilityGateWallHalfY = FacilityGateWallScaleY * 50.0f;
+    constexpr float FacilityGateOpeningHalfY = FacilityGateWallCenterY - FacilityGateWallHalfY;
+    constexpr float FacilityGateWallOuterY = FacilityGateWallCenterY + FacilityGateWallHalfY;
+    constexpr float FacilitySideWallScaleY = 0.35f;
+    constexpr float FacilitySideWallHalfY = FacilitySideWallScaleY * 50.0f;
+    constexpr float FacilityBoundaryWallOverlap = 35.0f;
+
+    struct FFacilityBoundaryGeometry
+    {
+        float BridgeStartAbsY = 0.0f;
+        float BridgeEndAbsY = 0.0f;
+        float BridgeCenterAbsY = 0.0f;
+        float BridgeScaleY = 0.0f;
+        float SideWallCenterAbsY = 0.0f;
+        float UnexpectedGapWidth = 0.0f;
+        bool bClosedOutsideOpening = false;
+    };
 
     FVector GetFacilityZoneCenter(const int32 ZoneIndex)
     {
@@ -114,6 +132,23 @@ namespace
         case 5: return FVector(24.0f, 24.0f, 0.5f); // Adam Arena: boss room.
         default: return FVector(18.0f, 14.0f, 0.5f);
         }
+    }
+
+    FFacilityBoundaryGeometry CalculateFacilityBoundaryGeometry(const float SideWallCenterAbsY)
+    {
+        FFacilityBoundaryGeometry Geometry;
+        Geometry.SideWallCenterAbsY = SideWallCenterAbsY;
+        Geometry.BridgeStartAbsY = FacilityGateWallOuterY - FacilityBoundaryWallOverlap;
+        Geometry.BridgeEndAbsY = SideWallCenterAbsY + FacilitySideWallHalfY + FacilityBoundaryWallOverlap;
+        Geometry.BridgeCenterAbsY = (Geometry.BridgeStartAbsY + Geometry.BridgeEndAbsY) * 0.5f;
+        Geometry.BridgeScaleY = FMath::Max(0.1f, (Geometry.BridgeEndAbsY - Geometry.BridgeStartAbsY) / 100.0f);
+
+        const float GapFromGateToBridge = FMath::Max(0.0f, Geometry.BridgeStartAbsY - FacilityGateWallOuterY);
+        const float SideWallInnerAbsY = SideWallCenterAbsY - FacilitySideWallHalfY;
+        const float GapFromBridgeToSideWall = FMath::Max(0.0f, SideWallInnerAbsY - Geometry.BridgeEndAbsY);
+        Geometry.UnexpectedGapWidth = FMath::Max(GapFromGateToBridge, GapFromBridgeToSideWall);
+        Geometry.bClosedOutsideOpening = Geometry.UnexpectedGapWidth <= KINDA_SMALL_NUMBER;
+        return Geometry;
     }
 
     FString GetFacilityZoneShape(const int32 ZoneIndex)
@@ -946,31 +981,31 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         const float ConnectorYScale = FMath::Max(GetFacilityZoneFloorScale(GateIndex).Y,
             GetFacilityZoneFloorScale(GateIndex + 1).Y);
         const float MaxSideWallY = ConnectorYScale * 50.0f + 60.0f;
-        const float BoundaryBridgeHalfWidth = FMath::Max(0.0f, (MaxSideWallY - FacilityConnectionGateOuterY) * 0.5f);
-        const float BoundaryBridgeY = FacilityConnectionGateOuterY + BoundaryBridgeHalfWidth;
+        const FFacilityBoundaryGeometry BoundaryGeometry = CalculateFacilityBoundaryGeometry(MaxSideWallY);
         const bool bFloorConnected = RegisterGeneratedFloor(SpawnArenaBox(FVector(GateX, 0.0f, 0.0f),
             FVector(1.35f, ConnectorYScale, 0.55f)));
-        const bool bWallA = SpawnTaggedArenaBox(FVector(GateX, 620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f),
-            FName(TEXT("EvaGate"))) != nullptr;
-        const bool bWallB = SpawnTaggedArenaBox(FVector(GateX, -620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f),
-            FName(TEXT("EvaGate"))) != nullptr;
+        const bool bWallA = SpawnTaggedArenaBox(FVector(GateX, FacilityGateWallCenterY, 160.0f),
+            FVector(0.35f, FacilityGateWallScaleY, 3.2f), FName(TEXT("EvaGate"))) != nullptr;
+        const bool bWallB = SpawnTaggedArenaBox(FVector(GateX, -FacilityGateWallCenterY, 160.0f),
+            FVector(0.35f, FacilityGateWallScaleY, 3.2f), FName(TEXT("EvaGate"))) != nullptr;
         const bool bHeader = SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f),
             FName(TEXT("EvaGate"))) != nullptr;
-        const bool bNorthBoundaryBridge = BoundaryBridgeHalfWidth <= KINDA_SMALL_NUMBER ||
-            SpawnTaggedArenaBox(FVector(GateX, BoundaryBridgeY, 180.0f),
-                FVector(0.35f, BoundaryBridgeHalfWidth / 100.0f, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
-        const bool bSouthBoundaryBridge = BoundaryBridgeHalfWidth <= KINDA_SMALL_NUMBER ||
-            SpawnTaggedArenaBox(FVector(GateX, -BoundaryBridgeY, 180.0f),
-                FVector(0.35f, BoundaryBridgeHalfWidth / 100.0f, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
+        const bool bNorthBoundaryBridge = SpawnTaggedArenaBox(
+            FVector(GateX, BoundaryGeometry.BridgeCenterAbsY, 180.0f),
+            FVector(0.35f, BoundaryGeometry.BridgeScaleY, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
+        const bool bSouthBoundaryBridge = SpawnTaggedArenaBox(
+            FVector(GateX, -BoundaryGeometry.BridgeCenterAbsY, 180.0f),
+            FVector(0.35f, BoundaryGeometry.BridgeScaleY, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
         const int32 FloorSegments = bFloorConnected ? 1 : 0;
         const int32 WallSegments = (bWallA ? 1 : 0) + (bWallB ? 1 : 0) + (bHeader ? 1 : 0) +
             (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
+        const bool bBoundaryGeometryClosed = BoundaryGeometry.bClosedOutsideOpening;
         const bool bConnected = bFloorConnected && bWallA && bWallB && bHeader && bNorthBoundaryBridge &&
-            bSouthBoundaryBridge;
+            bSouthBoundaryBridge && bBoundaryGeometryClosed;
         const int32 BridgeSegmentCount = (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
         BoundaryBridgeSegments[GateIndex] += BridgeSegmentCount;
         BoundaryBridgeSegments[GateIndex + 1] += BridgeSegmentCount;
-        if (!bNorthBoundaryBridge || !bSouthBoundaryBridge)
+        if (!bNorthBoundaryBridge || !bSouthBoundaryBridge || !bBoundaryGeometryClosed)
         {
             ++BoundaryUnexpectedOpenings[GateIndex];
             ++BoundaryUnexpectedOpenings[GateIndex + 1];
@@ -984,6 +1019,22 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             WallSegments,
             GateX,
             ConnectorYScale * 100.0f);
+        if (GateIndex <= 1)
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[BoundaryGeometry] Connection=%s LeftWallEnd=%.0f RightWallStart=%.0f OpeningMin=%.0f OpeningMax=%.0f ExpectedOpeningWidth=%.0f BridgeStartAbsY=%.0f BridgeEndAbsY=%.0f SideWallCenterAbsY=%.0f UnexpectedGapWidth=%.0f ClosedOutsideOpening=%s"),
+                GateIndex == 0 ? TEXT("EntryToSecurity") : TEXT("SecurityToObservation"),
+                -FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY,
+                -FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY * 2.0f,
+                BoundaryGeometry.BridgeStartAbsY,
+                BoundaryGeometry.BridgeEndAbsY,
+                BoundaryGeometry.SideWallCenterAbsY,
+                BoundaryGeometry.UnexpectedGapWidth,
+                *BoolText(BoundaryGeometry.bClosedOutsideOpening && bNorthBoundaryBridge && bSouthBoundaryBridge));
+        }
     }
 
     for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)

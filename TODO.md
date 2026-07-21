@@ -1,5 +1,26 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 027 status - Close Security Corridor boundary gaps
+
+- [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.
+- [x] Kept room sizes, floors, ZONE tracking, progression, AI, Combat, HUNTER, ADAM, and Runtime NavMesh algorithms unchanged.
+- [x] Recomputed connection boundary bridge geometry from actual gate wall and side wall extents.
+- [x] Closed the regular-opening exterior span around Entry Lobby <-> Security Corridor.
+- [x] Closed the regular-opening exterior span around Security Corridor <-> Observation Lab.
+- [x] Added `[BoundaryGeometry]` logs for the two target connections.
+- [x] Confirmed Runtime Smoke logs show `UnexpectedGapWidth=0` and `ClosedOutsideOpening=true` for both target connections.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify Entry Lobby <-> Security Corridor visible wall boundary is fully closed.
+- [ ] Human PIE-verify Security Corridor <-> Observation Lab visible wall boundary is fully closed.
+- [ ] Human PIE-verify the legal passage openings remain traversable.
+- [ ] Human PIE-verify the player cannot escape or fall at either target connection.
+
 ## Cycle 026 status - Zone Identity Hotfix 1 follow-up
 
 - [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.

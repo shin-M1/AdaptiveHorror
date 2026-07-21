@@ -1,5 +1,52 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-22 Cycle 027 Close Security Corridor boundary gaps
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke exit code: 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- `git diff --check`: passed.
+- Runtime log confirmed `BoundaryGeometry` for:
+  - EntryToSecurity: `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - SecurityToObservation: `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines, all `Connected=true GapDetected=false`.
+- Runtime log confirmed 6 `BoundaryIntegrity` lines, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Recomputed connector boundary wall spans from actual generated gate/side-wall coordinates.
+- The legal passage opening remains `-550..550` Y, expected width `1100`.
+- Visible boundary bridge walls now overlap the gate side wall and the zone outer side wall.
+- No floor, room size, ZONE tracking, progression, AI, Combat, HUNTER, ADAM, Stage Clear, UI behavior, or Runtime NavMesh algorithm changes were made.
+
+### Next highest-priority PIE task
+
+Verify only the remaining boundary hotfix:
+
+1. Start PIE from New Game.
+2. Inspect Entry Lobby <-> Security Corridor from both sides.
+3. Confirm the visible exterior wall is continuous except for the legal passage opening.
+4. Confirm the player cannot escape the facility or fall at this connection.
+5. Inspect Security Corridor <-> Observation Lab from both sides.
+6. Confirm the visible exterior wall is continuous except for the legal passage opening.
+7. Confirm the player cannot escape the facility or fall at this connection.
+8. Confirm the legal passage remains traversable.
+
+### Not verified by Codex
+
+- Human PIE visual closure of the two target wall gaps.
+- Human PIE collision/escape prevention at the two target connections.
+
 ## Latest handoff - 2026-07-21 Cycle 026 Zone Identity Hotfix 1 follow-up
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

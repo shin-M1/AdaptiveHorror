@@ -1,5 +1,70 @@
 # Development Log
 
+## 2026-07-22 - Cycle 027: Close Security Corridor boundary gaps
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Continued on the existing `feature/zone-identity-hotfix1` branch.
+- Pre-work status was clean; latest local commit was `d3f086e Fix zone boundaries and location tracking`.
+- Fixed only the remaining PIE-reported visible wall boundary gaps around:
+  - Entry Lobby <-> Security Corridor,
+  - Security Corridor <-> Observation Lab.
+- Did not change Zombie AI, ZONE tracking, room sizes, floors, progression, Objective, Runtime NavMesh algorithms, Combat, HUNTER, ADAM, Stage Clear, UI behavior, or Save/settings.
+
+### Root cause
+
+- The previous visible boundary bridge calculation used a midpoint/scale formula that produced only half the required Y coverage and started from a value that did not match the actual gate wall mesh outer edge.
+- Actual gate side walls cover up to `Y=+/-690`, while the widened outer side walls for the two target connections sit at `Y=+/-1110` and `Y=+/-1010`.
+- This left visible and physical gaps between the gate-side wall segment and the zone outer side wall even though floor connectors and connection integrity logs were present.
+
+### Exact geometry changes
+
+- Replaced the connector-side boundary bridge math with generated-coordinate calculations based on:
+  - gate wall center,
+  - gate wall half extent,
+  - regular opening half-width,
+  - side wall center,
+  - side wall half extent,
+  - explicit overlap.
+- Boundary bridge walls now cover from the gate wall outer edge with overlap to beyond the side wall thickness with overlap.
+- The legal passage opening remains `-550..550` Y, expected width `1100`.
+- Added `[BoundaryGeometry]` logs for the two target connections:
+  - EntryToSecurity,
+  - SecurityToObservation.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Validation
+
+- Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Development Editor / Win64 build without Live Coding: succeeded.
+- Automation RunTests `AdaptiveHorror`: 43 succeeded, 0 failed.
+- Runtime Smoke: exit code 0.
+- Runtime log scan: PASS, 0 blocking matches.
+- `git diff --check`: PASS.
+- Runtime log evidence:
+  - `[BoundaryGeometry] Connection=EntryToSecurity ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1162 SideWallCenterAbsY=1110 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - `[BoundaryGeometry] Connection=SecurityToObservation ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1062 SideWallCenterAbsY=1010 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that the remaining Entry/Security and Security/Observation wall gaps are closed.
+- Human PIE confirmation that the player cannot escape the facility perimeter at those two transitions.
+
+### Remaining risks / next task
+
+- If PIE still shows a visible gap, inspect the exact side and screenshot location and adjust only that connector wall segment. Do not change floor, room width, ZONE tracking, AI, combat, or progression.
+
 ## 2026-07-21 - Cycle 026: Zone Identity Hotfix 1 follow-up
 
 Branch: `feature/zone-identity-hotfix1`

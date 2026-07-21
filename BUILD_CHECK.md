@@ -1,5 +1,39 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 027 execution result - Close Security Corridor boundary gaps
+
+Date: 2026-07-22 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests, 43 succeeded, 0 failed.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-16.37.55.log`
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - `[BoundaryGeometry] Connection=EntryToSecurity ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1162 SideWallCenterAbsY=1110 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - `[BoundaryGeometry] Connection=SecurityToObservation ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1062 SideWallCenterAbsY=1010 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - Runtime NavMesh readiness logged `Ready=true`.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- `git diff --check`: PASS.
+
 ## Cycle 026 execution result - Zone Identity Hotfix 1 follow-up
 
 Date: 2026-07-21 JST
