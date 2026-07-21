@@ -71,6 +71,34 @@ namespace
     const FName RuntimeFloorTag(TEXT("RuntimeFloor"));
     const FName EvaNavigableFloorTag(TEXT("EvaNavigableFloor"));
 
+    FVector GetFacilityZoneFloorScale(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return FVector(18.0f, 21.0f, 0.5f); // Entry: wider lobby.
+        case 1: return FVector(18.0f, 12.5f, 0.5f); // Security: still corridor-like.
+        case 2: return FVector(18.0f, 19.0f, 0.5f); // Observation: room to circle equipment.
+        case 3: return FVector(18.0f, 18.0f, 0.5f); // Containment: side cells plus cover.
+        case 4: return FVector(18.0f, 19.0f, 0.5f); // Data Core: half-loop space.
+        case 5: return FVector(24.0f, 24.0f, 0.5f); // Adam Arena: boss room.
+        default: return FVector(18.0f, 14.0f, 0.5f);
+        }
+    }
+
+    FString GetFacilityZoneShape(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return TEXT("Open");
+        case 1: return TEXT("LShape");
+        case 2: return TEXT("Central");
+        case 3: return TEXT("Cell");
+        case 4: return TEXT("Central");
+        case 5: return TEXT("Arena");
+        default: return TEXT("Linear");
+        }
+    }
+
     bool IsLivingEvaEnemy(const AEvaZombieCharacter* Enemy)
     {
         return Enemy && Enemy->GetHealthComponent() && !Enemy->GetHealthComponent()->IsDead();
@@ -866,12 +894,56 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
     BuildFacilityZone(ZoneCenters[4], TEXT("Data Core Room"), 4);
     BuildFacilityZone(ZoneCenters[5], TEXT("Adam Arena"), 5);
 
+    auto RegisterGeneratedFloor = [this](AActor* FloorActor)
+    {
+        if (FloorActor)
+        {
+            if (UStaticMeshComponent* MeshComponent = Cast<UStaticMeshComponent>(FloorActor->GetComponentByClass(
+                UStaticMeshComponent::StaticClass())))
+            {
+                MeshComponent->ComponentTags.AddUnique(RuntimeFloorTag);
+                MeshComponent->ComponentTags.AddUnique(EvaNavigableFloorTag);
+                RegisterRuntimeFloorComponent(MeshComponent);
+                return true;
+            }
+        }
+        return false;
+    };
+
+    static const TCHAR* ZoneConnectionNames[] =
+    {
+        TEXT("Entry->Security"),
+        TEXT("Security->Observation"),
+        TEXT("Observation->Containment"),
+        TEXT("Containment->DataCore"),
+        TEXT("DataCore->Arena")
+    };
+
     for (int32 GateIndex = 0; GateIndex < 5; ++GateIndex)
     {
         const float GateX = -3900.0f + GateIndex * 1800.0f;
-        SpawnTaggedArenaBox(FVector(GateX, 620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f), FName(TEXT("EvaGate")));
-        SpawnTaggedArenaBox(FVector(GateX, -620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f), FName(TEXT("EvaGate")));
-        SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f), FName(TEXT("EvaGate")));
+        const float ConnectorYScale = FMath::Max(GetFacilityZoneFloorScale(GateIndex).Y,
+            GetFacilityZoneFloorScale(GateIndex + 1).Y);
+        const bool bFloorConnected = RegisterGeneratedFloor(SpawnArenaBox(FVector(GateX, 0.0f, 0.0f),
+            FVector(1.35f, ConnectorYScale, 0.55f)));
+        const bool bWallA = SpawnTaggedArenaBox(FVector(GateX, 620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f),
+            FName(TEXT("EvaGate"))) != nullptr;
+        const bool bWallB = SpawnTaggedArenaBox(FVector(GateX, -620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f),
+            FName(TEXT("EvaGate"))) != nullptr;
+        const bool bHeader = SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f),
+            FName(TEXT("EvaGate"))) != nullptr;
+        const int32 FloorSegments = bFloorConnected ? 1 : 0;
+        const int32 WallSegments = (bWallA ? 1 : 0) + (bWallB ? 1 : 0) + (bHeader ? 1 : 0);
+        const bool bConnected = bFloorConnected && bWallA && bWallB && bHeader;
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ConnectionIntegrity] Link=%s Connected=%s GapDetected=%s FloorSegments=%d WallSegments=%d ConnectorX=%.0f ConnectorWidth=%.0f"),
+            ZoneConnectionNames[GateIndex],
+            *BoolText(bConnected),
+            *BoolText(!bConnected),
+            FloorSegments,
+            WallSegments,
+            GateX,
+            ConnectorYScale * 100.0f);
     }
 
     CurrentDirector = GetWorld()->SpawnActor<AEvaResearchFacilityDirector>(AEvaResearchFacilityDirector::StaticClass(),
@@ -1403,7 +1475,37 @@ void AEvaPrototypeGameMode::LogNavigationStatus(const FString& Context) const
 
 void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FString& Label, const int32 ZoneIndex)
 {
-    AActor* Floor = SpawnArenaBox(FVector(Center.X, Center.Y, 0.0f), FVector(18.0f, 14.0f, 0.5f));
+    const FVector FloorScale = GetFacilityZoneFloorScale(ZoneIndex);
+    const float HalfWidth = FloorScale.Y * 50.0f;
+    const float SideWallY = HalfWidth + 60.0f;
+    const float WallHeightScale = ZoneIndex == 5 ? 4.3f : (ZoneIndex == 0 ? 3.9f : 3.6f);
+    int32 ObstacleCount = 0;
+    int32 LandmarkCount = 0;
+
+    auto MarkObstacle = [&ObstacleCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            ++ObstacleCount;
+        }
+    };
+    auto MarkLandmark = [&LandmarkCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            ++LandmarkCount;
+        }
+    };
+    auto MarkObstacleLandmark = [&ObstacleCount, &LandmarkCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            ++ObstacleCount;
+            ++LandmarkCount;
+        }
+    };
+
+    AActor* Floor = SpawnArenaBox(FVector(Center.X, Center.Y, 0.0f), FloorScale);
     if (Floor)
     {
         Floor->Tags.Add(FName(*FString::Printf(TEXT("EvaZone_%d"), ZoneIndex)));
@@ -1416,24 +1518,85 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
         }
     }
 
-    SpawnArenaBox(FVector(Center.X, 760.0f, 180.0f), FVector(18.0f, 0.35f, 3.6f));
-    SpawnArenaBox(FVector(Center.X, -760.0f, 180.0f), FVector(18.0f, 0.35f, 3.6f));
+    SpawnArenaBox(FVector(Center.X, SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
+    SpawnArenaBox(FVector(Center.X, -SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
 
-    SpawnTaggedArenaBox(FVector(Center.X - 360.0f, 420.0f, 95.0f), FVector(2.0f, 1.0f, 1.9f), FName(TEXT("EvaCover")),
-        FRotator(0.0f, 20.0f + ZoneIndex * 7.0f, 0.0f));
-    SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -430.0f, 80.0f), FVector(1.4f, 2.0f, 1.6f), FName(TEXT("EvaCover")),
-        FRotator(0.0f, -25.0f, 0.0f));
-    SpawnTaggedArenaBox(FVector(Center.X - 520.0f, -560.0f, 55.0f), FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaEscapeRoute")));
-    SpawnTaggedArenaBox(FVector(Center.X + 520.0f, 560.0f, 55.0f), FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaAmbushPoint")));
-    SpawnTaggedArenaBox(FVector(Center.X, -620.0f, 70.0f), FVector(0.55f, 0.55f, 0.55f), FName(TEXT("EvaHideSpot")));
+    MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 360.0f, FMath::Min(500.0f, HalfWidth - 170.0f), 95.0f),
+        FVector(2.0f, 1.0f, 1.9f), FName(TEXT("EvaCover")), FRotator(0.0f, 20.0f + ZoneIndex * 7.0f, 0.0f)));
+    MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -FMath::Min(500.0f, HalfWidth - 170.0f), 80.0f),
+        FVector(1.4f, 2.0f, 1.6f), FName(TEXT("EvaCover")), FRotator(0.0f, -25.0f, 0.0f)));
+    SpawnTaggedArenaBox(FVector(Center.X - 520.0f, -FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
+        FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaEscapeRoute")));
+    SpawnTaggedArenaBox(FVector(Center.X + 520.0f, FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
+        FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaAmbushPoint")));
+    SpawnTaggedArenaBox(FVector(Center.X, -FMath::Max(260.0f, HalfWidth - 110.0f), 70.0f),
+        FVector(0.55f, 0.55f, 0.55f), FName(TEXT("EvaHideSpot")));
+
+    switch (ZoneIndex)
+    {
+    case 0:
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 600.0f, 75.0f),
+            FVector(2.8f, 0.45f, 0.75f), FName(TEXT("EvaReceptionDesk"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 650.0f, 135.0f),
+            FVector(1.5f, 0.25f, 0.25f), FName(TEXT("EvaReceptionDesk"))));
+        break;
+    case 1:
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X - 410.0f, 160.0f, 105.0f),
+            FVector(2.8f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X + 120.0f, -160.0f, 105.0f),
+            FVector(2.6f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
+        break;
+    case 2:
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 115.0f),
+            FVector(2.7f, 2.35f, 2.3f), FName(TEXT("EvaObservationEquipment"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 420.0f, SideWallY - 70.0f, 190.0f),
+            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X + 420.0f, SideWallY - 70.0f, 190.0f),
+            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
+        break;
+    case 3:
+        for (int32 CellIndex = 0; CellIndex < 3; ++CellIndex)
+        {
+            const float CellX = Center.X - 520.0f + CellIndex * 520.0f;
+            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, SideWallY - 110.0f, 120.0f),
+                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
+            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, -SideWallY + 110.0f, 120.0f),
+                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
+        }
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 360.0f, -140.0f, 70.0f),
+            FVector(1.4f, 0.9f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, -35.0f, 0.0f)));
+        break;
+    case 4:
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 170.0f),
+            FVector(1.55f, 1.55f, 3.4f), FName(TEXT("EvaDataCore"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 300.0f, 320.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X, 410.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 300.0f, 320.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        break;
+    case 5:
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 720.0f, 0.0f, 210.0f),
+            FVector(0.28f, 5.6f, 0.35f), FName(TEXT("EvaAdamArenaGate"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 780.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 520.0f, -780.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        break;
+    default:
+        break;
+    }
 
     if (ZoneIndex == 0)
     {
-        SpawnArenaBox(FVector(Center.X - 880.0f, 0.0f, 180.0f), FVector(0.35f, 14.0f, 3.6f));
+        SpawnArenaBox(FVector(Center.X - 880.0f, 0.0f, WallHeightScale * 50.0f),
+            FVector(0.35f, FloorScale.Y, WallHeightScale));
     }
     if (ZoneIndex == 5)
     {
-        SpawnArenaBox(FVector(Center.X + 880.0f, 0.0f, 180.0f), FVector(0.35f, 14.0f, 3.6f));
+        SpawnArenaBox(FVector(Center.X + 880.0f, 0.0f, WallHeightScale * 50.0f),
+            FVector(0.35f, FloorScale.Y, WallHeightScale));
     }
 
     AActor* LabelMarker = SpawnArenaBox(FVector(Center.X, 0.0f, 25.0f), FVector(0.35f, 0.35f, 0.08f));
@@ -1443,6 +1606,17 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
         LabelMarker->SetActorHiddenInGame(true);
         LabelMarker->SetActorEnableCollision(false);
     }
+
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZoneIdentity] ZoneIndex=%d Zone=\"%s\" ZoneShape=%s FloorArea=%.0f ObstacleCount=%d LandmarkCount=%d AverageWidth=%.0f AverageHeight=%.0f"),
+        ZoneIndex,
+        *Label,
+        *GetFacilityZoneShape(ZoneIndex),
+        FloorScale.X * FloorScale.Y * 10000.0f,
+        ObstacleCount,
+        LandmarkCount,
+        FloorScale.Y * 100.0f,
+        WallHeightScale * 100.0f);
 }
 
 void AEvaPrototypeGameMode::SpawnFacilityTrigger(AEvaResearchFacilityDirector* Director,

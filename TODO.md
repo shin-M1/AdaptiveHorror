@@ -1,5 +1,29 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 025 status - Zone Identity Hotfix 1
+
+- [x] Created `feature/zone-identity-hotfix1` from latest clean `main`.
+- [x] Created `TASKS/zone-identity-hotfix-1.md`.
+- [x] Added explicit runtime floor connector slabs at all five zone transitions.
+- [x] Registered connector slabs as runtime navigable floor components.
+- [x] Added `[ConnectionIntegrity]` logs for Entry->Security, Security->Observation, Observation->Containment, Containment->DataCore, and DataCore->Arena.
+- [x] Confirmed runtime logs show `Connected=true` and `GapDetected=false` for all five connections.
+- [x] Kept `ZoneIdentity` runtime logs for all six zones.
+- [x] Widened Entry Lobby, Observation Lab, Containment Ward, Data Core Room, and Adam Arena within hotfix scope.
+- [x] Kept Security Corridor corridor-like while reducing cramped feel.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify no player fall at Entry Lobby -> Security Corridor.
+- [ ] Human PIE-verify no player fall at Security Corridor -> Observation Lab.
+- [ ] Human PIE-verify all other zone transitions remain traversable.
+- [ ] Human PIE-verify widened rooms feel less cramped without harming navigation/combat readability.
+- [ ] Human PIE-verify full New Game to Adam Arena traversal.
+
 ## Cycle 024 status - Autonomous Development Kit
 
 - [x] Created `chore/autonomous-development-kit` from latest clean `main`.

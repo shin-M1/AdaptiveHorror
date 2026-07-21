@@ -1,5 +1,107 @@
 # Development Log
 
+## 2026-07-21 - Cycle 025: Zone Identity Hotfix 1
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Created `feature/zone-identity-hotfix1` from latest clean `main`.
+- Latest `main` did not contain `TASKS/zone-identity-pass-1.md`; read the pass task from `feature/zone-identity-pass1` history for context only.
+- Created `TASKS/zone-identity-hotfix-1.md`.
+- Fixed only runtime facility geometry/connectivity issues reported from Zone Identity PIE.
+- Did not change AI, combat, HUNTER, ADAM, Stage Clear, UI, Save/settings, lighting, audio, art assets, encounters, or Runtime NavMesh algorithms/configuration.
+
+### Implemented
+
+- Added explicit overlapping runtime floor connector slabs at all five zone boundaries:
+  - Entry -> Security
+  - Security -> Observation
+  - Observation -> Containment
+  - Containment -> DataCore
+  - DataCore -> Arena
+- Registered connector floor slabs as runtime navigable floor components so Runtime NavMesh generation sees the connected path.
+- Preserved gate collision/header pieces at each connection.
+- Added `[ConnectionIntegrity]` runtime logs with:
+  - `Connected`,
+  - `GapDetected`,
+  - `FloorSegments`,
+  - `WallSegments`,
+  - connector X and width.
+- Restored/kept `[ZoneIdentity]` logs on this latest-main hotfix branch.
+- Widened the requested rooms by approximately 15-30%:
+  - Entry Lobby
+  - Observation Lab
+  - Containment Ward
+  - Data Core Room
+  - Adam Arena slightly widened
+  - Security Corridor kept corridor-like but less cramped.
+
+### Changed files
+
+- `TASKS/zone-identity-hotfix-1.md`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Verification
+
+- Initial sandboxed validation attempt:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Result: failed before build due sandbox denial while UnrealBuildTool attempted to access `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.20-20.34.31.uba`.
+  - This was an environment permission issue, not a compile failure.
+- Escalated validation:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Result: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: 43 tests succeeded, 0 failed.
+  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-08.42.34.log`
+  - Runtime Smoke: exit code 0.
+  - Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+  - Runtime log scan: PASS; 0 blocking matches for Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / Automation failure.
+  - `git diff --check`: PASS; CRLF conversion warnings only.
+
+### Runtime evidence
+
+- `Saved\Logs\AdaptiveHorror.log` contains 5 `ConnectionIntegrity` lines:
+  - `Entry->Security Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Security->Observation Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Observation->Containment Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Containment->DataCore Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `DataCore->Arena Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+- `Saved\Logs\AdaptiveHorror.log` contains 6 `ZoneIdentity` lines:
+  - `Entry Lobby`: `ZoneShape=Open FloorArea=3780000 AverageWidth=2100`
+  - `Security Corridor`: `ZoneShape=LShape FloorArea=2250000 AverageWidth=1250`
+  - `Observation Lab`: `ZoneShape=Central FloorArea=3420000 AverageWidth=1900`
+  - `Containment Ward`: `ZoneShape=Cell FloorArea=3240000 AverageWidth=1800`
+  - `Data Core Room`: `ZoneShape=Central FloorArea=3420000 AverageWidth=1900`
+  - `Adam Arena`: `ZoneShape=Arena FloorArea=5760000 AverageWidth=2400`
+- Runtime NavMesh readiness:
+  - `Ready=true`
+  - `PlayerProjected=true`
+  - `RepresentativeProjected=true`
+- Stage Clear regression remained covered by existing automation:
+  - `AdaptiveHorror.StageClear.Idempotent`
+  - `AdaptiveHorror.StageClear.RejectsPlayerDeath`
+  - `AdaptiveHorror.StageClear.SkipsSpawns`
+  - `AdaptiveHorror.StageClear.StopsEnemyCombat`
+
+### Not verified by Codex
+
+- Human PIE confirmation that the player no longer falls between Entry Lobby and Security Corridor.
+- Human PIE confirmation that the player no longer falls between Security Corridor and Observation Lab.
+- Human PIE feel check for widened rooms.
+- Full New Game to Adam Arena traversal in PIE.
+
+### Known issues / TBD
+
+- Runtime Smoke confirms generated geometry/logs and startup safety, but cannot prove human traversal comfort.
+- Latest `main` lacks the Zone Identity Pass 1 task/code, so this hotfix branch carries the minimal runtime zone identity/connectivity changes needed for verification.
+- UE5.8 still prints non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 validation succeeded.
+
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
 
 Branch: `chore/autonomous-development-kit`

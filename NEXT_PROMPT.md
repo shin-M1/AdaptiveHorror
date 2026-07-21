@@ -1,5 +1,73 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-21 Cycle 025 Zone Identity Hotfix 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log`: exit code 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- Runtime log confirmed 6 `ZoneIdentity` lines.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines.
+- All five connection logs show `Connected=true GapDetected=false`.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Added explicit overlapping runtime floor connector slabs at all five zone boundaries.
+- Registered connector slabs as runtime navigable floors.
+- Preserved gate side/header collision pieces and added connection diagnostics.
+- Widened Entry Lobby, Observation Lab, Containment Ward, Data Core Room, and Adam Arena.
+- Kept Security Corridor corridor-like while reducing cramped feel.
+- Did not change AI, combat, HUNTER, ADAM, Stage Clear, UI, Save/settings, lighting, audio, art assets, encounters, or Runtime NavMesh algorithms/configuration.
+
+### Next highest-priority task
+
+Run PIE and verify only the Zone Identity Hotfix 1 issues.
+
+PIE checklist:
+
+1. Start New Game.
+2. Walk from Entry Lobby to Security Corridor without jumping or debug movement.
+3. Confirm there is no visible/physical floor or wall collision gap and the player cannot fall.
+4. Walk from Security Corridor to Observation Lab.
+5. Confirm there is no visible/physical floor or wall collision gap and the player cannot fall.
+6. Continue through Observation Lab, Containment Ward, Data Core Room, and Adam Arena.
+7. Confirm all transitions remain traversable.
+8. Confirm widened rooms feel less cramped.
+9. Confirm Power Console, Keycard, Locked Door, 3 Research Logs, and Data Core Console remain reachable.
+10. Confirm enemy/player movement and Stage Clear are not regressed.
+
+If a problem is found:
+
+- Fix only runtime facility connector/room geometry directly related to the fall gap or cramped room feel.
+- Preserve AI, HUNTER, ADAM, combat, Player Death, Stage Clear, UI flow, Save/settings, audio, lighting, and art assets.
+
+### Important files
+
+- `TASKS/zone-identity-hotfix-1.md`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+
+### Completion condition for next pass
+
+- Human confirms in PIE that the connection fall gaps are gone.
+- Human confirms widened rooms are acceptable.
+- If code changes are needed, Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime Smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 023 Content Interactable Visibility and Pickup Fix
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
