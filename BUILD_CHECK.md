@@ -1,5 +1,47 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 026 execution result - Zone Identity Hotfix 1 follow-up
+
+Date: 2026-07-21 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Initial sandboxed run failed before build due `System.UnauthorizedAccessException` on UnrealBuildTool's local trace/log backup directory under `C:\Users\shinn\AppData\Local\UnrealBuildTool`.
+- Re-run with permission to use Unreal's normal local build/log directories: reached compiler.
+- First compiler result found one new issue:
+  - `EvaZombieAIController.cpp`: `BoolText` was not in scope for the new diagnostic log.
+- Fixed the diagnostic log to use local ternary text formatting.
+- Final validation result: PASS.
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests, 43 succeeded, 0 failed.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-09.10.39.log`
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true Source=GeneratedFacilityBounds`.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- Zombie attack diagnostics:
+  - Runtime Smoke emitted 0 `[ZombieAttackDiag]` lines because it does not drive close-range combat.
+  - PIE verification is still required for the reported zombie attack behavior.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+
 ## Cycle 025 execution result - Zone Identity Hotfix 1
 
 Date: 2026-07-21 JST

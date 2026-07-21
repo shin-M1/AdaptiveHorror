@@ -1,5 +1,30 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 026 status - Zone Identity Hotfix 1 follow-up
+
+- [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.
+- [x] Confirmed pre-work HEAD was `fe2eb1e Implement Zone Identity Hotfix 1`.
+- [x] Closed visible exterior wall discontinuities at zone transitions with visible boundary bridge wall segments, not floor-only or transparent-only collision.
+- [x] Kept legal central zone connections open and preserved runtime floor connectors.
+- [x] Added `[BoundaryIntegrity]` logs for all six zones.
+- [x] Added location-based zone lookup for the generated facility.
+- [x] Updated HUD ZONE display to follow actual player position independently from Director objective progression.
+- [x] Added `[ZoneTracking]` runtime structure log.
+- [x] Added zombie attack diagnostic logs for Target acquired, MoveTo, range/LOS, attack start, and damage application.
+- [x] Live Coding-free Development Editor / Win64 build succeeded after fixing the one compile error found by validation.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify Entry Lobby -> Security Corridor exterior walls are visually/physically closed.
+- [ ] Human PIE-verify Security Corridor -> Observation Lab exterior walls are visually/physically closed.
+- [ ] Human PIE-verify all other zone perimeter transitions cannot be used to leave the facility.
+- [ ] Human PIE-verify ZONE HUD updates when moving forward and backward across all adjacent zone boundaries.
+- [ ] Human PIE-verify ZONE HUD does not flicker at boundaries.
+- [ ] Human PIE-verify zombie attack behavior using `[ZombieAttackDiag]` if the issue persists.
+
 ## Cycle 025 status - Zone Identity Hotfix 1
 
 - [x] Created `feature/zone-identity-hotfix1` from latest clean `main`.

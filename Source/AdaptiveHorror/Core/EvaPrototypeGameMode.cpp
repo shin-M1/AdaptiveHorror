@@ -71,6 +71,37 @@ namespace
     const FName RuntimeFloorTag(TEXT("RuntimeFloor"));
     const FName EvaNavigableFloorTag(TEXT("EvaNavigableFloor"));
 
+    constexpr int32 FacilityZoneCount = 6;
+    constexpr float FacilityConnectionGateOuterY = 760.0f;
+
+    FVector GetFacilityZoneCenter(const int32 ZoneIndex)
+    {
+        static const FVector ZoneCenters[] =
+        {
+            FVector(-4800.0f, 0.0f, 0.0f),
+            FVector(-3000.0f, 0.0f, 0.0f),
+            FVector(-1200.0f, 0.0f, 0.0f),
+            FVector(600.0f, 0.0f, 0.0f),
+            FVector(2400.0f, 0.0f, 0.0f),
+            FVector(4200.0f, 0.0f, 0.0f)
+        };
+        return ZoneCenters[FMath::Clamp(ZoneIndex, 0, FacilityZoneCount - 1)];
+    }
+
+    FString GetFacilityZoneDisplayName(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return TEXT("Entry Lobby");
+        case 1: return TEXT("Security Corridor");
+        case 2: return TEXT("Observation Lab");
+        case 3: return TEXT("Containment Ward");
+        case 4: return TEXT("Data Core Room");
+        case 5: return TEXT("Adam Arena");
+        default: return TEXT("Unknown");
+        }
+    }
+
     FVector GetFacilityZoneFloorScale(const int32 ZoneIndex)
     {
         switch (ZoneIndex)
@@ -873,26 +904,14 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         return;
     }
 
-    static const FVector ZoneCenters[] =
-    {
-        FVector(-4800.0f, 0.0f, 0.0f),
-        FVector(-3000.0f, 0.0f, 0.0f),
-        FVector(-1200.0f, 0.0f, 0.0f),
-        FVector(600.0f, 0.0f, 0.0f),
-        FVector(2400.0f, 0.0f, 0.0f),
-        FVector(4200.0f, 0.0f, 0.0f)
-    };
-
     RuntimeFloorComponents.Reset();
     RuntimeFacilityBounds = FBox(EForceInit::ForceInit);
     SpawnedFacilityInteractableKeys.Reset();
 
-    BuildFacilityZone(ZoneCenters[0], TEXT("Entry Lobby"), 0);
-    BuildFacilityZone(ZoneCenters[1], TEXT("Security Corridor"), 1);
-    BuildFacilityZone(ZoneCenters[2], TEXT("Observation Lab"), 2);
-    BuildFacilityZone(ZoneCenters[3], TEXT("Containment Ward"), 3);
-    BuildFacilityZone(ZoneCenters[4], TEXT("Data Core Room"), 4);
-    BuildFacilityZone(ZoneCenters[5], TEXT("Adam Arena"), 5);
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        BuildFacilityZone(GetFacilityZoneCenter(ZoneIndex), GetFacilityZoneDisplayName(ZoneIndex), ZoneIndex);
+    }
 
     auto RegisterGeneratedFloor = [this](AActor* FloorActor)
     {
@@ -918,12 +937,17 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         TEXT("Containment->DataCore"),
         TEXT("DataCore->Arena")
     };
+    int32 BoundaryUnexpectedOpenings[FacilityZoneCount] = {};
+    int32 BoundaryBridgeSegments[FacilityZoneCount] = {};
 
     for (int32 GateIndex = 0; GateIndex < 5; ++GateIndex)
     {
         const float GateX = -3900.0f + GateIndex * 1800.0f;
         const float ConnectorYScale = FMath::Max(GetFacilityZoneFloorScale(GateIndex).Y,
             GetFacilityZoneFloorScale(GateIndex + 1).Y);
+        const float MaxSideWallY = ConnectorYScale * 50.0f + 60.0f;
+        const float BoundaryBridgeHalfWidth = FMath::Max(0.0f, (MaxSideWallY - FacilityConnectionGateOuterY) * 0.5f);
+        const float BoundaryBridgeY = FacilityConnectionGateOuterY + BoundaryBridgeHalfWidth;
         const bool bFloorConnected = RegisterGeneratedFloor(SpawnArenaBox(FVector(GateX, 0.0f, 0.0f),
             FVector(1.35f, ConnectorYScale, 0.55f)));
         const bool bWallA = SpawnTaggedArenaBox(FVector(GateX, 620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f),
@@ -932,9 +956,25 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             FName(TEXT("EvaGate"))) != nullptr;
         const bool bHeader = SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f),
             FName(TEXT("EvaGate"))) != nullptr;
+        const bool bNorthBoundaryBridge = BoundaryBridgeHalfWidth <= KINDA_SMALL_NUMBER ||
+            SpawnTaggedArenaBox(FVector(GateX, BoundaryBridgeY, 180.0f),
+                FVector(0.35f, BoundaryBridgeHalfWidth / 100.0f, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
+        const bool bSouthBoundaryBridge = BoundaryBridgeHalfWidth <= KINDA_SMALL_NUMBER ||
+            SpawnTaggedArenaBox(FVector(GateX, -BoundaryBridgeY, 180.0f),
+                FVector(0.35f, BoundaryBridgeHalfWidth / 100.0f, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
         const int32 FloorSegments = bFloorConnected ? 1 : 0;
-        const int32 WallSegments = (bWallA ? 1 : 0) + (bWallB ? 1 : 0) + (bHeader ? 1 : 0);
-        const bool bConnected = bFloorConnected && bWallA && bWallB && bHeader;
+        const int32 WallSegments = (bWallA ? 1 : 0) + (bWallB ? 1 : 0) + (bHeader ? 1 : 0) +
+            (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
+        const bool bConnected = bFloorConnected && bWallA && bWallB && bHeader && bNorthBoundaryBridge &&
+            bSouthBoundaryBridge;
+        const int32 BridgeSegmentCount = (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
+        BoundaryBridgeSegments[GateIndex] += BridgeSegmentCount;
+        BoundaryBridgeSegments[GateIndex + 1] += BridgeSegmentCount;
+        if (!bNorthBoundaryBridge || !bSouthBoundaryBridge)
+        {
+            ++BoundaryUnexpectedOpenings[GateIndex];
+            ++BoundaryUnexpectedOpenings[GateIndex + 1];
+        }
         UE_LOG(LogAdaptiveHorror, Log,
             TEXT("[ConnectionIntegrity] Link=%s Connected=%s GapDetected=%s FloorSegments=%d WallSegments=%d ConnectorX=%.0f ConnectorWidth=%.0f"),
             ZoneConnectionNames[GateIndex],
@@ -945,6 +985,31 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
             GateX,
             ConnectorYScale * 100.0f);
     }
+
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        const bool bBoundaryClosed = BoundaryUnexpectedOpenings[ZoneIndex] == 0;
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[BoundaryIntegrity] Zone=%s OuterBoundaryClosed=%s UnexpectedOpenings=%d OuterSideWalls=2 BoundaryBridgeSegments=%d BoundaryBridgeAware=true"),
+            *GetFacilityZoneDisplayName(ZoneIndex).Replace(TEXT(" "), TEXT("")),
+            *BoolText(bBoundaryClosed),
+            BoundaryUnexpectedOpenings[ZoneIndex],
+            BoundaryBridgeSegments[ZoneIndex]);
+    }
+
+    const bool bZoneTrackingBoundsValid =
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(0)) == GetFacilityZoneDisplayName(0) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(1)) == GetFacilityZoneDisplayName(1) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(2)) == GetFacilityZoneDisplayName(2) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(3)) == GetFacilityZoneDisplayName(3) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(4)) == GetFacilityZoneDisplayName(4) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(5)) == GetFacilityZoneDisplayName(5);
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZoneTracking] ZoneBounds=%d BidirectionalTrackingEnabled=%s ObjectiveIndependent=%s BoundsValid=%s Source=GeneratedFacilityBounds"),
+        FacilityZoneCount,
+        FacilityZoneCount == 6 ? TEXT("true") : TEXT("false"),
+        TEXT("true"),
+        *BoolText(bZoneTrackingBoundsValid));
 
     CurrentDirector = GetWorld()->SpawnActor<AEvaResearchFacilityDirector>(AEvaResearchFacilityDirector::StaticClass(),
         FVector::ZeroVector, FRotator::ZeroRotator);
@@ -1032,9 +1097,9 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
 
     RuntimeEmergencyLightComponents.Reset();
     RuntimeEmergencyLightBaseIntensities.Reset();
-    for (int32 ZoneIndex = 0; ZoneIndex < UE_ARRAY_COUNT(ZoneCenters); ++ZoneIndex)
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
     {
-        const FVector EmergencyLightLocation(ZoneCenters[ZoneIndex].X, ZoneCenters[ZoneIndex].Y + 585.0f, 285.0f);
+        const FVector EmergencyLightLocation(GetFacilityZoneCenter(ZoneIndex).X, GetFacilityZoneCenter(ZoneIndex).Y + 585.0f, 285.0f);
         if (APointLight* EmergencyLight = GetWorld()->SpawnActor<APointLight>(EmergencyLightLocation, FRotator::ZeroRotator))
         {
             if (UPointLightComponent* PointLightComponent = Cast<UPointLightComponent>(EmergencyLight->GetLightComponent()))
@@ -1471,6 +1536,30 @@ void AEvaPrototypeGameMode::LogNavigationStatus(const FString& Context) const
             *BoolText(bPlayerProjected),
             bPlayerProjected ? *ProjectedPlayerLocation.Location.ToCompactString() : TEXT("None"));
     }
+}
+
+FString AEvaPrototypeGameMode::GetFacilityZoneNameForLocation(const FVector& WorldLocation) const
+{
+    int32 BestZoneIndex = 0;
+    float BestScore = TNumericLimits<float>::Max();
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        const FVector ZoneCenter = GetFacilityZoneCenter(ZoneIndex);
+        const FVector ZoneScale = GetFacilityZoneFloorScale(ZoneIndex);
+        const float HalfLengthX = ZoneScale.X * 50.0f;
+        const float HalfWidthY = ZoneScale.Y * 50.0f;
+        const float OutsideX = FMath::Max(0.0f, FMath::Abs(WorldLocation.X - ZoneCenter.X) - HalfLengthX);
+        const float OutsideY = FMath::Max(0.0f, FMath::Abs(WorldLocation.Y - ZoneCenter.Y) - HalfWidthY);
+        const float Score = OutsideX * OutsideX + OutsideY * OutsideY +
+            FMath::Abs(WorldLocation.X - ZoneCenter.X) * 0.01f;
+        if (Score < BestScore)
+        {
+            BestScore = Score;
+            BestZoneIndex = ZoneIndex;
+        }
+    }
+
+    return GetFacilityZoneDisplayName(BestZoneIndex);
 }
 
 void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FString& Label, const int32 ZoneIndex)

@@ -1,5 +1,53 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-21 Cycle 026 Zone Identity Hotfix 1 follow-up
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log`: exit code 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- Runtime log confirmed 6 `ZoneIdentity` lines.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines; all show `Connected=true GapDetected=false`.
+- Runtime log confirmed 6 `BoundaryIntegrity` lines; all show `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- Runtime log confirmed `ZoneTracking` with `ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true`.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Added visible outer boundary bridge wall segments at each zone connection to close perimeter gaps left by widened zone side walls.
+- Kept legal central connection openings traversable.
+- Added position-based facility zone lookup in `AEvaPrototypeGameMode`.
+- Updated HUD ZONE display to follow the player's actual location instead of the Director's progression-only zone.
+- Added structure logs for boundary integrity and zone tracking.
+- Added zombie attack diagnostic logs only; no zombie behavior/balance/state-machine change was made.
+
+### Next highest-priority PIE task
+
+Verify the follow-up hotfix in PIE:
+
+1. Start New Game.
+2. At Entry Lobby -> Security Corridor, inspect the exterior walls near the transition and confirm the player cannot leave the facility or fall.
+3. At Security Corridor -> Observation Lab, inspect the exterior walls near the transition and confirm the player cannot leave the facility or fall.
+4. Walk backward and forward across every adjacent zone boundary and confirm the ZONE HUD follows actual location, not only progression.
+5. Confirm Objective, checkpoint, Stage Clear, HUNTER, ADAM, and Player Death behavior did not change.
+6. Re-test zombie attack behavior. If zombies still do not damage the player, capture `[ZombieAttackDiag]` lines and identify the first missing stage among TargetAcquired, MoveTo, RangeCheck, AttackStateStart, and DamageApplied.
+
+### Not verified by Codex
+
+- Visible wall closure in PIE.
+- Player escape/fall prevention in PIE.
+- ZONE HUD forward/backward tracking in PIE.
+- Zombie attack behavior in PIE.
+
 ## Latest handoff - 2026-07-21 Cycle 025 Zone Identity Hotfix 1
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.

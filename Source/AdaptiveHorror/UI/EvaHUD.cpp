@@ -193,6 +193,8 @@ void AEvaHUD::DrawHUD()
     DrawStat(FString::Printf(TEXT("HUNTER: %s  TIER %d"), *HunterStateToString(HunterState), HunterTier));
 
     const AEvaResearchFacilityDirector* Director = GameMode ? GameMode->GetResearchDirector() : nullptr;
+    const FString LocationZoneText = GameMode ? GameMode->GetFacilityZoneNameForLocation(Player->GetActorLocation()) :
+        (Director ? Director->GetCurrentZoneName() : FString(TEXT("None")));
     const bool bShowDebugHUD = GameMode && GameMode->IsGameplayActive() && GameMode->IsDebugHUDVisible();
     FString FirstEnemyIntent(TEXT("None"));
     FString FirstMoveStatus(TEXT("None"));
@@ -300,7 +302,7 @@ void AEvaHUD::DrawHUD()
                 GameMode->GetActiveZombieCount(), GameMode->GetActiveHunterCount(), GameMode->GetActiveAdamCount()));
             DrawDebugStat(FString::Printf(TEXT("Spawn: %s"), *GameMode->GetLastSpawnResult()));
             DrawDebugStat(FString::Printf(TEXT("Spawn Loc: %s"), *GameMode->GetLastSpawnLocation().ToCompactString()));
-            DrawDebugStat(FString::Printf(TEXT("Zone: %s"), Director ? *Director->GetCurrentZoneName() : TEXT("None")));
+            DrawDebugStat(FString::Printf(TEXT("Zone: %s"), *LocationZoneText));
             DrawDebugStat(FString::Printf(TEXT("Objective: %s"), Director ? *Director->GetObjectiveText() : TEXT("None")));
             DrawDebugStat(FString::Printf(TEXT("Objective Index: %d"), Director ? Director->GetObjectiveIndex() : -1));
             DrawDebugStat(FString::Printf(TEXT("Power: %s"), Director && Director->IsFacilityPowerOnline() ? TEXT("ONLINE") : TEXT("OFFLINE")));
@@ -323,7 +325,7 @@ void AEvaHUD::DrawHUD()
 
     if (Director && !bShowDebugHUD)
     {
-        DrawStat(FString::Printf(TEXT("ZONE: %s"), *Director->GetCurrentZoneName()));
+        DrawStat(FString::Printf(TEXT("ZONE: %s"), *LocationZoneText));
         DrawStat(FString::Printf(TEXT("OBJECTIVE: %s"), *Director->GetObjectiveText()));
         DrawStat(Director->GetObjectiveProgressText());
     }
