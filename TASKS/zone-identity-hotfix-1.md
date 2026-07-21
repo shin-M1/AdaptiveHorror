@@ -10,8 +10,8 @@
 ## Context
 
 - Human PIE feedback from Zone Identity Pass 1 found player-fall gaps at early zone connections.
-- Latest `main` in this workspace does not contain `TASKS/zone-identity-pass-1.md` or the Zone Identity Pass 1 production changes, while `origin/feature/zone-identity-pass1` does.
-- This hotfix stays on the user-requested latest-main branch and applies only the runtime facility geometry/connectivity work needed for the hotfix candidate.
+- Superseded during integration: latest `main` now contains Zone Identity Pass 1 through PR #1.
+- This hotfix branch merges latest `main` and keeps only the runtime facility geometry/connectivity and current-location ZONE display work needed for the hotfix candidate.
 
 ## Goal
 

@@ -1,5 +1,39 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Integration validation result - Zone Identity Hotfix 1 with latest main
+
+Date: 2026-07-22 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count from backup log `Saved\Logs\AdaptiveHorror-backup-2026.07.21-19.15.45.log`: 43 started, 43 succeeded, 0 failed.
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - 2 `[BoundaryGeometry]` lines emitted for `EntryToSecurity` and `SecurityToObservation`, both `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true Source=GeneratedFacilityBounds`.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- `git diff --check`: PASS.
+
 ## Cycle 027 execution result - Close Security Corridor boundary gaps
 
 Date: 2026-07-22 JST
@@ -70,8 +104,8 @@ Result:
   - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true Source=GeneratedFacilityBounds`.
   - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
 - Zombie attack diagnostics:
-  - Runtime Smoke emitted 0 `[ZombieAttackDiag]` lines because it does not drive close-range combat.
-  - PIE verification is still required for the reported zombie attack behavior.
+  - Superseded during main integration. The Zone Identity Hotfix PR no longer carries Zombie AI diagnostic production changes.
+  - PIE verification of zombie attack behavior remains assigned to the separate regression task if needed.
 - Log scan: PASS.
   - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
   - Matches: 0.

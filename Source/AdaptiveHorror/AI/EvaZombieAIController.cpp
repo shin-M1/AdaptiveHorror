@@ -216,29 +216,6 @@ void AEvaZombieAIController::Tick(const float DeltaSeconds)
     }
 
     const FVector CurrentPawnLocation = GetPawn()->GetActorLocation();
-    const float DistanceToTarget = TargetActor ? FVector::Dist(CurrentPawnLocation, TargetActor->GetActorLocation()) : -1.0f;
-    const bool bInAttackRange = TargetActor && DistanceToTarget <= AttackRange;
-    const bool bAttackLineOfSight = bInAttackRange && HasAttackLineOfSightToTarget();
-    if (GetWorld())
-    {
-        const float Now = GetWorld()->GetTimeSeconds();
-        const float AttackDiagInterval = bInAttackRange ? 0.65f : 1.35f;
-        if (Now - LastMoveDiagnosticLogTime >= AttackDiagInterval)
-        {
-            LastMoveDiagnosticLogTime = Now;
-            UE_LOG(LogAdaptiveHorror, Log,
-                TEXT("[ZombieAttackDiag] Stage=RangeCheck Controller=%s Pawn=%s Target=%s Distance=%.1f AttackRange=%.1f InRange=%s LineOfSight=%s MoveStatus=%s Intent=%s"),
-                *GetName(),
-                GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
-                TargetActor ? *TargetActor->GetName() : TEXT("None"),
-                DistanceToTarget,
-                AttackRange,
-                bInAttackRange ? TEXT("true") : TEXT("false"),
-                bAttackLineOfSight ? TEXT("true") : TEXT("false"),
-                EvaPathStatusToString(GetMoveStatus()),
-                *GetCurrentActionIntent());
-        }
-    }
     bool bPerformedStuckRecovery = false;
     if (LastObservedPawnLocation.IsNearlyZero())
     {
@@ -338,13 +315,6 @@ void AEvaZombieAIController::SetPlayerTarget(AActor* NewTarget)
             GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
             *NewTarget->GetName(),
             GetPawn() ? FVector::Dist(GetPawn()->GetActorLocation(), NewTarget->GetActorLocation()) : -1.0f);
-        UE_LOG(LogAdaptiveHorror, Log,
-            TEXT("[ZombieAttackDiag] Stage=TargetAcquired Controller=%s Pawn=%s Target=%s Distance=%.1f AttackRange=%.1f"),
-            *GetName(),
-            GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
-            *NewTarget->GetName(),
-            GetPawn() ? FVector::Dist(GetPawn()->GetActorLocation(), NewTarget->GetActorLocation()) : -1.0f,
-            AttackRange);
         SetCurrentActionIntent(TEXT("CHASE"));
         if (GetPawn())
         {
@@ -655,21 +625,7 @@ void AEvaZombieAIController::TryAttackTarget()
 
     LastAttackTime = Now;
     SetCurrentActionIntent(TEXT("ATTACK"));
-    UE_LOG(LogAdaptiveHorror, Log,
-        TEXT("[ZombieAttackDiag] Stage=AttackStateStart Controller=%s Pawn=%s Target=%s Distance=%.1f AttackRange=%.1f Damage=%.1f"),
-        *GetName(),
-        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
-        TargetActor ? *TargetActor->GetName() : TEXT("None"),
-        GetPawn() && TargetActor ? FVector::Dist(GetPawn()->GetActorLocation(), TargetActor->GetActorLocation()) : -1.0f,
-        AttackRange,
-        AttackDamage);
     UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, this, GetPawn(), UDamageType::StaticClass());
-    UE_LOG(LogAdaptiveHorror, Log,
-        TEXT("[ZombieAttackDiag] Stage=DamageApplied Controller=%s Pawn=%s Target=%s Damage=%.1f"),
-        *GetName(),
-        GetPawn() ? *GetPawn()->GetName() : TEXT("None"),
-        TargetActor ? *TargetActor->GetName() : TEXT("None"),
-        AttackDamage);
     if (AEvaZombieCharacter* Zombie = Cast<AEvaZombieCharacter>(GetPawn()))
     {
         Zombie->PlayPrototypeAttackFeedback();
@@ -1149,14 +1105,6 @@ bool AEvaZombieAIController::MoveToActorOrDirect(AActor* GoalActor, const float 
                 EvaMoveRequestResultToString(MoveResult));
             LogPathDiagnostics(TEXT("MoveToActorAccepted"), GoalLocation, MoveResult);
         }
-        UE_LOG(LogAdaptiveHorror, Log,
-            TEXT("[ZombieAttackDiag] Stage=MoveTo Controller=%s Pawn=%s Target=%s Acceptance=%.1f Result=%s Distance=%.1f"),
-            *GetName(),
-            *ControlledPawn->GetName(),
-            *GoalActor->GetName(),
-            AcceptanceRadius,
-            EvaMoveRequestResultToString(MoveResult),
-            FVector::Dist(ControlledPawn->GetActorLocation(), GoalActor->GetActorLocation()));
         return true;
     }
 

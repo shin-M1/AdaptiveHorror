@@ -261,6 +261,10 @@ private:
     AActor* SpawnTaggedArenaBox(const FVector& Location, const FVector& Scale, const FName Tag,
         const FRotator& Rotation = FRotator::ZeroRotator);
     void BuildFacilityZone(const FVector& Center, const FString& Label, const int32 ZoneIndex);
+    void BuildZoneIdentityGeometry(const FVector& Center, int32 ZoneIndex, float SideWallY,
+        int32& OutObstacleCount, int32& OutLandmarkCount, FString& OutZoneShape, float& OutAverageHeight);
+    void LogZoneIdentity(const FString& Label, int32 ZoneIndex, const FString& ZoneShape, const FVector& FloorScale,
+        int32 ObstacleCount, int32 LandmarkCount, float AverageHeight) const;
     void RegisterRuntimeFloorComponent(UPrimitiveComponent* FloorComponent);
     FBox CalculateRuntimeFacilityBounds() const;
     bool ValidateNavigationProjection(const FString& Context, const FVector& Location, FVector* OutProjectedLocation = nullptr) const;

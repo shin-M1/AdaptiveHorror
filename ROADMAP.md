@@ -4,11 +4,11 @@ This file tracks development order only. Put product requirements in `REQUIREMEN
 
 ## Current milestone
 
-### Field Pass 1
+### Zone Identity Pass 1
 
-Status: Planned / next implementation candidate.
+Status: Implemented candidate / awaiting human PIE confirmation.
 
-Goal: turn the runtime research facility from a functional graybox into a readable playable field pass without adding new major systems. See `TASKS/field-pass-1.md`.
+Goal: make the six runtime-generated facility zones spatially recognizable by room shape, width, height, cover, landmarks, sightlines, and walking pattern without adding new major systems. See `TASKS/zone-identity-pass-1.md`.
 
 ## Completed
 
@@ -35,6 +35,8 @@ Goal: turn the runtime research facility from a functional graybox into a readab
 
 ## In progress
 
+- Zone Identity Pass 1 PIE confirmation
+  - Human validation is required for "recognizable on entry" visual/readability criteria.
 - Content Pass 1 PIE confirmation
   - Human validation still required for interactable visibility/feel and full content flow after latest fixes.
 - Autonomous workflow hardening
@@ -42,8 +44,8 @@ Goal: turn the runtime research facility from a functional graybox into a readab
 
 ## Planned
 
-- Field Pass 1
-  - Readable zone dressing, landmarking, navigation cues, encounter-space layout polish using existing systems only.
+- Field/Zone Readability follow-up
+  - Apply only targeted fixes from human PIE feedback after Zone Identity Pass 1.
 - Weapon Pass 1
   - Improve handgun feedback and consider one additional weapon only if required by demo pacing.
 - Enemy Pass 2

@@ -70,6 +70,8 @@ namespace
 
     const FName RuntimeFloorTag(TEXT("RuntimeFloor"));
     const FName EvaNavigableFloorTag(TEXT("EvaNavigableFloor"));
+    const FName EvaZoneIdentityTag(TEXT("EvaZoneIdentity"));
+    const FName EvaZoneLandmarkTag(TEXT("EvaZoneLandmark"));
 
     constexpr int32 FacilityZoneCount = 6;
     constexpr float FacilityGateWallCenterY = 620.0f;
@@ -1621,29 +1623,8 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
     const float WallHeightScale = ZoneIndex == 5 ? 4.3f : (ZoneIndex == 0 ? 3.9f : 3.6f);
     int32 ObstacleCount = 0;
     int32 LandmarkCount = 0;
-
-    auto MarkObstacle = [&ObstacleCount](AActor* Actor)
-    {
-        if (Actor)
-        {
-            ++ObstacleCount;
-        }
-    };
-    auto MarkLandmark = [&LandmarkCount](AActor* Actor)
-    {
-        if (Actor)
-        {
-            ++LandmarkCount;
-        }
-    };
-    auto MarkObstacleLandmark = [&ObstacleCount, &LandmarkCount](AActor* Actor)
-    {
-        if (Actor)
-        {
-            ++ObstacleCount;
-            ++LandmarkCount;
-        }
-    };
+    FString ZoneShape = GetFacilityZoneShape(ZoneIndex);
+    float AverageHeight = WallHeightScale * 100.0f;
 
     AActor* Floor = SpawnArenaBox(FVector(Center.X, Center.Y, 0.0f), FloorScale);
     if (Floor)
@@ -1661,10 +1642,18 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
     SpawnArenaBox(FVector(Center.X, SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
     SpawnArenaBox(FVector(Center.X, -SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
 
-    MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 360.0f, FMath::Min(500.0f, HalfWidth - 170.0f), 95.0f),
-        FVector(2.0f, 1.0f, 1.9f), FName(TEXT("EvaCover")), FRotator(0.0f, 20.0f + ZoneIndex * 7.0f, 0.0f)));
-    MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -FMath::Min(500.0f, HalfWidth - 170.0f), 80.0f),
-        FVector(1.4f, 2.0f, 1.6f), FName(TEXT("EvaCover")), FRotator(0.0f, -25.0f, 0.0f)));
+    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X - 360.0f, FMath::Min(500.0f, HalfWidth - 170.0f), 95.0f),
+        FVector(2.0f, 1.0f, 1.9f), FName(TEXT("EvaCover")), FRotator(0.0f, 20.0f + ZoneIndex * 7.0f, 0.0f)))
+    {
+        Cover->Tags.AddUnique(EvaZoneIdentityTag);
+        ++ObstacleCount;
+    }
+    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -FMath::Min(500.0f, HalfWidth - 170.0f), 80.0f),
+        FVector(1.4f, 2.0f, 1.6f), FName(TEXT("EvaCover")), FRotator(0.0f, -25.0f, 0.0f)))
+    {
+        Cover->Tags.AddUnique(EvaZoneIdentityTag);
+        ++ObstacleCount;
+    }
     SpawnTaggedArenaBox(FVector(Center.X - 520.0f, -FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
         FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaEscapeRoute")));
     SpawnTaggedArenaBox(FVector(Center.X + 520.0f, FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
@@ -1672,61 +1661,7 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
     SpawnTaggedArenaBox(FVector(Center.X, -FMath::Max(260.0f, HalfWidth - 110.0f), 70.0f),
         FVector(0.55f, 0.55f, 0.55f), FName(TEXT("EvaHideSpot")));
 
-    switch (ZoneIndex)
-    {
-    case 0:
-        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 600.0f, 75.0f),
-            FVector(2.8f, 0.45f, 0.75f), FName(TEXT("EvaReceptionDesk"))));
-        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 650.0f, 135.0f),
-            FVector(1.5f, 0.25f, 0.25f), FName(TEXT("EvaReceptionDesk"))));
-        break;
-    case 1:
-        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X - 410.0f, 160.0f, 105.0f),
-            FVector(2.8f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
-        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X + 120.0f, -160.0f, 105.0f),
-            FVector(2.6f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
-        break;
-    case 2:
-        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 115.0f),
-            FVector(2.7f, 2.35f, 2.3f), FName(TEXT("EvaObservationEquipment"))));
-        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 420.0f, SideWallY - 70.0f, 190.0f),
-            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
-        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X + 420.0f, SideWallY - 70.0f, 190.0f),
-            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
-        break;
-    case 3:
-        for (int32 CellIndex = 0; CellIndex < 3; ++CellIndex)
-        {
-            const float CellX = Center.X - 520.0f + CellIndex * 520.0f;
-            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, SideWallY - 110.0f, 120.0f),
-                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
-            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, -SideWallY + 110.0f, 120.0f),
-                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
-        }
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 360.0f, -140.0f, 70.0f),
-            FVector(1.4f, 0.9f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, -35.0f, 0.0f)));
-        break;
-    case 4:
-        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 170.0f),
-            FVector(1.55f, 1.55f, 3.4f), FName(TEXT("EvaDataCore"))));
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 300.0f, 320.0f, 70.0f),
-            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X, 410.0f, 70.0f),
-            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 300.0f, 320.0f, 70.0f),
-            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
-        break;
-    case 5:
-        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 720.0f, 0.0f, 210.0f),
-            FVector(0.28f, 5.6f, 0.35f), FName(TEXT("EvaAdamArenaGate"))));
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 780.0f, 115.0f),
-            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
-        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 520.0f, -780.0f, 115.0f),
-            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
-        break;
-    default:
-        break;
-    }
+    BuildZoneIdentityGeometry(Center, ZoneIndex, SideWallY, ObstacleCount, LandmarkCount, ZoneShape, AverageHeight);
 
     if (ZoneIndex == 0)
     {
@@ -1747,16 +1682,152 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
         LabelMarker->SetActorEnableCollision(false);
     }
 
+    LogZoneIdentity(Label, ZoneIndex, ZoneShape, FloorScale, ObstacleCount, LandmarkCount, AverageHeight);
+}
+
+void AEvaPrototypeGameMode::BuildZoneIdentityGeometry(const FVector& Center, const int32 ZoneIndex,
+    const float SideWallY, int32& OutObstacleCount, int32& OutLandmarkCount, FString& OutZoneShape,
+    float& OutAverageHeight)
+{
+    auto MarkObstacle = [this, &OutObstacleCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            Actor->Tags.AddUnique(EvaZoneIdentityTag);
+            ++OutObstacleCount;
+        }
+        return Actor;
+    };
+    auto MarkLandmark = [this, &OutLandmarkCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            Actor->Tags.AddUnique(EvaZoneIdentityTag);
+            Actor->Tags.AddUnique(EvaZoneLandmarkTag);
+            ++OutLandmarkCount;
+        }
+        return Actor;
+    };
+    auto MarkObstacleLandmark = [this, &OutObstacleCount, &OutLandmarkCount](AActor* Actor)
+    {
+        if (Actor)
+        {
+            Actor->Tags.AddUnique(EvaZoneIdentityTag);
+            Actor->Tags.AddUnique(EvaZoneLandmarkTag);
+            ++OutObstacleCount;
+            ++OutLandmarkCount;
+        }
+        return Actor;
+    };
+
+    switch (ZoneIndex)
+    {
+    case 0:
+        OutZoneShape = TEXT("Open");
+        OutAverageHeight = 390.0f;
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 470.0f, 75.0f),
+            FVector(2.8f, 0.45f, 0.75f), FName(TEXT("EvaReceptionDesk"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 520.0f, 520.0f, 135.0f),
+            FVector(1.5f, 0.25f, 0.25f), FName(TEXT("EvaReceptionDesk"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 260.0f, 560.0f, 70.0f),
+            FVector(1.1f, 0.75f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, 8.0f, 0.0f)));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 460.0f, -540.0f, 70.0f),
+            FVector(1.1f, 0.75f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, -8.0f, 0.0f)));
+        break;
+
+    case 1:
+        OutZoneShape = TEXT("LShape");
+        OutAverageHeight = 360.0f;
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X - 410.0f, 160.0f, 105.0f),
+            FVector(2.8f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X + 120.0f, -160.0f, 105.0f),
+            FVector(2.6f, 0.42f, 2.1f), FName(TEXT("EvaSecurityPartition"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 520.0f, 220.0f, 80.0f),
+            FVector(1.2f, 0.8f, 1.6f), FName(TEXT("EvaCover"))));
+        break;
+
+    case 2:
+        OutZoneShape = TEXT("Central");
+        OutAverageHeight = 410.0f;
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 115.0f),
+            FVector(2.7f, 2.35f, 2.3f), FName(TEXT("EvaObservationEquipment"))));
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 275.0f),
+            FVector(1.2f, 1.1f, 0.45f), FName(TEXT("EvaObservationEquipment"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 420.0f, SideWallY - 70.0f, 190.0f),
+            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X + 420.0f, SideWallY - 70.0f, 190.0f),
+            FVector(1.4f, 0.12f, 2.4f), FName(TEXT("EvaObservationGlass"))));
+        break;
+
+    case 3:
+        OutZoneShape = TEXT("Cell");
+        OutAverageHeight = 380.0f;
+        for (int32 CellIndex = 0; CellIndex < 3; ++CellIndex)
+        {
+            const float CellX = Center.X - 520.0f + CellIndex * 520.0f;
+            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, SideWallY - 110.0f, 120.0f),
+                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
+            MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(CellX, -SideWallY + 110.0f, 120.0f),
+                FVector(1.65f, 0.18f, 2.4f), FName(TEXT("EvaContainmentCell"))));
+        }
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 80.0f, 120.0f, 70.0f),
+            FVector(1.4f, 0.9f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, 35.0f, 0.0f)));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 360.0f, -140.0f, 70.0f),
+            FVector(1.4f, 0.9f, 1.4f), FName(TEXT("EvaCover")), FRotator(0.0f, -35.0f, 0.0f)));
+        break;
+
+    case 4:
+        OutZoneShape = TEXT("Central");
+        OutAverageHeight = 430.0f;
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 170.0f),
+            FVector(1.55f, 1.55f, 3.4f), FName(TEXT("EvaDataCore"))));
+        MarkObstacleLandmark(SpawnTaggedArenaBox(FVector(Center.X, 0.0f, 370.0f),
+            FVector(2.0f, 2.0f, 0.35f), FName(TEXT("EvaDataCore")), FRotator(0.0f, 45.0f, 0.0f)));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 300.0f, 270.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X, 340.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 300.0f, 270.0f, 70.0f),
+            FVector(1.3f, 0.55f, 1.4f), FName(TEXT("EvaDataCoreHalfLoop"))));
+        break;
+
+    case 5:
+        OutZoneShape = TEXT("Arena");
+        OutAverageHeight = 430.0f;
+        MarkLandmark(SpawnTaggedArenaBox(FVector(Center.X - 720.0f, 0.0f, 210.0f),
+            FVector(0.28f, 5.6f, 0.35f), FName(TEXT("EvaAdamArenaGate"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 460.0f, 720.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 460.0f, 720.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X - 460.0f, -720.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        MarkObstacle(SpawnTaggedArenaBox(FVector(Center.X + 460.0f, -720.0f, 115.0f),
+            FVector(1.0f, 1.0f, 2.3f), FName(TEXT("EvaArenaPillar"))));
+        break;
+
+    default:
+        OutZoneShape = TEXT("Linear");
+        break;
+    }
+}
+
+void AEvaPrototypeGameMode::LogZoneIdentity(const FString& Label, const int32 ZoneIndex,
+    const FString& ZoneShape, const FVector& FloorScale, const int32 ObstacleCount,
+    const int32 LandmarkCount, const float AverageHeight) const
+{
+    const float AverageWidth = FloorScale.Y * 100.0f;
+    const float FloorArea = FloorScale.X * 100.0f * AverageWidth;
     UE_LOG(LogAdaptiveHorror, Log,
         TEXT("[ZoneIdentity] ZoneIndex=%d Zone=\"%s\" ZoneShape=%s FloorArea=%.0f ObstacleCount=%d LandmarkCount=%d AverageWidth=%.0f AverageHeight=%.0f"),
         ZoneIndex,
         *Label,
-        *GetFacilityZoneShape(ZoneIndex),
-        FloorScale.X * FloorScale.Y * 10000.0f,
+        *ZoneShape,
+        FloorArea,
         ObstacleCount,
         LandmarkCount,
-        FloorScale.Y * 100.0f,
-        WallHeightScale * 100.0f);
+        AverageWidth,
+        AverageHeight);
 }
 
 void AEvaPrototypeGameMode::SpawnFacilityTrigger(AEvaResearchFacilityDirector* Director,

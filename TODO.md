@@ -1,5 +1,21 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Integration status - Zone Identity Hotfix 1 with latest main
+
+- [x] Confirmed latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- [x] Merged latest `main` into `feature/zone-identity-hotfix1` with normal merge conflict resolution.
+- [x] Preserved six Zone Identity shapes and `[ZoneIdentity]` runtime logs.
+- [x] Preserved boundary hotfix logs: `[ConnectionIntegrity]`, `[BoundaryIntegrity]`, and `[BoundaryGeometry]`.
+- [x] Preserved current-location ZONE display tracking.
+- [x] Removed out-of-scope Zombie AI diagnostic production changes from this PR scope.
+- [x] Validation passed: Build, Automation 43/43, Runtime Smoke, Log Scan, and `git diff --check`.
+
+### Next TODO
+
+- [ ] Open/review the PR for `feature/zone-identity-hotfix1` into `main`.
+- [ ] Human PIE-verify the two target wall gaps after the integration.
+- [ ] Human PIE-verify ZONE HUD still follows forward/backward movement after the integration.
+
 ## Cycle 027 status - Close Security Corridor boundary gaps
 
 - [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.
@@ -31,7 +47,7 @@
 - [x] Added location-based zone lookup for the generated facility.
 - [x] Updated HUD ZONE display to follow actual player position independently from Director objective progression.
 - [x] Added `[ZoneTracking]` runtime structure log.
-- [x] Added zombie attack diagnostic logs for Target acquired, MoveTo, range/LOS, attack start, and damage application.
+- [x] Removed zombie attack diagnostic production changes from the Zone Identity Hotfix PR scope during main integration.
 - [x] Live Coding-free Development Editor / Win64 build succeeded after fixing the one compile error found by validation.
 - [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
 - [x] Runtime Smoke succeeded with exit code 0.
@@ -44,7 +60,7 @@
 - [ ] Human PIE-verify all other zone perimeter transitions cannot be used to leave the facility.
 - [ ] Human PIE-verify ZONE HUD updates when moving forward and backward across all adjacent zone boundaries.
 - [ ] Human PIE-verify ZONE HUD does not flicker at boundaries.
-- [ ] Human PIE-verify zombie attack behavior using `[ZombieAttackDiag]` if the issue persists.
+- [ ] Track zombie attack behavior in the separate Zombie Attack Regression task if the issue persists.
 
 ## Cycle 025 status - Zone Identity Hotfix 1
 

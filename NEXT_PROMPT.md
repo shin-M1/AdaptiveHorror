@@ -1,6 +1,49 @@
 # Next Codex Prompt
 
-## Latest handoff - 2026-07-22 Cycle 027 Close Security Corridor boundary gaps
+## Latest handoff - 2026-07-22 Zone Identity Hotfix 1 integration
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Latest `main` was merged into this branch with a normal merge workflow. PR review/merge should use the GitHub PR workflow rules in `AGENTS.md`, `REVIEW.md`, and `TASKS/review-pr.md`.
+
+### Current verified state
+
+- Latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- Zone Identity Pass 1 structure is preserved:
+  - Entry Lobby: `Open`
+  - Security Corridor: `LShape`
+  - Observation Lab: `Central`
+  - Containment Ward: `Cell`
+  - Data Core Room: `Central`
+  - Adam Arena: `Arena`
+- Boundary Hotfix is preserved:
+  - EntryToSecurity `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - SecurityToObservation `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - All 5 `[ConnectionIntegrity]` lines show `Connected=true GapDetected=false`.
+  - All 6 `[BoundaryIntegrity]` lines show `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- ZONE display still uses player-location lookup and remains independent from objective progression.
+- Zombie AI diagnostic production changes were removed from this PR scope.
+- Validation passed:
+  - Generate Project Files: PASS.
+  - Development Editor / Win64 build without Live Coding: PASS.
+  - `Automation RunTests AdaptiveHorror`: 43 succeeded, 0 failed.
+  - Runtime Smoke: PASS, exit code 0.
+  - Runtime log scan: PASS, 0 blocking matches.
+  - `git diff --check`: PASS.
+
+### Next highest-priority task
+
+Review the `feature/zone-identity-hotfix1` PR into `main`. Do not merge unless the user or task explicitly asks for the merge.
+
+### Human PIE items
+
+- Not verified by Codex: target wall gap closure after the main integration.
+- Not verified by Codex: ZONE HUD bidirectional tracking after the main integration.
+- Not verified by Codex: full New Game to Stage Clear traversal after the main integration.
+
+## Previous handoff - 2026-07-22 Cycle 027 Close Security Corridor boundary gaps
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
 
@@ -75,7 +118,7 @@ Do not merge this branch into `main` until the user confirms the hotfix in PIE.
 - Added position-based facility zone lookup in `AEvaPrototypeGameMode`.
 - Updated HUD ZONE display to follow the player's actual location instead of the Director's progression-only zone.
 - Added structure logs for boundary integrity and zone tracking.
-- Added zombie attack diagnostic logs only; no zombie behavior/balance/state-machine change was made.
+- Superseded during main integration: Zombie AI diagnostic production changes were removed from this PR scope.
 
 ### Next highest-priority PIE task
 
@@ -86,7 +129,7 @@ Verify the follow-up hotfix in PIE:
 3. At Security Corridor -> Observation Lab, inspect the exterior walls near the transition and confirm the player cannot leave the facility or fall.
 4. Walk backward and forward across every adjacent zone boundary and confirm the ZONE HUD follows actual location, not only progression.
 5. Confirm Objective, checkpoint, Stage Clear, HUNTER, ADAM, and Player Death behavior did not change.
-6. Re-test zombie attack behavior. If zombies still do not damage the player, capture `[ZombieAttackDiag]` lines and identify the first missing stage among TargetAcquired, MoveTo, RangeCheck, AttackStateStart, and DamageApplied.
+6. Re-test zombie attack behavior only in the separate Zombie Attack Regression task if needed; do not modify Zombie AI as part of the Zone Identity Hotfix integration.
 
 ### Not verified by Codex
 

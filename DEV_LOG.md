@@ -1,5 +1,44 @@
 # Development Log
 
+## 2026-07-22 - Integration: Zone Identity Hotfix 1 with latest main
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Merged latest `main` (`f00e217`) into `feature/zone-identity-hotfix1` with a normal merge commit workflow.
+- Confirmed latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- Preserved Zone Identity Pass 1 spatial zone structure and `[ZoneIdentity]` logs.
+- Preserved Hotfix boundary bridge walls, `[ConnectionIntegrity]`, `[BoundaryIntegrity]`, `[BoundaryGeometry]`, and current-location ZONE tracking.
+- Removed out-of-scope Zombie AI diagnostic production changes from this PR integration.
+- Did not change Combat, Player Damage, HUNTER, ADAM, Stage Clear, Save, Weapon, Runtime NavMesh algorithm, or progression sequence.
+
+### Validation
+
+- Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Generate Project Files: PASS.
+- Development Editor / Win64 build without Live Coding: PASS.
+- Automation RunTests `AdaptiveHorror`: 43 started, 43 succeeded, 0 failed.
+- Runtime Smoke: PASS, exit code 0.
+- Runtime log scan: PASS, 0 blocking matches.
+- `git diff --check`: PASS.
+
+### Runtime evidence
+
+- `Saved\Logs\AdaptiveHorror.log` contains 6 `[ZoneIdentity]` lines with shapes `Open`, `LShape`, `Central`, `Cell`, `Central`, `Arena`.
+- It contains 5 `[ConnectionIntegrity]` lines, all `Connected=true GapDetected=false`.
+- It contains 6 `[BoundaryIntegrity]` lines, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- It contains 2 `[BoundaryGeometry]` lines:
+  - `EntryToSecurity ... UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - `SecurityToObservation ... UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+- It contains `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true`.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that the two target wall gaps remain closed after the main integration.
+- Human PIE confirmation that ZONE HUD tracks backward and forward movement across zone boundaries after the main integration.
+
 ## 2026-07-22 - Cycle 027: Close Security Corridor boundary gaps
 
 Branch: `feature/zone-identity-hotfix1`
@@ -73,7 +112,7 @@ Branch: `feature/zone-identity-hotfix1`
 
 - Continued on the existing `feature/zone-identity-hotfix1` branch.
 - Verified the working tree was clean before work and HEAD was `fe2eb1e Implement Zone Identity Hotfix 1`.
-- Fixed only the PIE-reported follow-up issues that could be addressed safely:
+- Fixed only the PIE-reported follow-up issues that could be addressed safely at that time:
   - visible exterior wall gaps around widened zone connections,
   - stale ZONE HUD display when walking backward into a previous zone,
   - zombie attack diagnostics for the reported non-attacking behavior.
@@ -98,7 +137,7 @@ Branch: `feature/zone-identity-hotfix1`
 - Updated HUD ZONE display to use the player's actual location instead of Director progression state.
 - Left Objective/progression/checkpoint/Stage Clear state tied to the Director as before.
 - Added `[ZoneTracking]` runtime structure log from generated zone bounds.
-- Added low-frequency `[ZombieAttackDiag]` logs without changing zombie movement or attack behavior.
+- Superseded during the main integration: `[ZombieAttackDiag]` production changes were removed from the PR scope so this branch does not carry Zombie AI changes.
 
 ### Changed files
 
@@ -132,11 +171,11 @@ Branch: `feature/zone-identity-hotfix1`
 - Human PIE visual confirmation that no exterior wall gaps remain.
 - Human PIE confirmation that the player cannot escape the facility perimeter at zone transitions.
 - Human PIE confirmation that ZONE HUD follows backward movement across every adjacent zone boundary without flicker.
-- Human PIE confirmation of the reported zombie attack issue. Runtime Smoke emitted no `[ZombieAttackDiag]` lines because it does not perform close-range combat.
+- Human PIE confirmation of the reported zombie attack issue remains outside this PR scope.
 
 ### Remaining risks / next task
 
-- If PIE still shows zombies not attacking, use the new `[ZombieAttackDiag]` stages to determine whether the first missing stage is range, line-of-sight, attack-state entry, or damage application. Do not modify protected AI logic unless the log proves the current layout caused the regression.
+- If PIE still shows zombies not attacking, handle it in the separate Zombie Attack Regression task; this integration PR intentionally leaves Zombie AI unchanged.
 - If any wall gap remains, adjust only the relevant visible boundary segment; do not expand rooms or alter progression.
 
 ## 2026-07-21 - Cycle 025: Zone Identity Hotfix 1
@@ -238,7 +277,7 @@ Branch: `feature/zone-identity-hotfix1`
 ### Known issues / TBD
 
 - Runtime Smoke confirms generated geometry/logs and startup safety, but cannot prove human traversal comfort.
-- Latest `main` lacks the Zone Identity Pass 1 task/code, so this hotfix branch carries the minimal runtime zone identity/connectivity changes needed for verification.
+- Superseded by the 2026-07-22 integration: latest `main` now contains Zone Identity Pass 1, and this hotfix branch is being merged with it rather than carrying an isolated copy.
 - UE5.8 still prints non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 validation succeeded.
 
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
