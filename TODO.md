@@ -1,5 +1,34 @@
 # TODO — Adaptive Horror FPS Demo
 
+## Cycle 025 status - Zone Identity Pass 1
+
+- [x] Created `feature/zone-identity-pass1` from latest clean `main`.
+- [x] Confirmed latest `main` was already up to date with `origin/main`.
+- [x] Created `TASKS/zone-identity-pass-1.md`.
+- [x] Kept changes scoped to runtime facility geometry and logging.
+- [x] Made Entry Lobby structurally wider/open with reception landmarks.
+- [x] Made Security Corridor narrower with a light L-shape/zigzag partition layout.
+- [x] Made Observation Lab route around central equipment.
+- [x] Made Containment Ward use side cell structures and additional cover.
+- [x] Made Data Core use a central core plus half-loop cover pieces.
+- [x] Kept Adam Arena broad while adding arena-scale landmarks/cover.
+- [x] Added `[ZoneIdentity]` runtime logs for all 6 zones.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify Entry Lobby reads as an open reception area.
+- [ ] Human PIE-verify Security Corridor reads as a light L-shape/zigzag without becoming a maze.
+- [ ] Human PIE-verify Observation Lab clearly routes the player around central equipment.
+- [ ] Human PIE-verify Containment Ward side cells and cover are readable during combat.
+- [ ] Human PIE-verify Data Core reads as a half-loop around the central core.
+- [ ] Human PIE-verify Adam Arena remains comfortable for boss combat.
+- [ ] Human PIE-verify full New Game to Adam Arena progression after the geometry pass.
+- [ ] Decide whether `TASKS/TEMPLATE.md` should be restored/added on `main` in a separate documentation-only pass.
+
 ## Cycle 024 status - Autonomous Development Kit
 
 - [x] Created `chore/autonomous-development-kit` from latest clean `main`.

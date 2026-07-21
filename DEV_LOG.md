@@ -1,5 +1,112 @@
 # Development Log
 
+## 2026-07-21 - Cycle 025: Zone Identity Pass 1
+
+Branch: `feature/zone-identity-pass1`
+
+### Scope
+
+- Created `feature/zone-identity-pass1` from latest clean `main`.
+- Created `TASKS/zone-identity-pass-1.md` because latest `main` does not contain `TASKS/TEMPLATE.md`.
+- Implemented spatial identity changes only in the existing runtime research facility generation.
+- Did not change AI behavior, Runtime NavMesh algorithms/configuration, combat rules, HUNTER, ADAM, Player Death, Stage Clear, UI flow, Save/settings, audio, or art assets.
+
+### Implemented
+
+- Entry Lobby:
+  - Wider open floor footprint.
+  - Reception-desk landmark and sparse cover to keep sightlines readable.
+- Security Corridor:
+  - Narrower corridor footprint.
+  - Offset security partitions to create a light L-shape/zigzag walking pattern without maze behavior.
+- Observation Lab:
+  - Large central observation equipment.
+  - Side observation-glass landmarks so the player routes around the center.
+- Containment Ward:
+  - Side containment cell structures on both sides.
+  - Denser cover than the earlier generic room pass.
+- Data Core Room:
+  - Central core landmark.
+  - Half-loop cover pieces around the core.
+- Adam Arena:
+  - Enlarged boss floor footprint.
+  - Gate landmark and four arena pillars while preserving broad boss-fight space.
+- Added `[ZoneIdentity]` runtime logs per zone:
+  - `ZoneShape`,
+  - `FloorArea`,
+  - `ObstacleCount`,
+  - `LandmarkCount`,
+  - `AverageWidth`,
+  - `AverageHeight`.
+
+### Changed files
+
+- `TASKS/zone-identity-pass-1.md`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+- `ROADMAP.md`
+
+### Verification
+
+- Initial sandboxed validation attempt:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Result: failed before build due sandbox denial while UnrealBuildTool attempted to access `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.41.uba`.
+  - This was an environment permission issue, not a compile failure.
+- Escalated validation:
+  - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+  - Result: PASS.
+  - Generate Project Files: Succeeded.
+  - Development Editor / Win64 build without Live Coding: Succeeded.
+  - Automation RunTests `AdaptiveHorror`: 43 tests succeeded, 0 failed.
+  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-05.49.25.log`
+  - Runtime Smoke: exit code 0.
+  - Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+  - Runtime log scan: PASS; 0 blocking matches for Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / Automation failure.
+  - `git diff --check`: PASS; CRLF conversion warnings only.
+
+### Runtime evidence
+
+- `Saved\Logs\AdaptiveHorror.log` contains 6 `ZoneIdentity` lines:
+  - `Entry Lobby`: `ZoneShape=Open FloorArea=3240000 ObstacleCount=4 LandmarkCount=2 AverageWidth=1800 AverageHeight=390`
+  - `Security Corridor`: `ZoneShape=LShape FloorArea=1800000 ObstacleCount=5 LandmarkCount=2 AverageWidth=1000 AverageHeight=360`
+  - `Observation Lab`: `ZoneShape=Central FloorArea=2880000 ObstacleCount=4 LandmarkCount=4 AverageWidth=1600 AverageHeight=410`
+  - `Containment Ward`: `ZoneShape=Cell FloorArea=2700000 ObstacleCount=10 LandmarkCount=6 AverageWidth=1500 AverageHeight=380`
+  - `Data Core Room`: `ZoneShape=Central FloorArea=2880000 ObstacleCount=7 LandmarkCount=2 AverageWidth=1600 AverageHeight=430`
+  - `Adam Arena`: `ZoneShape=Arena FloorArea=5280000 ObstacleCount=6 LandmarkCount=1 AverageWidth=2200 AverageHeight=430`
+- Runtime NavMesh readiness:
+  - `Ready=true`
+  - `PlayerProjected=true`
+  - `RepresentativeProjected=true`
+- Required content objects still emit existing runtime diagnostics:
+  - Power Console
+  - Security Keycard
+  - Locked Door
+  - 3 Research Logs
+  - Data Core Console
+- Stage Clear regression remained covered by existing automation:
+  - `AdaptiveHorror.StageClear.Idempotent`
+  - `AdaptiveHorror.StageClear.RejectsPlayerDeath`
+  - `AdaptiveHorror.StageClear.SkipsSpawns`
+  - `AdaptiveHorror.StageClear.StopsEnemyCombat`
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that each room is instantly recognizable by shape.
+- Human PIE comfort check for the light L-shape / half-loop walking patterns.
+- Human PIE full New Game to Adam Arena traversal after the geometry pass.
+- Human PIE combat readability in the changed rooms.
+
+### Known issues / TBD
+
+- Latest `main` did not contain the previously local Field Pass 1 branch contents, so this pass implemented the requested zone identity structure directly from latest `main` instead of merging/cherry-picking other branches.
+- `TASKS/TEMPLATE.md` is missing on latest `main`; `TASKS/zone-identity-pass-1.md` records the task format directly.
+- UE5.8 command output still reports non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 validation succeeded.
+- Runtime Smoke is not a substitute for PIE visual judgment.
+
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
 
 Branch: `chore/autonomous-development-kit`

@@ -1,5 +1,55 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## Cycle 025 execution result - Zone Identity Pass 1
+
+Date: 2026-07-21 JST
+
+Branch: `feature/zone-identity-pass1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Initial sandboxed run failed before build due `System.UnauthorizedAccessException` on `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.41.uba`.
+- Re-run with permission to use Unreal's normal local build/log directories: PASS.
+- Static source sanity: PASS.
+- Tool discovery:
+  - `UnrealEditor.exe`: `C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
+  - `UnrealBuildTool.exe`: found.
+  - `MSBuild.exe`: `C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe`
+  - `cl.exe`: `C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe`
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests, 43 succeeded, 0 failed.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-05.49.25.log`
+- Runtime Smoke:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log
+```
+
+- Runtime Smoke exit code: 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+  - Required content objects still logged after navigation readiness.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- `git diff --check`: exit code 0, no whitespace errors. CRLF conversion warnings only.
+
+Notes:
+
+- UE5.8 still prints non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 build/automation/runtime smoke succeeded.
+- PIE visual verification was not performed by Codex.
+
 ## Cycle 024 execution result - Autonomous Development Kit
 
 Date: 2026-07-21 JST

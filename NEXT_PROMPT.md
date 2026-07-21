@@ -1,5 +1,88 @@
 # Next Codex Prompt
 
+## Latest handoff - 2026-07-21 Cycle 025 Zone Identity Pass 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-pass1`.
+
+Do not merge this branch into `main` until the user confirms the zone identity changes in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log`: exit code 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- Runtime log confirmed 6 `ZoneIdentity` lines.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent change
+
+- Created `TASKS/zone-identity-pass-1.md`.
+- Updated runtime-generated facility geometry only:
+  - Entry Lobby: wider/open reception-like shape.
+  - Security Corridor: narrower L-shape/light zigzag partitions.
+  - Observation Lab: central equipment route-around.
+  - Containment Ward: side cells and denser cover.
+  - Data Core Room: central core and half-loop cover.
+  - Adam Arena: broader boss arena with gate/pillars.
+- Added `[ZoneIdentity]` logs with:
+  - `ZoneShape`,
+  - `FloorArea`,
+  - `ObstacleCount`,
+  - `LandmarkCount`,
+  - `AverageWidth`,
+  - `AverageHeight`.
+- Did not change AI, Runtime NavMesh algorithm/config, HUNTER, ADAM, combat, UI flow, Player Death, Stage Clear, Save/settings, audio, or art assets.
+
+### Next highest-priority task
+
+Run PIE and verify only the Zone Identity Pass 1 visual/readability goals.
+
+PIE checklist:
+
+1. Start New Game.
+2. Walk through the six zones in order:
+   - Entry Lobby
+   - Security Corridor
+   - Observation Lab
+   - Containment Ward
+   - Data Core Room
+   - Adam Arena
+3. Confirm each zone is recognizable by structure, not only color/signage.
+4. Confirm Entry Lobby reads as an open reception space.
+5. Confirm Security Corridor reads as a light L-shape/zigzag and is not a maze.
+6. Confirm Observation Lab forces a clear route around central equipment.
+7. Confirm Containment Ward reads as side cells plus cover.
+8. Confirm Data Core reads as a half-loop around the central core.
+9. Confirm Adam Arena remains large enough for boss combat.
+10. Confirm Power Console, Keycard, Locked Door, 3 Research Logs, and Data Core Console remain reachable and readable.
+11. Confirm enemy/player movement and Stage Clear are not regressed.
+
+If a problem is found:
+
+- Fix only runtime facility geometry or placement/logging directly related to zone identity.
+- Preserve AI, HUNTER, ADAM, combat, Player Death, Stage Clear, UI flow, Save/settings, audio, and art assets.
+
+### Important files
+
+- `TASKS/zone-identity-pass-1.md`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+
+### Completion condition for next pass
+
+- Human confirms in PIE that the six zones are spatially distinct and traversable.
+- If code changes are needed, Development Editor / Win64 build succeeds.
+- Automation RunTests `AdaptiveHorror` succeeds.
+- Runtime Smoke succeeds.
+- Docs are updated with actual PIE results.
+
 ## Latest handoff - 2026-07-14 Cycle 023 Content Interactable Visibility and Pickup Fix
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
