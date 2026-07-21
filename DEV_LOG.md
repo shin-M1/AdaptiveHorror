@@ -2572,3 +2572,83 @@ The C++ menu widgets built their `WidgetTree->RootWidget` inside `NativeConstruc
 6. Confirm `[InputState] ... InputMode=GameOnly ShowMouseCursor=false IgnoreMoveInput=false IgnoreLookInput=false`.
 7. Confirm `[Player] ... PossessedPawn=EvaPlayerCharacter`.
 8. Verify movement, look, shooting, and Esc Pause.
+
+## 2026-07-22 - Zombie attack regression fix
+
+### Context
+
+- Phase A completed before this work: PR #3 (`feature/zone-identity-hotfix1`) was reviewed, merged into `main` with a normal Merge Commit, and validated on `main`.
+- Confirmed PR #3 commits `088c413` and `0440ce5` are ancestors of `main`.
+- Phase B branch: `fix/zombie-attack-regression`.
+
+### Symptom investigated
+
+- Normal Zombies could acquire/chase the player but did not reliably enter the attack/damage loop after closing distance.
+
+### Root cause
+
+- Player-target `MoveToActor` calls used `bStopOnOverlap=true`, allowing path following to finish at capsule overlap distance before the Zombie's explicit `AttackRange` gate was satisfied.
+- Attack line-of-sight tracing did not ignore the target actor, so the target itself could block the attack gate in the isolated validation path.
+- Automation-only note: lightweight `UWorld::CreateWorld` tests lack an auth GameMode, and UE5.8 `APawn::ShouldTakeDamage()` rejects damage in that case. The damage test now uses `FTestWorldWrapper` to match game-world damage conditions.
+
+### Fix
+
+- Normal Zombie chase toward its current player target now uses `bStopOnOverlap=false` while preserving normal stop-on-overlap behavior for non-target actor goals.
+- Attack LoS trace now ignores both the Zombie pawn and the target actor.
+- Added event-based `[ZombieAttack]` diagnostics for target acquisition, chase move requests, attack range entry/exit, attack condition failures, attack start, damage result, cooldown block/start/completion, and repeat attack readiness.
+- Added non-shipping Zombie attack validation helpers and `-EvaValidateZombieAttackSmoke` runtime smoke path.
+- `Scripts/RunCodexValidation.ps1` now requires `[ZombieAttackSummary] RuntimeSmokeResult=PASS` in the current runtime log.
+- Added two focused automation tests:
+  - `AdaptiveHorror.ZombieAttack.TargetMoveStopsInsideRange`
+  - `AdaptiveHorror.ZombieAttack.AttackCycleAppliesDamage`
+
+### Changed files
+
+- `Scripts/RunCodexValidation.ps1`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.h`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Tests/EvaLearningTests.cpp`
+- `TASKS/zombie-attack-regression-fix.md`
+- `DEV_LOG.md`
+- `BUILD_CHECK.md`
+- `TODO.md`
+- `NEXT_PROMPT.md`
+
+### Verification
+
+- Command:
+  - `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Development Editor / Win64 build without Live Coding: PASS.
+  - Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: PASS.
+  - Total: 45
+  - Success: 45
+  - Failures: 0
+  - Log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-20.16.14.log`
+- Runtime Smoke: PASS.
+  - Log: `Saved\Logs\AdaptiveHorror.log`
+  - Evidence:
+    - `[ZombieAttackSummary] RuntimeSmokeResult=PASS`
+    - `HpBefore=100.0`
+    - `HpAfterFirst=90.0`
+    - `HpAfterCooldownBlocked=90.0`
+    - `HpAfterSecond=80.0`
+    - `AttackStartedCount=2`
+    - `DamageAppliedCount=2`
+- Log Scan: PASS.
+- `git diff --check`: PASS with CRLF conversion warnings only.
+
+### PIE status
+
+- Not verified by Codex:
+  - Visible Zombie attack animation in PIE.
+  - Player HP visibly decreasing in PIE HUD.
+  - Zombie returns to chase if the player moves away.
+  - Player death/respawn after repeated Zombie attacks.
+  - HUNTER/ADAM/Stage Clear visual regression check.
+
+### Notes
+
+- One validation attempt timed out because a stale `UnrealEditor-Cmd.exe` from the previous smoke run held `UnrealEditor-AdaptiveHorror.dll`; the process was terminated and validation was rerun successfully.
+- No HUNTER, ADAM, Stage Clear, Zone, Boundary, Player Movement, Weapon, Lighting, or Audio behavior was intentionally changed.

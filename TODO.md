@@ -871,3 +871,25 @@ UE5.8 Development Editor / Win64の初回ビルドエラーを修正し、Automa
 - [ ] PIE visual confirmation: damage flash / vignette / camera shake feel.
 - [ ] PIE audio confirmation: ambient pulse and Adam/HUNTER cues are audible but not overpowering.
 - [ ] PIE regression check: existing zombie/HUNTER/ADAM/Stage Clear/Game Over flow remains stable.
+
+## 2026-07-22 Zombie attack regression fix
+
+- [x] Create branch `fix/zombie-attack-regression` from merged `main`.
+- [x] Create `TASKS/zombie-attack-regression-fix.md`.
+- [x] Diagnose normal Zombie attack pipeline with `[ZombieAttack]` logs.
+- [x] Fix player-target MoveTo overlap stopping before explicit attack range.
+- [x] Fix attack LoS trace so the target actor does not block the Zombie's own attack gate.
+- [x] Add Runtime Smoke validation with `[ZombieAttackSummary] RuntimeSmokeResult=PASS`.
+- [x] Add focused automation tests for target MoveTo overlap and attack/damage/cooldown cycle.
+- [x] Development Editor / Win64 build without Live Coding: PASS.
+- [x] Automation RunTests `AdaptiveHorror`: 45 succeeded, 0 failed.
+- [x] Runtime Smoke: PASS with player HP `100 -> 90 -> 80` and cooldown-blocked duplicate damage.
+- [x] Log Scan: PASS.
+- [x] `git diff --check`: PASS.
+- [ ] Human PIE: confirm visible Zombie attack animation.
+- [ ] Human PIE: confirm Player HP decreases on HUD during normal Zombie attack.
+- [ ] Human PIE: confirm Zombie does not damage every frame.
+- [ ] Human PIE: confirm Zombie repeats attack after cooldown.
+- [ ] Human PIE: confirm Zombie returns to chase if Player moves away.
+- [ ] Human PIE: confirm Player death/respawn remains normal.
+- [ ] Human PIE: confirm HUNTER, ADAM, and Stage Clear show no visible regression.

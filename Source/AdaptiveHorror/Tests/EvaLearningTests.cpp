@@ -7,6 +7,7 @@
 #include "AI/EvaZombieAIController.h"
 #include "AI/EvaZombieCharacter.h"
 #include "Characters/EvaPlayerCharacter.h"
+#include "Components/EvaHealthComponent.h"
 #include "Components/EvaPlayerTelemetryComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -17,6 +18,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "Tests/AutomationCommon.h"
 #include "World/EvaFacilityInteractable.h"
 #include "World/EvaResearchFacilityDirector.h"
 
@@ -1040,6 +1042,121 @@ bool FEvaEnemyIntentControllerFallbackTest::RunTest(const FString& Parameters)
     }
 
     World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaZombieAttackTargetMoveStopsInsideRangeTest,
+    "AdaptiveHorror.ZombieAttack.TargetMoveStopsInsideRange",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaZombieAttackTargetMoveStopsInsideRangeTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>(
+        FVector(0.0f, 0.0f, 160.0f), FRotator::ZeroRotator);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>(
+        FVector(260.0f, 0.0f, 160.0f), FRotator::ZeroRotator);
+    AEvaZombieAIController* Controller = World->SpawnActor<AEvaZombieAIController>();
+
+    TestNotNull(TEXT("Player spawns for zombie attack target move test"), Player);
+    TestNotNull(TEXT("Zombie spawns for zombie attack target move test"), Zombie);
+    TestNotNull(TEXT("Controller spawns for zombie attack target move test"), Controller);
+    if (!Player || !Zombie || !Controller)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+
+    Controller->Possess(Zombie);
+    Controller->ConfigureCombat(150.0f, 10.0f, 1.5f);
+    Controller->SetPlayerTarget(Player);
+
+    TestFalse(TEXT("Player chase MoveTo does not stop on capsule overlap before attack range"),
+        Controller->DebugShouldStopOnOverlapForGoal(Player));
+    TestTrue(TEXT("Non-target actor MoveTo still keeps normal stop-on-overlap behavior"),
+        Controller->DebugShouldStopOnOverlapForGoal(Zombie));
+
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEvaZombieAttackCycleAppliesDamageTest,
+    "AdaptiveHorror.ZombieAttack.AttackCycleAppliesDamage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEvaZombieAttackCycleAppliesDamageTest::RunTest(const FString& Parameters)
+{
+    FTestWorldWrapper WorldWrapper;
+    if (!WorldWrapper.CreateTestWorld(EWorldType::Game))
+    {
+        WorldWrapper.ForwardErrorMessages(this);
+        return false;
+    }
+    if (!WorldWrapper.BeginPlayInTestWorld())
+    {
+        WorldWrapper.ForwardErrorMessages(this);
+        return false;
+    }
+    UWorld* World = WorldWrapper.GetTestWorld();
+    AEvaPrototypeGameMode* GameMode = World->GetAuthGameMode<AEvaPrototypeGameMode>();
+    TestNotNull(TEXT("Zombie attack test world has auth game mode for APawn damage"), GameMode);
+    if (GameMode)
+    {
+        GameMode->StartNewGameFlow();
+    }
+
+    AEvaPlayerCharacter* Player = World->SpawnActor<AEvaPlayerCharacter>(
+        FVector(0.0f, 0.0f, 160.0f), FRotator::ZeroRotator);
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>(
+        FVector(100.0f, 0.0f, 160.0f), FRotator::ZeroRotator);
+    AEvaZombieAIController* Controller = World->SpawnActor<AEvaZombieAIController>();
+
+    TestNotNull(TEXT("Player spawns for zombie attack cycle test"), Player);
+    TestNotNull(TEXT("Zombie spawns for zombie attack cycle test"), Zombie);
+    TestNotNull(TEXT("Controller spawns for zombie attack cycle test"), Controller);
+    if (!Player || !Zombie || !Controller)
+    {
+        WorldWrapper.DestroyTestWorld(false);
+        return false;
+    }
+
+    if (!Player->HasActorBegunPlay())
+    {
+        Player->DispatchBeginPlay();
+    }
+    if (!Zombie->HasActorBegunPlay())
+    {
+        Zombie->DispatchBeginPlay();
+    }
+    if (!Controller->HasActorBegunPlay())
+    {
+        Controller->DispatchBeginPlay();
+    }
+
+    Controller->Possess(Zombie);
+    Controller->ConfigureCombat(150.0f, 10.0f, 1.5f);
+    if (UEvaHealthComponent* PlayerHealth = Player->GetHealthComponent())
+    {
+        PlayerHealth->ResetToFullHealth();
+    }
+
+    float HpBefore = -1.0f;
+    float HpAfterFirst = -1.0f;
+    float HpAfterCooldownBlocked = -1.0f;
+    float HpAfterSecond = -1.0f;
+    int32 AttackStartedCount = 0;
+    int32 DamageAppliedCount = 0;
+    const bool bAttackCyclePassed = Controller->DebugRunAttackValidationCycle(Player, HpBefore, HpAfterFirst,
+        HpAfterCooldownBlocked, HpAfterSecond, AttackStartedCount, DamageAppliedCount);
+
+    TestTrue(TEXT("Zombie attack validation cycle passes"), bAttackCyclePassed);
+    TestTrue(TEXT("First attack reduces player HP"), HpAfterFirst < HpBefore);
+    TestTrue(TEXT("Cooldown blocks duplicate damage"), FMath::IsNearlyEqual(HpAfterCooldownBlocked, HpAfterFirst));
+    TestTrue(TEXT("Second attack after cooldown reduces player HP again"), HpAfterSecond < HpAfterCooldownBlocked);
+    TestTrue(TEXT("Two attacks started"), AttackStartedCount >= 2);
+    TestTrue(TEXT("Two damage applications recorded"), DamageAppliedCount >= 2);
+
+    WorldWrapper.DestroyTestWorld(false);
     return true;
 }
 

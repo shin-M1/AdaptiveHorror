@@ -465,6 +465,109 @@ static FAutoConsoleCommandWithWorldAndArgs CCmdEvaDebugBlackout(
         }
     }));
 
+#if !UE_BUILD_SHIPPING
+static bool RunEvaZombieAttackRuntimeSmoke(UWorld* World)
+{
+    if (!World)
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[ZombieAttackSummary] ZombieSpawned=false TargetAcquired=false EnteredAttackRange=false AttackStarted=false DamageApplied=false PlayerHpChanged=false CooldownStarted=false CooldownCompleted=false RepeatedAttackObserved=false FatalErrors=0 EnsureFailures=0 Reason=NoWorld"));
+        return false;
+    }
+
+    AEvaPrototypeGameMode* GameMode = World->GetAuthGameMode<AEvaPrototypeGameMode>();
+    if (!GameMode)
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[ZombieAttackSummary] ZombieSpawned=false TargetAcquired=false EnteredAttackRange=false AttackStarted=false DamageApplied=false PlayerHpChanged=false CooldownStarted=false CooldownCompleted=false RepeatedAttackObserved=false FatalErrors=0 EnsureFailures=0 Reason=NoGameMode"));
+        return false;
+    }
+
+    GameMode->StartNewGameFlow();
+
+    APlayerController* PlayerController = World->GetFirstPlayerController();
+    AEvaPlayerCharacter* Player = PlayerController ? Cast<AEvaPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
+    if (!Player || !Player->GetHealthComponent())
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[ZombieAttackSummary] ZombieSpawned=false TargetAcquired=false EnteredAttackRange=false AttackStarted=false DamageApplied=false PlayerHpChanged=false CooldownStarted=false CooldownCompleted=false RepeatedAttackObserved=false FatalErrors=0 EnsureFailures=0 Reason=NoPlayer"));
+        return false;
+    }
+
+    Player->ResetForCheckpoint(FTransform(FRotator::ZeroRotator, FVector(-5400.0f, 0.0f, 160.0f)));
+    Player->GetHealthComponent()->ResetToFullHealth();
+
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    AEvaZombieCharacter* Zombie = World->SpawnActor<AEvaZombieCharacter>(AEvaZombieCharacter::StaticClass(),
+        Player->GetActorLocation() + FVector(100.0f, 0.0f, 0.0f), FRotator::ZeroRotator, SpawnParameters);
+    AEvaZombieAIController* Controller = World->SpawnActor<AEvaZombieAIController>(
+        AEvaZombieAIController::StaticClass(), Zombie ? Zombie->GetActorLocation() : Player->GetActorLocation(),
+        FRotator::ZeroRotator, SpawnParameters);
+    if (!Zombie || !Controller)
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[ZombieAttackSummary] ZombieSpawned=%s TargetAcquired=false EnteredAttackRange=false AttackStarted=false DamageApplied=false PlayerHpChanged=false CooldownStarted=false CooldownCompleted=false RepeatedAttackObserved=false FatalErrors=0 EnsureFailures=0 Reason=SpawnFailed"),
+            Zombie ? TEXT("true") : TEXT("false"));
+        if (Controller)
+        {
+            Controller->Destroy();
+        }
+        if (Zombie)
+        {
+            Zombie->Destroy();
+        }
+        return false;
+    }
+
+    Controller->Possess(Zombie);
+    Controller->ConfigureCombat(150.0f, 10.0f, 1.5f);
+
+    float HpBefore = -1.0f;
+    float HpAfterFirst = -1.0f;
+    float HpAfterCooldownBlocked = -1.0f;
+    float HpAfterSecond = -1.0f;
+    int32 AttackStartedCount = 0;
+    int32 DamageAppliedCount = 0;
+    const bool bPassed = Controller->DebugRunAttackValidationCycle(Player, HpBefore, HpAfterFirst,
+        HpAfterCooldownBlocked, HpAfterSecond, AttackStartedCount, DamageAppliedCount);
+    if (bPassed)
+    {
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ZombieAttackSummary] RuntimeSmokeResult=PASS HpBefore=%.1f HpAfterFirst=%.1f HpAfterCooldownBlocked=%.1f HpAfterSecond=%.1f AttackStartedCount=%d DamageAppliedCount=%d"),
+            HpBefore,
+            HpAfterFirst,
+            HpAfterCooldownBlocked,
+            HpAfterSecond,
+            AttackStartedCount,
+            DamageAppliedCount);
+    }
+    else
+    {
+        UE_LOG(LogAdaptiveHorror, Error,
+            TEXT("[ZombieAttackSummary] RuntimeSmokeResult=FAIL HpBefore=%.1f HpAfterFirst=%.1f HpAfterCooldownBlocked=%.1f HpAfterSecond=%.1f AttackStartedCount=%d DamageAppliedCount=%d"),
+            HpBefore,
+            HpAfterFirst,
+            HpAfterCooldownBlocked,
+            HpAfterSecond,
+            AttackStartedCount,
+            DamageAppliedCount);
+    }
+
+    Controller->Destroy();
+    Zombie->Destroy();
+    return bPassed;
+}
+
+static FAutoConsoleCommandWithWorld CCmdEvaValidateZombieAttack(
+    TEXT("Eva.ValidateZombieAttack"),
+    TEXT("Runs a non-shipping runtime smoke validation for the normal Zombie attack cycle."),
+    FConsoleCommandWithWorldDelegate::CreateStatic([](UWorld* World)
+    {
+        RunEvaZombieAttackRuntimeSmoke(World);
+    }));
+#endif
+
 AEvaPrototypeGameMode::AEvaPrototypeGameMode()
 {
     DefaultPawnClass = AEvaPlayerCharacter::StaticClass();
@@ -499,6 +602,17 @@ void AEvaPrototypeGameMode::BeginPlay()
     {
         bRuntimeNavigationReady = true;
     }
+
+#if !UE_BUILD_SHIPPING
+    if (FParse::Param(FCommandLine::Get(), TEXT("EvaValidateZombieAttackSmoke")))
+    {
+        GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+        {
+            const bool bPassed = RunEvaZombieAttackRuntimeSmoke(GetWorld());
+            FPlatformMisc::RequestExitWithStatus(false, bPassed ? 0 : 1, TEXT("EvaValidateZombieAttackSmoke"));
+        }));
+    }
+#endif
 }
 
 void AEvaPrototypeGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)

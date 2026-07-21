@@ -1,5 +1,50 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
+## 2026-07-22 result - Zombie attack regression fix
+
+Branch: `fix/zombie-attack-regression`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Results:
+
+- Generate Project Files: PASS.
+- Development Editor / Win64 build without Live Coding: PASS.
+- Automation RunTests `AdaptiveHorror`: PASS.
+  - Total: 45
+  - Success: 45
+  - Failures: 0
+  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-20.16.14.log`
+- Runtime Smoke: PASS.
+  - Runtime log: `Saved\Logs\AdaptiveHorror.log`
+  - Runtime command is now run through:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" `
+  -game -Unattended -NullRHI -NoSound -NoSplash -EvaValidateZombieAttackSmoke -log
+```
+
+Runtime Smoke evidence:
+
+- `[ZombieAttackSummary] RuntimeSmokeResult=PASS`
+- `HpBefore=100.0`
+- `HpAfterFirst=90.0`
+- `HpAfterCooldownBlocked=90.0`
+- `HpAfterSecond=80.0`
+- `AttackStartedCount=2`
+- `DamageAppliedCount=2`
+
+Notes:
+
+- `RunCodexValidation.ps1` now treats missing `[ZombieAttackSummary] RuntimeSmokeResult=PASS` as a Runtime Smoke failure.
+- UE5.8 still emits SDK validation warnings for unsupported/non-Win64 platforms; Win64 remains valid.
+- Human PIE verification is still required for visual attack animation, HUD HP change, chase return, death/respawn, and visible HUNTER/ADAM/Stage Clear regression checks.
+
 ## Integration validation result - Zone Identity Hotfix 1 with latest main
 
 Date: 2026-07-22 JST
