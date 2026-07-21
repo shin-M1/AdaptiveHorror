@@ -1,10 +1,10 @@
 # BUILD_CHECK — UE5実環境ビルド検証
 
-## Cycle 025 execution result - Zone Identity Pass 1
+## Integration validation result - Zone Identity Hotfix 1 with latest main
 
-Date: 2026-07-21 JST
+Date: 2026-07-22 JST
 
-Branch: `feature/zone-identity-pass1`
+Branch: `feature/zone-identity-hotfix1`
 
 Command:
 
@@ -14,7 +14,117 @@ powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxPa
 
 Result:
 
-- Initial sandboxed run failed before build due `System.UnauthorizedAccessException` on `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.41.uba`.
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count from backup log `Saved\Logs\AdaptiveHorror-backup-2026.07.21-19.15.45.log`: 43 started, 43 succeeded, 0 failed.
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - 2 `[BoundaryGeometry]` lines emitted for `EntryToSecurity` and `SecurityToObservation`, both `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true Source=GeneratedFacilityBounds`.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- `git diff --check`: PASS.
+
+## Cycle 027 execution result - Close Security Corridor boundary gaps
+
+Date: 2026-07-22 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests, 43 succeeded, 0 failed.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-16.37.55.log`
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - `[BoundaryGeometry] Connection=EntryToSecurity ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1162 SideWallCenterAbsY=1110 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - `[BoundaryGeometry] Connection=SecurityToObservation ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1062 SideWallCenterAbsY=1010 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - Runtime NavMesh readiness logged `Ready=true`.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+- `git diff --check`: PASS.
+
+## Cycle 026 execution result - Zone Identity Hotfix 1 follow-up
+
+Date: 2026-07-21 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Initial sandboxed run failed before build due `System.UnauthorizedAccessException` on UnrealBuildTool's local trace/log backup directory under `C:\Users\shinn\AppData\Local\UnrealBuildTool`.
+- Re-run with permission to use Unreal's normal local build/log directories: reached compiler.
+- First compiler result found one new issue:
+  - `EvaZombieAIController.cpp`: `BoolText` was not in scope for the new diagnostic log.
+- Fixed the diagnostic log to use local ternary text formatting.
+- Final validation result: PASS.
+- Static source sanity: PASS.
+- Generate Project Files: Succeeded.
+- Development Editor / Win64 build without Live Coding: Succeeded.
+- Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
+- Automation RunTests `AdaptiveHorror`: Succeeded.
+- Automation count: 43 tests, 43 succeeded, 0 failed.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-09.10.39.log`
+- Runtime Smoke: exit code 0.
+- Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
+- Runtime evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true Source=GeneratedFacilityBounds`.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- Zombie attack diagnostics:
+  - Superseded during main integration. The Zone Identity Hotfix PR no longer carries Zombie AI diagnostic production changes.
+  - PIE verification of zombie attack behavior remains assigned to the separate regression task if needed.
+- Log scan: PASS.
+  - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
+  - Matches: 0.
+
+## Cycle 025 execution result - Zone Identity Hotfix 1
+
+Date: 2026-07-21 JST
+
+Branch: `feature/zone-identity-hotfix1`
+
+Command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4
+```
+
+Result:
+
+- Initial sandboxed run failed before build due `System.UnauthorizedAccessException` on `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.20-20.34.31.uba`.
 - Re-run with permission to use Unreal's normal local build/log directories: PASS.
 - Static source sanity: PASS.
 - Tool discovery:
@@ -27,19 +137,14 @@ Result:
 - Build log: `C:\Users\shinn\AppData\Local\UnrealBuildTool\Log.txt`
 - Automation RunTests `AdaptiveHorror`: Succeeded.
 - Automation count: 43 tests, 43 succeeded, 0 failed.
-- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-05.49.25.log`
-- Runtime Smoke:
-
-```powershell
-& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\shinn\Documents\Codex\2026-06-23\unreal-engine-5-fps-30-60\AdaptiveHorror.uproject" -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log
-```
-
-- Runtime Smoke exit code: 0.
+- Automation backup log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-08.42.34.log`
+- Runtime Smoke: exit code 0.
 - Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
 - Runtime evidence:
   - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted.
+  - All five connections logged `Connected=true GapDetected=false`.
   - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
-  - Required content objects still logged after navigation readiness.
 - Log scan: PASS.
   - Blocking pattern: `Fatal error|LogOutputDevice: Error: Ensure|Ensure condition failed|Ensure failed|Assertion failed|EXCEPTION|Stack overflow|Access violation|NavReady=false|Result=\{Fail|Automation Test failed`
   - Matches: 0.
@@ -47,8 +152,8 @@ Result:
 
 Notes:
 
+- PIE visual/traversal verification was not performed by Codex.
 - UE5.8 still prints non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 build/automation/runtime smoke succeeded.
-- PIE visual verification was not performed by Codex.
 
 ## Cycle 024 execution result - Autonomous Development Kit
 

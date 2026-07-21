@@ -1,18 +1,30 @@
 # TODO — Adaptive Horror FPS Demo
 
-## Cycle 025 status - Zone Identity Pass 1
+## Integration status - Zone Identity Hotfix 1 with latest main
 
-- [x] Created `feature/zone-identity-pass1` from latest clean `main`.
-- [x] Confirmed latest `main` was already up to date with `origin/main`.
-- [x] Created `TASKS/zone-identity-pass-1.md`.
-- [x] Kept changes scoped to runtime facility geometry and logging.
-- [x] Made Entry Lobby structurally wider/open with reception landmarks.
-- [x] Made Security Corridor narrower with a light L-shape/zigzag partition layout.
-- [x] Made Observation Lab route around central equipment.
-- [x] Made Containment Ward use side cell structures and additional cover.
-- [x] Made Data Core use a central core plus half-loop cover pieces.
-- [x] Kept Adam Arena broad while adding arena-scale landmarks/cover.
-- [x] Added `[ZoneIdentity]` runtime logs for all 6 zones.
+- [x] Confirmed latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- [x] Merged latest `main` into `feature/zone-identity-hotfix1` with normal merge conflict resolution.
+- [x] Preserved six Zone Identity shapes and `[ZoneIdentity]` runtime logs.
+- [x] Preserved boundary hotfix logs: `[ConnectionIntegrity]`, `[BoundaryIntegrity]`, and `[BoundaryGeometry]`.
+- [x] Preserved current-location ZONE display tracking.
+- [x] Removed out-of-scope Zombie AI diagnostic production changes from this PR scope.
+- [x] Validation passed: Build, Automation 43/43, Runtime Smoke, Log Scan, and `git diff --check`.
+
+### Next TODO
+
+- [ ] Open/review the PR for `feature/zone-identity-hotfix1` into `main`.
+- [ ] Human PIE-verify the two target wall gaps after the integration.
+- [ ] Human PIE-verify ZONE HUD still follows forward/backward movement after the integration.
+
+## Cycle 027 status - Close Security Corridor boundary gaps
+
+- [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.
+- [x] Kept room sizes, floors, ZONE tracking, progression, AI, Combat, HUNTER, ADAM, and Runtime NavMesh algorithms unchanged.
+- [x] Recomputed connection boundary bridge geometry from actual gate wall and side wall extents.
+- [x] Closed the regular-opening exterior span around Entry Lobby <-> Security Corridor.
+- [x] Closed the regular-opening exterior span around Security Corridor <-> Observation Lab.
+- [x] Added `[BoundaryGeometry]` logs for the two target connections.
+- [x] Confirmed Runtime Smoke logs show `UnexpectedGapWidth=0` and `ClosedOutsideOpening=true` for both target connections.
 - [x] Live Coding-free Development Editor / Win64 build succeeded.
 - [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
 - [x] Runtime Smoke succeeded with exit code 0.
@@ -20,14 +32,59 @@
 
 ### Next TODO
 
-- [ ] Human PIE-verify Entry Lobby reads as an open reception area.
-- [ ] Human PIE-verify Security Corridor reads as a light L-shape/zigzag without becoming a maze.
-- [ ] Human PIE-verify Observation Lab clearly routes the player around central equipment.
-- [ ] Human PIE-verify Containment Ward side cells and cover are readable during combat.
-- [ ] Human PIE-verify Data Core reads as a half-loop around the central core.
-- [ ] Human PIE-verify Adam Arena remains comfortable for boss combat.
-- [ ] Human PIE-verify full New Game to Adam Arena progression after the geometry pass.
-- [ ] Decide whether `TASKS/TEMPLATE.md` should be restored/added on `main` in a separate documentation-only pass.
+- [ ] Human PIE-verify Entry Lobby <-> Security Corridor visible wall boundary is fully closed.
+- [ ] Human PIE-verify Security Corridor <-> Observation Lab visible wall boundary is fully closed.
+- [ ] Human PIE-verify the legal passage openings remain traversable.
+- [ ] Human PIE-verify the player cannot escape or fall at either target connection.
+
+## Cycle 026 status - Zone Identity Hotfix 1 follow-up
+
+- [x] Continued on existing `feature/zone-identity-hotfix1`; no new branch created.
+- [x] Confirmed pre-work HEAD was `fe2eb1e Implement Zone Identity Hotfix 1`.
+- [x] Closed visible exterior wall discontinuities at zone transitions with visible boundary bridge wall segments, not floor-only or transparent-only collision.
+- [x] Kept legal central zone connections open and preserved runtime floor connectors.
+- [x] Added `[BoundaryIntegrity]` logs for all six zones.
+- [x] Added location-based zone lookup for the generated facility.
+- [x] Updated HUD ZONE display to follow actual player position independently from Director objective progression.
+- [x] Added `[ZoneTracking]` runtime structure log.
+- [x] Removed zombie attack diagnostic production changes from the Zone Identity Hotfix PR scope during main integration.
+- [x] Live Coding-free Development Editor / Win64 build succeeded after fixing the one compile error found by validation.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify Entry Lobby -> Security Corridor exterior walls are visually/physically closed.
+- [ ] Human PIE-verify Security Corridor -> Observation Lab exterior walls are visually/physically closed.
+- [ ] Human PIE-verify all other zone perimeter transitions cannot be used to leave the facility.
+- [ ] Human PIE-verify ZONE HUD updates when moving forward and backward across all adjacent zone boundaries.
+- [ ] Human PIE-verify ZONE HUD does not flicker at boundaries.
+- [ ] Track zombie attack behavior in the separate Zombie Attack Regression task if the issue persists.
+
+## Cycle 025 status - Zone Identity Hotfix 1
+
+- [x] Created `feature/zone-identity-hotfix1` from latest clean `main`.
+- [x] Created `TASKS/zone-identity-hotfix-1.md`.
+- [x] Added explicit runtime floor connector slabs at all five zone transitions.
+- [x] Registered connector slabs as runtime navigable floor components.
+- [x] Added `[ConnectionIntegrity]` logs for Entry->Security, Security->Observation, Observation->Containment, Containment->DataCore, and DataCore->Arena.
+- [x] Confirmed runtime logs show `Connected=true` and `GapDetected=false` for all five connections.
+- [x] Kept `ZoneIdentity` runtime logs for all six zones.
+- [x] Widened Entry Lobby, Observation Lab, Containment Ward, Data Core Room, and Adam Arena within hotfix scope.
+- [x] Kept Security Corridor corridor-like while reducing cramped feel.
+- [x] Live Coding-free Development Editor / Win64 build succeeded.
+- [x] Automation RunTests `AdaptiveHorror` succeeded: 43 tests, 0 failures.
+- [x] Runtime Smoke succeeded with exit code 0.
+- [x] Runtime log scan found 0 blocking patterns.
+
+### Next TODO
+
+- [ ] Human PIE-verify no player fall at Entry Lobby -> Security Corridor.
+- [ ] Human PIE-verify no player fall at Security Corridor -> Observation Lab.
+- [ ] Human PIE-verify all other zone transitions remain traversable.
+- [ ] Human PIE-verify widened rooms feel less cramped without harming navigation/combat readability.
+- [ ] Human PIE-verify full New Game to Adam Arena traversal.
 
 ## Cycle 024 status - Autonomous Development Kit
 

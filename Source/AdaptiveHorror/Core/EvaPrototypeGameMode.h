@@ -89,6 +89,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "EVA|Facility")
     AEvaResearchFacilityDirector* GetResearchDirector() const { return CurrentDirector; }
 
+    UFUNCTION(BlueprintPure, Category = "EVA|Facility")
+    FString GetFacilityZoneNameForLocation(const FVector& WorldLocation) const;
+
     UFUNCTION(BlueprintCallable, Category = "EVA|Facility")
     void SetFacilityPowerOnline(bool bOnline);
 

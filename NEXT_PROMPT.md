@@ -1,12 +1,102 @@
 # Next Codex Prompt
 
-## Latest handoff - 2026-07-21 Cycle 025 Zone Identity Pass 1
+## Latest handoff - 2026-07-22 Zone Identity Hotfix 1 integration
 
 You are continuing the UE5.8 C++ Adaptive Horror prototype.
 
-Current branch: `feature/zone-identity-pass1`.
+Current branch: `feature/zone-identity-hotfix1`.
 
-Do not merge this branch into `main` until the user confirms the zone identity changes in PIE.
+Latest `main` was merged into this branch with a normal merge workflow. PR review/merge should use the GitHub PR workflow rules in `AGENTS.md`, `REVIEW.md`, and `TASKS/review-pr.md`.
+
+### Current verified state
+
+- Latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- Zone Identity Pass 1 structure is preserved:
+  - Entry Lobby: `Open`
+  - Security Corridor: `LShape`
+  - Observation Lab: `Central`
+  - Containment Ward: `Cell`
+  - Data Core Room: `Central`
+  - Adam Arena: `Arena`
+- Boundary Hotfix is preserved:
+  - EntryToSecurity `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - SecurityToObservation `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - All 5 `[ConnectionIntegrity]` lines show `Connected=true GapDetected=false`.
+  - All 6 `[BoundaryIntegrity]` lines show `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- ZONE display still uses player-location lookup and remains independent from objective progression.
+- Zombie AI diagnostic production changes were removed from this PR scope.
+- Validation passed:
+  - Generate Project Files: PASS.
+  - Development Editor / Win64 build without Live Coding: PASS.
+  - `Automation RunTests AdaptiveHorror`: 43 succeeded, 0 failed.
+  - Runtime Smoke: PASS, exit code 0.
+  - Runtime log scan: PASS, 0 blocking matches.
+  - `git diff --check`: PASS.
+
+### Next highest-priority task
+
+Review the `feature/zone-identity-hotfix1` PR into `main`. Do not merge unless the user or task explicitly asks for the merge.
+
+### Human PIE items
+
+- Not verified by Codex: target wall gap closure after the main integration.
+- Not verified by Codex: ZONE HUD bidirectional tracking after the main integration.
+- Not verified by Codex: full New Game to Stage Clear traversal after the main integration.
+
+## Previous handoff - 2026-07-22 Cycle 027 Close Security Corridor boundary gaps
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke exit code: 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- `git diff --check`: passed.
+- Runtime log confirmed `BoundaryGeometry` for:
+  - EntryToSecurity: `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - SecurityToObservation: `UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines, all `Connected=true GapDetected=false`.
+- Runtime log confirmed 6 `BoundaryIntegrity` lines, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Recomputed connector boundary wall spans from actual generated gate/side-wall coordinates.
+- The legal passage opening remains `-550..550` Y, expected width `1100`.
+- Visible boundary bridge walls now overlap the gate side wall and the zone outer side wall.
+- No floor, room size, ZONE tracking, progression, AI, Combat, HUNTER, ADAM, Stage Clear, UI behavior, or Runtime NavMesh algorithm changes were made.
+
+### Next highest-priority PIE task
+
+Verify only the remaining boundary hotfix:
+
+1. Start PIE from New Game.
+2. Inspect Entry Lobby <-> Security Corridor from both sides.
+3. Confirm the visible exterior wall is continuous except for the legal passage opening.
+4. Confirm the player cannot escape the facility or fall at this connection.
+5. Inspect Security Corridor <-> Observation Lab from both sides.
+6. Confirm the visible exterior wall is continuous except for the legal passage opening.
+7. Confirm the player cannot escape the facility or fall at this connection.
+8. Confirm the legal passage remains traversable.
+
+### Not verified by Codex
+
+- Human PIE visual closure of the two target wall gaps.
+- Human PIE collision/escape prevention at the two target connections.
+
+## Latest handoff - 2026-07-21 Cycle 026 Zone Identity Hotfix 1 follow-up
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
 
 ### Current verified state
 
@@ -15,61 +105,93 @@ Do not merge this branch into `main` until the user confirms the zone identity c
 - Runtime Smoke with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log`: exit code 0.
 - Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
 - Runtime log confirmed 6 `ZoneIdentity` lines.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines; all show `Connected=true GapDetected=false`.
+- Runtime log confirmed 6 `BoundaryIntegrity` lines; all show `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- Runtime log confirmed `ZoneTracking` with `ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true`.
 - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
 - PIE viewport confirmation was not performed by Codex.
 
-### Most recent change
+### Most recent fix
 
-- Created `TASKS/zone-identity-pass-1.md`.
-- Updated runtime-generated facility geometry only:
-  - Entry Lobby: wider/open reception-like shape.
-  - Security Corridor: narrower L-shape/light zigzag partitions.
-  - Observation Lab: central equipment route-around.
-  - Containment Ward: side cells and denser cover.
-  - Data Core Room: central core and half-loop cover.
-  - Adam Arena: broader boss arena with gate/pillars.
-- Added `[ZoneIdentity]` logs with:
-  - `ZoneShape`,
-  - `FloorArea`,
-  - `ObstacleCount`,
-  - `LandmarkCount`,
-  - `AverageWidth`,
-  - `AverageHeight`.
-- Did not change AI, Runtime NavMesh algorithm/config, HUNTER, ADAM, combat, UI flow, Player Death, Stage Clear, Save/settings, audio, or art assets.
+- Added visible outer boundary bridge wall segments at each zone connection to close perimeter gaps left by widened zone side walls.
+- Kept legal central connection openings traversable.
+- Added position-based facility zone lookup in `AEvaPrototypeGameMode`.
+- Updated HUD ZONE display to follow the player's actual location instead of the Director's progression-only zone.
+- Added structure logs for boundary integrity and zone tracking.
+- Superseded during main integration: Zombie AI diagnostic production changes were removed from this PR scope.
+
+### Next highest-priority PIE task
+
+Verify the follow-up hotfix in PIE:
+
+1. Start New Game.
+2. At Entry Lobby -> Security Corridor, inspect the exterior walls near the transition and confirm the player cannot leave the facility or fall.
+3. At Security Corridor -> Observation Lab, inspect the exterior walls near the transition and confirm the player cannot leave the facility or fall.
+4. Walk backward and forward across every adjacent zone boundary and confirm the ZONE HUD follows actual location, not only progression.
+5. Confirm Objective, checkpoint, Stage Clear, HUNTER, ADAM, and Player Death behavior did not change.
+6. Re-test zombie attack behavior only in the separate Zombie Attack Regression task if needed; do not modify Zombie AI as part of the Zone Identity Hotfix integration.
+
+### Not verified by Codex
+
+- Visible wall closure in PIE.
+- Player escape/fall prevention in PIE.
+- ZONE HUD forward/backward tracking in PIE.
+- Zombie attack behavior in PIE.
+
+## Latest handoff - 2026-07-21 Cycle 025 Zone Identity Hotfix 1
+
+You are continuing the UE5.8 C++ Adaptive Horror prototype.
+
+Current branch: `feature/zone-identity-hotfix1`.
+
+Do not merge this branch into `main` until the user confirms the hotfix in PIE.
+
+### Current verified state
+
+- Development Editor / Win64 build without Live Coding: succeeded.
+- `Automation RunTests AdaptiveHorror`: 43 tests succeeded, 0 failed.
+- Runtime Smoke with `UnrealEditor-Cmd.exe -game -Unattended -NullRHI -NoSound -NoSplash -ExecCmds=Quit -log`: exit code 0.
+- Runtime log scan: 0 blocking Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / automation failure patterns.
+- Runtime log confirmed 6 `ZoneIdentity` lines.
+- Runtime log confirmed 5 `ConnectionIntegrity` lines.
+- All five connection logs show `Connected=true GapDetected=false`.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+- PIE viewport confirmation was not performed by Codex.
+
+### Most recent fix
+
+- Added explicit overlapping runtime floor connector slabs at all five zone boundaries.
+- Registered connector slabs as runtime navigable floors.
+- Preserved gate side/header collision pieces and added connection diagnostics.
+- Widened Entry Lobby, Observation Lab, Containment Ward, Data Core Room, and Adam Arena.
+- Kept Security Corridor corridor-like while reducing cramped feel.
+- Did not change AI, combat, HUNTER, ADAM, Stage Clear, UI, Save/settings, lighting, audio, art assets, encounters, or Runtime NavMesh algorithms/configuration.
 
 ### Next highest-priority task
 
-Run PIE and verify only the Zone Identity Pass 1 visual/readability goals.
+Run PIE and verify only the Zone Identity Hotfix 1 issues.
 
 PIE checklist:
 
 1. Start New Game.
-2. Walk through the six zones in order:
-   - Entry Lobby
-   - Security Corridor
-   - Observation Lab
-   - Containment Ward
-   - Data Core Room
-   - Adam Arena
-3. Confirm each zone is recognizable by structure, not only color/signage.
-4. Confirm Entry Lobby reads as an open reception space.
-5. Confirm Security Corridor reads as a light L-shape/zigzag and is not a maze.
-6. Confirm Observation Lab forces a clear route around central equipment.
-7. Confirm Containment Ward reads as side cells plus cover.
-8. Confirm Data Core reads as a half-loop around the central core.
-9. Confirm Adam Arena remains large enough for boss combat.
-10. Confirm Power Console, Keycard, Locked Door, 3 Research Logs, and Data Core Console remain reachable and readable.
-11. Confirm enemy/player movement and Stage Clear are not regressed.
+2. Walk from Entry Lobby to Security Corridor without jumping or debug movement.
+3. Confirm there is no visible/physical floor or wall collision gap and the player cannot fall.
+4. Walk from Security Corridor to Observation Lab.
+5. Confirm there is no visible/physical floor or wall collision gap and the player cannot fall.
+6. Continue through Observation Lab, Containment Ward, Data Core Room, and Adam Arena.
+7. Confirm all transitions remain traversable.
+8. Confirm widened rooms feel less cramped.
+9. Confirm Power Console, Keycard, Locked Door, 3 Research Logs, and Data Core Console remain reachable.
+10. Confirm enemy/player movement and Stage Clear are not regressed.
 
 If a problem is found:
 
-- Fix only runtime facility geometry or placement/logging directly related to zone identity.
-- Preserve AI, HUNTER, ADAM, combat, Player Death, Stage Clear, UI flow, Save/settings, audio, and art assets.
+- Fix only runtime facility connector/room geometry directly related to the fall gap or cramped room feel.
+- Preserve AI, HUNTER, ADAM, combat, Player Death, Stage Clear, UI flow, Save/settings, audio, lighting, and art assets.
 
 ### Important files
 
-- `TASKS/zone-identity-pass-1.md`
-- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `TASKS/zone-identity-hotfix-1.md`
 - `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
 - `DEV_LOG.md`
 - `TODO.md`
@@ -77,7 +199,8 @@ If a problem is found:
 
 ### Completion condition for next pass
 
-- Human confirms in PIE that the six zones are spatially distinct and traversable.
+- Human confirms in PIE that the connection fall gaps are gone.
+- Human confirms widened rooms are acceptable.
 - If code changes are needed, Development Editor / Win64 build succeeds.
 - Automation RunTests `AdaptiveHorror` succeeds.
 - Runtime Smoke succeeds.

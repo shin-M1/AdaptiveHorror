@@ -1,60 +1,234 @@
 # Development Log
 
-## 2026-07-21 - Cycle 025: Zone Identity Pass 1
+## 2026-07-22 - Integration: Zone Identity Hotfix 1 with latest main
 
-Branch: `feature/zone-identity-pass1`
+Branch: `feature/zone-identity-hotfix1`
 
 ### Scope
 
-- Created `feature/zone-identity-pass1` from latest clean `main`.
-- Created `TASKS/zone-identity-pass-1.md` because latest `main` does not contain `TASKS/TEMPLATE.md`.
-- Implemented spatial identity changes only in the existing runtime research facility generation.
-- Did not change AI behavior, Runtime NavMesh algorithms/configuration, combat rules, HUNTER, ADAM, Player Death, Stage Clear, UI flow, Save/settings, audio, or art assets.
+- Merged latest `main` (`f00e217`) into `feature/zone-identity-hotfix1` with a normal merge commit workflow.
+- Confirmed latest `main` contains Zone Identity Pass 1 commit `4de573e`.
+- Preserved Zone Identity Pass 1 spatial zone structure and `[ZoneIdentity]` logs.
+- Preserved Hotfix boundary bridge walls, `[ConnectionIntegrity]`, `[BoundaryIntegrity]`, `[BoundaryGeometry]`, and current-location ZONE tracking.
+- Removed out-of-scope Zombie AI diagnostic production changes from this PR integration.
+- Did not change Combat, Player Damage, HUNTER, ADAM, Stage Clear, Save, Weapon, Runtime NavMesh algorithm, or progression sequence.
 
-### Implemented
+### Validation
 
-- Entry Lobby:
-  - Wider open floor footprint.
-  - Reception-desk landmark and sparse cover to keep sightlines readable.
-- Security Corridor:
-  - Narrower corridor footprint.
-  - Offset security partitions to create a light L-shape/zigzag walking pattern without maze behavior.
-- Observation Lab:
-  - Large central observation equipment.
-  - Side observation-glass landmarks so the player routes around the center.
-- Containment Ward:
-  - Side containment cell structures on both sides.
-  - Denser cover than the earlier generic room pass.
-- Data Core Room:
-  - Central core landmark.
-  - Half-loop cover pieces around the core.
-- Adam Arena:
-  - Enlarged boss floor footprint.
-  - Gate landmark and four arena pillars while preserving broad boss-fight space.
-- Added `[ZoneIdentity]` runtime logs per zone:
-  - `ZoneShape`,
-  - `FloorArea`,
-  - `ObstacleCount`,
-  - `LandmarkCount`,
-  - `AverageWidth`,
-  - `AverageHeight`.
+- Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Generate Project Files: PASS.
+- Development Editor / Win64 build without Live Coding: PASS.
+- Automation RunTests `AdaptiveHorror`: 43 started, 43 succeeded, 0 failed.
+- Runtime Smoke: PASS, exit code 0.
+- Runtime log scan: PASS, 0 blocking matches.
+- `git diff --check`: PASS.
+
+### Runtime evidence
+
+- `Saved\Logs\AdaptiveHorror.log` contains 6 `[ZoneIdentity]` lines with shapes `Open`, `LShape`, `Central`, `Cell`, `Central`, `Arena`.
+- It contains 5 `[ConnectionIntegrity]` lines, all `Connected=true GapDetected=false`.
+- It contains 6 `[BoundaryIntegrity]` lines, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+- It contains 2 `[BoundaryGeometry]` lines:
+  - `EntryToSecurity ... UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+  - `SecurityToObservation ... UnexpectedGapWidth=0 ClosedOutsideOpening=true`.
+- It contains `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true`.
+- Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that the two target wall gaps remain closed after the main integration.
+- Human PIE confirmation that ZONE HUD tracks backward and forward movement across zone boundaries after the main integration.
+
+## 2026-07-22 - Cycle 027: Close Security Corridor boundary gaps
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Continued on the existing `feature/zone-identity-hotfix1` branch.
+- Pre-work status was clean; latest local commit was `d3f086e Fix zone boundaries and location tracking`.
+- Fixed only the remaining PIE-reported visible wall boundary gaps around:
+  - Entry Lobby <-> Security Corridor,
+  - Security Corridor <-> Observation Lab.
+- Did not change Zombie AI, ZONE tracking, room sizes, floors, progression, Objective, Runtime NavMesh algorithms, Combat, HUNTER, ADAM, Stage Clear, UI behavior, or Save/settings.
+
+### Root cause
+
+- The previous visible boundary bridge calculation used a midpoint/scale formula that produced only half the required Y coverage and started from a value that did not match the actual gate wall mesh outer edge.
+- Actual gate side walls cover up to `Y=+/-690`, while the widened outer side walls for the two target connections sit at `Y=+/-1110` and `Y=+/-1010`.
+- This left visible and physical gaps between the gate-side wall segment and the zone outer side wall even though floor connectors and connection integrity logs were present.
+
+### Exact geometry changes
+
+- Replaced the connector-side boundary bridge math with generated-coordinate calculations based on:
+  - gate wall center,
+  - gate wall half extent,
+  - regular opening half-width,
+  - side wall center,
+  - side wall half extent,
+  - explicit overlap.
+- Boundary bridge walls now cover from the gate wall outer edge with overlap to beyond the side wall thickness with overlap.
+- The legal passage opening remains `-550..550` Y, expected width `1100`.
+- Added `[BoundaryGeometry]` logs for the two target connections:
+  - EntryToSecurity,
+  - SecurityToObservation.
 
 ### Changed files
 
-- `TASKS/zone-identity-pass-1.md`
-- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
 - `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
 - `DEV_LOG.md`
 - `TODO.md`
 - `BUILD_CHECK.md`
 - `NEXT_PROMPT.md`
-- `ROADMAP.md`
+
+### Validation
+
+- Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Development Editor / Win64 build without Live Coding: succeeded.
+- Automation RunTests `AdaptiveHorror`: 43 succeeded, 0 failed.
+- Runtime Smoke: exit code 0.
+- Runtime log scan: PASS, 0 blocking matches.
+- `git diff --check`: PASS.
+- Runtime log evidence:
+  - `[BoundaryGeometry] Connection=EntryToSecurity ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1162 SideWallCenterAbsY=1110 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - `[BoundaryGeometry] Connection=SecurityToObservation ... ExpectedOpeningWidth=1100 BridgeStartAbsY=655 BridgeEndAbsY=1062 SideWallCenterAbsY=1010 UnexpectedGapWidth=0 ClosedOutsideOpening=true`
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that the remaining Entry/Security and Security/Observation wall gaps are closed.
+- Human PIE confirmation that the player cannot escape the facility perimeter at those two transitions.
+
+### Remaining risks / next task
+
+- If PIE still shows a visible gap, inspect the exact side and screenshot location and adjust only that connector wall segment. Do not change floor, room width, ZONE tracking, AI, combat, or progression.
+
+## 2026-07-21 - Cycle 026: Zone Identity Hotfix 1 follow-up
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Continued on the existing `feature/zone-identity-hotfix1` branch.
+- Verified the working tree was clean before work and HEAD was `fe2eb1e Implement Zone Identity Hotfix 1`.
+- Fixed only the PIE-reported follow-up issues that could be addressed safely at that time:
+  - visible exterior wall gaps around widened zone connections,
+  - stale ZONE HUD display when walking backward into a previous zone,
+  - zombie attack diagnostics for the reported non-attacking behavior.
+- Did not change Runtime NavMesh algorithms, progression order, Objective progression, checkpoints, Stage Clear, HUNTER, ADAM, Player Death, Save/settings, lighting, audio, encounters, weapons, or enemy balance.
+
+### Root causes
+
+- Wall gaps: Hotfix 1 added floor connectors but the visible side gate wall pieces did not bridge from the legal central passage out to the widened zone side walls. This left exterior perimeter discontinuities near zone transitions even though the floor itself was connected.
+- Stale ZONE HUD: the HUD was using the Director's progression zone. That value intentionally moves forward with objective progression and does not rewind when the player walks back, so it was unsuitable for current-location display.
+- Zombie attack: no behavior change was made. Diagnostic logs were added at target acquisition, MoveTo, range/line-of-sight checks, attack start, and damage application. Runtime Smoke does not drive close-range combat, so PIE is still required to identify whether the issue is layout/LOS/range or an AI protected-system issue.
+
+### Implemented
+
+- Added visible outer boundary bridge wall segments at every zone connection to close widened-perimeter discontinuities while preserving the legal central connection opening.
+- Kept existing runtime floor connectors and connection gate/header pieces.
+- Added `[BoundaryIntegrity]` runtime logs for all six zones using generated boundary data:
+  - `OuterBoundaryClosed`,
+  - `UnexpectedOpenings`,
+  - `OuterSideWalls`,
+  - `BoundaryBridgeSegments`.
+- Added position-based facility zone lookup on `AEvaPrototypeGameMode`.
+- Updated HUD ZONE display to use the player's actual location instead of Director progression state.
+- Left Objective/progression/checkpoint/Stage Clear state tied to the Director as before.
+- Added `[ZoneTracking]` runtime structure log from generated zone bounds.
+- Superseded during the main integration: `[ZombieAttackDiag]` production changes were removed from the PR scope so this branch does not carry Zombie AI changes.
+
+### Changed files
+
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.h`
+- `Source/AdaptiveHorror/UI/EvaHUD.cpp`
+- `Source/AdaptiveHorror/AI/EvaZombieAIController.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
+
+### Validation
+
+- Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
+- Initial sandboxed validation could not access UnrealBuildTool's normal local trace/log backup directory.
+- First full validation reached the compiler and found `BoolText` was unavailable in `EvaZombieAIController.cpp`; fixed by using local ternary text formatting.
+- Final Development Editor / Win64 build without Live Coding: succeeded.
+- Automation RunTests `AdaptiveHorror`: 43 succeeded, 0 failed.
+- Runtime Smoke: exit code 0.
+- Runtime log scan: PASS, 0 blocking matches.
+- Runtime log evidence:
+  - 6 `[ZoneIdentity]` lines emitted.
+  - 5 `[ConnectionIntegrity]` lines emitted, all `Connected=true GapDetected=false`.
+  - 6 `[BoundaryIntegrity]` lines emitted, all `OuterBoundaryClosed=true UnexpectedOpenings=0`.
+  - `[ZoneTracking] ZoneBounds=6 BidirectionalTrackingEnabled=true ObjectiveIndependent=true BoundsValid=true`.
+  - Runtime NavMesh readiness logged `Ready=true PlayerProjected=true RepresentativeProjected=true`.
+
+### Not verified by Codex
+
+- Human PIE visual confirmation that no exterior wall gaps remain.
+- Human PIE confirmation that the player cannot escape the facility perimeter at zone transitions.
+- Human PIE confirmation that ZONE HUD follows backward movement across every adjacent zone boundary without flicker.
+- Human PIE confirmation of the reported zombie attack issue remains outside this PR scope.
+
+### Remaining risks / next task
+
+- If PIE still shows zombies not attacking, handle it in the separate Zombie Attack Regression task; this integration PR intentionally leaves Zombie AI unchanged.
+- If any wall gap remains, adjust only the relevant visible boundary segment; do not expand rooms or alter progression.
+
+## 2026-07-21 - Cycle 025: Zone Identity Hotfix 1
+
+Branch: `feature/zone-identity-hotfix1`
+
+### Scope
+
+- Created `feature/zone-identity-hotfix1` from latest clean `main`.
+- Latest `main` did not contain `TASKS/zone-identity-pass-1.md`; read the pass task from `feature/zone-identity-pass1` history for context only.
+- Created `TASKS/zone-identity-hotfix-1.md`.
+- Fixed only runtime facility geometry/connectivity issues reported from Zone Identity PIE.
+- Did not change AI, combat, HUNTER, ADAM, Stage Clear, UI, Save/settings, lighting, audio, art assets, encounters, or Runtime NavMesh algorithms/configuration.
+
+### Implemented
+
+- Added explicit overlapping runtime floor connector slabs at all five zone boundaries:
+  - Entry -> Security
+  - Security -> Observation
+  - Observation -> Containment
+  - Containment -> DataCore
+  - DataCore -> Arena
+- Registered connector floor slabs as runtime navigable floor components so Runtime NavMesh generation sees the connected path.
+- Preserved gate collision/header pieces at each connection.
+- Added `[ConnectionIntegrity]` runtime logs with:
+  - `Connected`,
+  - `GapDetected`,
+  - `FloorSegments`,
+  - `WallSegments`,
+  - connector X and width.
+- Restored/kept `[ZoneIdentity]` logs on this latest-main hotfix branch.
+- Widened the requested rooms by approximately 15-30%:
+  - Entry Lobby
+  - Observation Lab
+  - Containment Ward
+  - Data Core Room
+  - Adam Arena slightly widened
+  - Security Corridor kept corridor-like but less cramped.
+
+### Changed files
+
+- `TASKS/zone-identity-hotfix-1.md`
+- `Source/AdaptiveHorror/Core/EvaPrototypeGameMode.cpp`
+- `DEV_LOG.md`
+- `TODO.md`
+- `BUILD_CHECK.md`
+- `NEXT_PROMPT.md`
 
 ### Verification
 
 - Initial sandboxed validation attempt:
   - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
-  - Result: failed before build due sandbox denial while UnrealBuildTool attempted to access `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.14-10.18.41.uba`.
+  - Result: failed before build due sandbox denial while UnrealBuildTool attempted to access `C:\Users\shinn\AppData\Local\UnrealBuildTool\Trace-backup-2026.07.20-20.34.31.uba`.
   - This was an environment permission issue, not a compile failure.
 - Escalated validation:
   - Command: `powershell -ExecutionPolicy Bypass -File .\Scripts\RunCodexValidation.ps1 -MaxParallelActions 4`
@@ -62,7 +236,7 @@ Branch: `feature/zone-identity-pass1`
   - Generate Project Files: Succeeded.
   - Development Editor / Win64 build without Live Coding: Succeeded.
   - Automation RunTests `AdaptiveHorror`: 43 tests succeeded, 0 failed.
-  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-05.49.25.log`
+  - Automation log: `Saved\Logs\AdaptiveHorror-backup-2026.07.21-08.42.34.log`
   - Runtime Smoke: exit code 0.
   - Runtime Smoke log: `Saved\Logs\AdaptiveHorror.log`
   - Runtime log scan: PASS; 0 blocking matches for Fatal / Ensure failure / Assertion failure / EXCEPTION / Stack overflow / Access violation / NavReady=false / Automation failure.
@@ -70,23 +244,23 @@ Branch: `feature/zone-identity-pass1`
 
 ### Runtime evidence
 
+- `Saved\Logs\AdaptiveHorror.log` contains 5 `ConnectionIntegrity` lines:
+  - `Entry->Security Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Security->Observation Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Observation->Containment Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `Containment->DataCore Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
+  - `DataCore->Arena Connected=true GapDetected=false FloorSegments=1 WallSegments=3`
 - `Saved\Logs\AdaptiveHorror.log` contains 6 `ZoneIdentity` lines:
-  - `Entry Lobby`: `ZoneShape=Open FloorArea=3240000 ObstacleCount=4 LandmarkCount=2 AverageWidth=1800 AverageHeight=390`
-  - `Security Corridor`: `ZoneShape=LShape FloorArea=1800000 ObstacleCount=5 LandmarkCount=2 AverageWidth=1000 AverageHeight=360`
-  - `Observation Lab`: `ZoneShape=Central FloorArea=2880000 ObstacleCount=4 LandmarkCount=4 AverageWidth=1600 AverageHeight=410`
-  - `Containment Ward`: `ZoneShape=Cell FloorArea=2700000 ObstacleCount=10 LandmarkCount=6 AverageWidth=1500 AverageHeight=380`
-  - `Data Core Room`: `ZoneShape=Central FloorArea=2880000 ObstacleCount=7 LandmarkCount=2 AverageWidth=1600 AverageHeight=430`
-  - `Adam Arena`: `ZoneShape=Arena FloorArea=5280000 ObstacleCount=6 LandmarkCount=1 AverageWidth=2200 AverageHeight=430`
+  - `Entry Lobby`: `ZoneShape=Open FloorArea=3780000 AverageWidth=2100`
+  - `Security Corridor`: `ZoneShape=LShape FloorArea=2250000 AverageWidth=1250`
+  - `Observation Lab`: `ZoneShape=Central FloorArea=3420000 AverageWidth=1900`
+  - `Containment Ward`: `ZoneShape=Cell FloorArea=3240000 AverageWidth=1800`
+  - `Data Core Room`: `ZoneShape=Central FloorArea=3420000 AverageWidth=1900`
+  - `Adam Arena`: `ZoneShape=Arena FloorArea=5760000 AverageWidth=2400`
 - Runtime NavMesh readiness:
   - `Ready=true`
   - `PlayerProjected=true`
   - `RepresentativeProjected=true`
-- Required content objects still emit existing runtime diagnostics:
-  - Power Console
-  - Security Keycard
-  - Locked Door
-  - 3 Research Logs
-  - Data Core Console
 - Stage Clear regression remained covered by existing automation:
   - `AdaptiveHorror.StageClear.Idempotent`
   - `AdaptiveHorror.StageClear.RejectsPlayerDeath`
@@ -95,17 +269,16 @@ Branch: `feature/zone-identity-pass1`
 
 ### Not verified by Codex
 
-- Human PIE visual confirmation that each room is instantly recognizable by shape.
-- Human PIE comfort check for the light L-shape / half-loop walking patterns.
-- Human PIE full New Game to Adam Arena traversal after the geometry pass.
-- Human PIE combat readability in the changed rooms.
+- Human PIE confirmation that the player no longer falls between Entry Lobby and Security Corridor.
+- Human PIE confirmation that the player no longer falls between Security Corridor and Observation Lab.
+- Human PIE feel check for widened rooms.
+- Full New Game to Adam Arena traversal in PIE.
 
 ### Known issues / TBD
 
-- Latest `main` did not contain the previously local Field Pass 1 branch contents, so this pass implemented the requested zone identity structure directly from latest `main` instead of merging/cherry-picking other branches.
-- `TASKS/TEMPLATE.md` is missing on latest `main`; `TASKS/zone-identity-pass-1.md` records the task format directly.
-- UE5.8 command output still reports non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 validation succeeded.
-- Runtime Smoke is not a substitute for PIE visual judgment.
+- Runtime Smoke confirms generated geometry/logs and startup safety, but cannot prove human traversal comfort.
+- Superseded by the 2026-07-22 integration: latest `main` now contains Zone Identity Pass 1, and this hotfix branch is being merged with it rather than carrying an isolated copy.
+- UE5.8 still prints non-Win64 SDK validation warnings for platforms such as LinuxArm64/VisionOS; Win64 validation succeeded.
 
 ## 2026-07-21 - Cycle 024: Autonomous Development Kit
 

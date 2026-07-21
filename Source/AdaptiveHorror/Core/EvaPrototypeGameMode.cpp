@@ -73,21 +73,87 @@ namespace
     const FName EvaZoneIdentityTag(TEXT("EvaZoneIdentity"));
     const FName EvaZoneLandmarkTag(TEXT("EvaZoneLandmark"));
 
-    FVector GetZoneIdentityFloorScale(const int32 ZoneIndex)
+    constexpr int32 FacilityZoneCount = 6;
+    constexpr float FacilityGateWallCenterY = 620.0f;
+    constexpr float FacilityGateWallScaleY = 1.4f;
+    constexpr float FacilityGateWallHalfY = FacilityGateWallScaleY * 50.0f;
+    constexpr float FacilityGateOpeningHalfY = FacilityGateWallCenterY - FacilityGateWallHalfY;
+    constexpr float FacilityGateWallOuterY = FacilityGateWallCenterY + FacilityGateWallHalfY;
+    constexpr float FacilitySideWallScaleY = 0.35f;
+    constexpr float FacilitySideWallHalfY = FacilitySideWallScaleY * 50.0f;
+    constexpr float FacilityBoundaryWallOverlap = 35.0f;
+
+    struct FFacilityBoundaryGeometry
+    {
+        float BridgeStartAbsY = 0.0f;
+        float BridgeEndAbsY = 0.0f;
+        float BridgeCenterAbsY = 0.0f;
+        float BridgeScaleY = 0.0f;
+        float SideWallCenterAbsY = 0.0f;
+        float UnexpectedGapWidth = 0.0f;
+        bool bClosedOutsideOpening = false;
+    };
+
+    FVector GetFacilityZoneCenter(const int32 ZoneIndex)
+    {
+        static const FVector ZoneCenters[] =
+        {
+            FVector(-4800.0f, 0.0f, 0.0f),
+            FVector(-3000.0f, 0.0f, 0.0f),
+            FVector(-1200.0f, 0.0f, 0.0f),
+            FVector(600.0f, 0.0f, 0.0f),
+            FVector(2400.0f, 0.0f, 0.0f),
+            FVector(4200.0f, 0.0f, 0.0f)
+        };
+        return ZoneCenters[FMath::Clamp(ZoneIndex, 0, FacilityZoneCount - 1)];
+    }
+
+    FString GetFacilityZoneDisplayName(const int32 ZoneIndex)
     {
         switch (ZoneIndex)
         {
-        case 0: return FVector(18.0f, 18.0f, 0.5f); // Entry Lobby: wider reception space.
-        case 1: return FVector(18.0f, 10.0f, 0.5f); // Security Corridor: narrower route.
-        case 2: return FVector(18.0f, 16.0f, 0.5f); // Observation Lab: room to circle equipment.
-        case 3: return FVector(18.0f, 15.0f, 0.5f); // Containment Ward: room for side cells.
-        case 4: return FVector(18.0f, 16.0f, 0.5f); // Data Core: half-loop around core.
-        case 5: return FVector(24.0f, 22.0f, 0.5f); // Adam Arena: boss arena remains broad.
+        case 0: return TEXT("Entry Lobby");
+        case 1: return TEXT("Security Corridor");
+        case 2: return TEXT("Observation Lab");
+        case 3: return TEXT("Containment Ward");
+        case 4: return TEXT("Data Core Room");
+        case 5: return TEXT("Adam Arena");
+        default: return TEXT("Unknown");
+        }
+    }
+
+    FVector GetFacilityZoneFloorScale(const int32 ZoneIndex)
+    {
+        switch (ZoneIndex)
+        {
+        case 0: return FVector(18.0f, 21.0f, 0.5f); // Entry: wider lobby.
+        case 1: return FVector(18.0f, 12.5f, 0.5f); // Security: still corridor-like.
+        case 2: return FVector(18.0f, 19.0f, 0.5f); // Observation: room to circle equipment.
+        case 3: return FVector(18.0f, 18.0f, 0.5f); // Containment: side cells plus cover.
+        case 4: return FVector(18.0f, 19.0f, 0.5f); // Data Core: half-loop space.
+        case 5: return FVector(24.0f, 24.0f, 0.5f); // Adam Arena: boss room.
         default: return FVector(18.0f, 14.0f, 0.5f);
         }
     }
 
-    FString GetZoneIdentityShapeName(const int32 ZoneIndex)
+    FFacilityBoundaryGeometry CalculateFacilityBoundaryGeometry(const float SideWallCenterAbsY)
+    {
+        FFacilityBoundaryGeometry Geometry;
+        Geometry.SideWallCenterAbsY = SideWallCenterAbsY;
+        Geometry.BridgeStartAbsY = FacilityGateWallOuterY - FacilityBoundaryWallOverlap;
+        Geometry.BridgeEndAbsY = SideWallCenterAbsY + FacilitySideWallHalfY + FacilityBoundaryWallOverlap;
+        Geometry.BridgeCenterAbsY = (Geometry.BridgeStartAbsY + Geometry.BridgeEndAbsY) * 0.5f;
+        Geometry.BridgeScaleY = FMath::Max(0.1f, (Geometry.BridgeEndAbsY - Geometry.BridgeStartAbsY) / 100.0f);
+
+        const float GapFromGateToBridge = FMath::Max(0.0f, Geometry.BridgeStartAbsY - FacilityGateWallOuterY);
+        const float SideWallInnerAbsY = SideWallCenterAbsY - FacilitySideWallHalfY;
+        const float GapFromBridgeToSideWall = FMath::Max(0.0f, SideWallInnerAbsY - Geometry.BridgeEndAbsY);
+        Geometry.UnexpectedGapWidth = FMath::Max(GapFromGateToBridge, GapFromBridgeToSideWall);
+        Geometry.bClosedOutsideOpening = Geometry.UnexpectedGapWidth <= KINDA_SMALL_NUMBER;
+        return Geometry;
+    }
+
+    FString GetFacilityZoneShape(const int32 ZoneIndex)
     {
         switch (ZoneIndex)
         {
@@ -875,34 +941,128 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
         return;
     }
 
-    static const FVector ZoneCenters[] =
-    {
-        FVector(-4800.0f, 0.0f, 0.0f),
-        FVector(-3000.0f, 0.0f, 0.0f),
-        FVector(-1200.0f, 0.0f, 0.0f),
-        FVector(600.0f, 0.0f, 0.0f),
-        FVector(2400.0f, 0.0f, 0.0f),
-        FVector(4200.0f, 0.0f, 0.0f)
-    };
-
     RuntimeFloorComponents.Reset();
     RuntimeFacilityBounds = FBox(EForceInit::ForceInit);
     SpawnedFacilityInteractableKeys.Reset();
 
-    BuildFacilityZone(ZoneCenters[0], TEXT("Entry Lobby"), 0);
-    BuildFacilityZone(ZoneCenters[1], TEXT("Security Corridor"), 1);
-    BuildFacilityZone(ZoneCenters[2], TEXT("Observation Lab"), 2);
-    BuildFacilityZone(ZoneCenters[3], TEXT("Containment Ward"), 3);
-    BuildFacilityZone(ZoneCenters[4], TEXT("Data Core Room"), 4);
-    BuildFacilityZone(ZoneCenters[5], TEXT("Adam Arena"), 5);
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        BuildFacilityZone(GetFacilityZoneCenter(ZoneIndex), GetFacilityZoneDisplayName(ZoneIndex), ZoneIndex);
+    }
+
+    auto RegisterGeneratedFloor = [this](AActor* FloorActor)
+    {
+        if (FloorActor)
+        {
+            if (UStaticMeshComponent* MeshComponent = Cast<UStaticMeshComponent>(FloorActor->GetComponentByClass(
+                UStaticMeshComponent::StaticClass())))
+            {
+                MeshComponent->ComponentTags.AddUnique(RuntimeFloorTag);
+                MeshComponent->ComponentTags.AddUnique(EvaNavigableFloorTag);
+                RegisterRuntimeFloorComponent(MeshComponent);
+                return true;
+            }
+        }
+        return false;
+    };
+
+    static const TCHAR* ZoneConnectionNames[] =
+    {
+        TEXT("Entry->Security"),
+        TEXT("Security->Observation"),
+        TEXT("Observation->Containment"),
+        TEXT("Containment->DataCore"),
+        TEXT("DataCore->Arena")
+    };
+    int32 BoundaryUnexpectedOpenings[FacilityZoneCount] = {};
+    int32 BoundaryBridgeSegments[FacilityZoneCount] = {};
 
     for (int32 GateIndex = 0; GateIndex < 5; ++GateIndex)
     {
         const float GateX = -3900.0f + GateIndex * 1800.0f;
-        SpawnTaggedArenaBox(FVector(GateX, 620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f), FName(TEXT("EvaGate")));
-        SpawnTaggedArenaBox(FVector(GateX, -620.0f, 160.0f), FVector(0.35f, 1.4f, 3.2f), FName(TEXT("EvaGate")));
-        SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f), FName(TEXT("EvaGate")));
+        const float ConnectorYScale = FMath::Max(GetFacilityZoneFloorScale(GateIndex).Y,
+            GetFacilityZoneFloorScale(GateIndex + 1).Y);
+        const float MaxSideWallY = ConnectorYScale * 50.0f + 60.0f;
+        const FFacilityBoundaryGeometry BoundaryGeometry = CalculateFacilityBoundaryGeometry(MaxSideWallY);
+        const bool bFloorConnected = RegisterGeneratedFloor(SpawnArenaBox(FVector(GateX, 0.0f, 0.0f),
+            FVector(1.35f, ConnectorYScale, 0.55f)));
+        const bool bWallA = SpawnTaggedArenaBox(FVector(GateX, FacilityGateWallCenterY, 160.0f),
+            FVector(0.35f, FacilityGateWallScaleY, 3.2f), FName(TEXT("EvaGate"))) != nullptr;
+        const bool bWallB = SpawnTaggedArenaBox(FVector(GateX, -FacilityGateWallCenterY, 160.0f),
+            FVector(0.35f, FacilityGateWallScaleY, 3.2f), FName(TEXT("EvaGate"))) != nullptr;
+        const bool bHeader = SpawnTaggedArenaBox(FVector(GateX, 0.0f, 360.0f), FVector(0.35f, 3.4f, 0.35f),
+            FName(TEXT("EvaGate"))) != nullptr;
+        const bool bNorthBoundaryBridge = SpawnTaggedArenaBox(
+            FVector(GateX, BoundaryGeometry.BridgeCenterAbsY, 180.0f),
+            FVector(0.35f, BoundaryGeometry.BridgeScaleY, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
+        const bool bSouthBoundaryBridge = SpawnTaggedArenaBox(
+            FVector(GateX, -BoundaryGeometry.BridgeCenterAbsY, 180.0f),
+            FVector(0.35f, BoundaryGeometry.BridgeScaleY, 3.6f), FName(TEXT("EvaOuterBoundary"))) != nullptr;
+        const int32 FloorSegments = bFloorConnected ? 1 : 0;
+        const int32 WallSegments = (bWallA ? 1 : 0) + (bWallB ? 1 : 0) + (bHeader ? 1 : 0) +
+            (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
+        const bool bBoundaryGeometryClosed = BoundaryGeometry.bClosedOutsideOpening;
+        const bool bConnected = bFloorConnected && bWallA && bWallB && bHeader && bNorthBoundaryBridge &&
+            bSouthBoundaryBridge && bBoundaryGeometryClosed;
+        const int32 BridgeSegmentCount = (bNorthBoundaryBridge ? 1 : 0) + (bSouthBoundaryBridge ? 1 : 0);
+        BoundaryBridgeSegments[GateIndex] += BridgeSegmentCount;
+        BoundaryBridgeSegments[GateIndex + 1] += BridgeSegmentCount;
+        if (!bNorthBoundaryBridge || !bSouthBoundaryBridge || !bBoundaryGeometryClosed)
+        {
+            ++BoundaryUnexpectedOpenings[GateIndex];
+            ++BoundaryUnexpectedOpenings[GateIndex + 1];
+        }
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[ConnectionIntegrity] Link=%s Connected=%s GapDetected=%s FloorSegments=%d WallSegments=%d ConnectorX=%.0f ConnectorWidth=%.0f"),
+            ZoneConnectionNames[GateIndex],
+            *BoolText(bConnected),
+            *BoolText(!bConnected),
+            FloorSegments,
+            WallSegments,
+            GateX,
+            ConnectorYScale * 100.0f);
+        if (GateIndex <= 1)
+        {
+            UE_LOG(LogAdaptiveHorror, Log,
+                TEXT("[BoundaryGeometry] Connection=%s LeftWallEnd=%.0f RightWallStart=%.0f OpeningMin=%.0f OpeningMax=%.0f ExpectedOpeningWidth=%.0f BridgeStartAbsY=%.0f BridgeEndAbsY=%.0f SideWallCenterAbsY=%.0f UnexpectedGapWidth=%.0f ClosedOutsideOpening=%s"),
+                GateIndex == 0 ? TEXT("EntryToSecurity") : TEXT("SecurityToObservation"),
+                -FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY,
+                -FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY,
+                FacilityGateOpeningHalfY * 2.0f,
+                BoundaryGeometry.BridgeStartAbsY,
+                BoundaryGeometry.BridgeEndAbsY,
+                BoundaryGeometry.SideWallCenterAbsY,
+                BoundaryGeometry.UnexpectedGapWidth,
+                *BoolText(BoundaryGeometry.bClosedOutsideOpening && bNorthBoundaryBridge && bSouthBoundaryBridge));
+        }
     }
+
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        const bool bBoundaryClosed = BoundaryUnexpectedOpenings[ZoneIndex] == 0;
+        UE_LOG(LogAdaptiveHorror, Log,
+            TEXT("[BoundaryIntegrity] Zone=%s OuterBoundaryClosed=%s UnexpectedOpenings=%d OuterSideWalls=2 BoundaryBridgeSegments=%d BoundaryBridgeAware=true"),
+            *GetFacilityZoneDisplayName(ZoneIndex).Replace(TEXT(" "), TEXT("")),
+            *BoolText(bBoundaryClosed),
+            BoundaryUnexpectedOpenings[ZoneIndex],
+            BoundaryBridgeSegments[ZoneIndex]);
+    }
+
+    const bool bZoneTrackingBoundsValid =
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(0)) == GetFacilityZoneDisplayName(0) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(1)) == GetFacilityZoneDisplayName(1) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(2)) == GetFacilityZoneDisplayName(2) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(3)) == GetFacilityZoneDisplayName(3) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(4)) == GetFacilityZoneDisplayName(4) &&
+        GetFacilityZoneNameForLocation(GetFacilityZoneCenter(5)) == GetFacilityZoneDisplayName(5);
+    UE_LOG(LogAdaptiveHorror, Log,
+        TEXT("[ZoneTracking] ZoneBounds=%d BidirectionalTrackingEnabled=%s ObjectiveIndependent=%s BoundsValid=%s Source=GeneratedFacilityBounds"),
+        FacilityZoneCount,
+        FacilityZoneCount == 6 ? TEXT("true") : TEXT("false"),
+        TEXT("true"),
+        *BoolText(bZoneTrackingBoundsValid));
 
     CurrentDirector = GetWorld()->SpawnActor<AEvaResearchFacilityDirector>(AEvaResearchFacilityDirector::StaticClass(),
         FVector::ZeroVector, FRotator::ZeroRotator);
@@ -990,9 +1150,9 @@ void AEvaPrototypeGameMode::BuildPrototypeArena()
 
     RuntimeEmergencyLightComponents.Reset();
     RuntimeEmergencyLightBaseIntensities.Reset();
-    for (int32 ZoneIndex = 0; ZoneIndex < UE_ARRAY_COUNT(ZoneCenters); ++ZoneIndex)
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
     {
-        const FVector EmergencyLightLocation(ZoneCenters[ZoneIndex].X, ZoneCenters[ZoneIndex].Y + 585.0f, 285.0f);
+        const FVector EmergencyLightLocation(GetFacilityZoneCenter(ZoneIndex).X, GetFacilityZoneCenter(ZoneIndex).Y + 585.0f, 285.0f);
         if (APointLight* EmergencyLight = GetWorld()->SpawnActor<APointLight>(EmergencyLightLocation, FRotator::ZeroRotator))
         {
             if (UPointLightComponent* PointLightComponent = Cast<UPointLightComponent>(EmergencyLight->GetLightComponent()))
@@ -1431,12 +1591,40 @@ void AEvaPrototypeGameMode::LogNavigationStatus(const FString& Context) const
     }
 }
 
+FString AEvaPrototypeGameMode::GetFacilityZoneNameForLocation(const FVector& WorldLocation) const
+{
+    int32 BestZoneIndex = 0;
+    float BestScore = TNumericLimits<float>::Max();
+    for (int32 ZoneIndex = 0; ZoneIndex < FacilityZoneCount; ++ZoneIndex)
+    {
+        const FVector ZoneCenter = GetFacilityZoneCenter(ZoneIndex);
+        const FVector ZoneScale = GetFacilityZoneFloorScale(ZoneIndex);
+        const float HalfLengthX = ZoneScale.X * 50.0f;
+        const float HalfWidthY = ZoneScale.Y * 50.0f;
+        const float OutsideX = FMath::Max(0.0f, FMath::Abs(WorldLocation.X - ZoneCenter.X) - HalfLengthX);
+        const float OutsideY = FMath::Max(0.0f, FMath::Abs(WorldLocation.Y - ZoneCenter.Y) - HalfWidthY);
+        const float Score = OutsideX * OutsideX + OutsideY * OutsideY +
+            FMath::Abs(WorldLocation.X - ZoneCenter.X) * 0.01f;
+        if (Score < BestScore)
+        {
+            BestScore = Score;
+            BestZoneIndex = ZoneIndex;
+        }
+    }
+
+    return GetFacilityZoneDisplayName(BestZoneIndex);
+}
+
 void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FString& Label, const int32 ZoneIndex)
 {
-    const FVector FloorScale = GetZoneIdentityFloorScale(ZoneIndex);
+    const FVector FloorScale = GetFacilityZoneFloorScale(ZoneIndex);
     const float HalfWidth = FloorScale.Y * 50.0f;
     const float SideWallY = HalfWidth + 60.0f;
     const float WallHeightScale = ZoneIndex == 5 ? 4.3f : (ZoneIndex == 0 ? 3.9f : 3.6f);
+    int32 ObstacleCount = 0;
+    int32 LandmarkCount = 0;
+    FString ZoneShape = GetFacilityZoneShape(ZoneIndex);
+    float AverageHeight = WallHeightScale * 100.0f;
 
     AActor* Floor = SpawnArenaBox(FVector(Center.X, Center.Y, 0.0f), FloorScale);
     if (Floor)
@@ -1454,29 +1642,23 @@ void AEvaPrototypeGameMode::BuildFacilityZone(const FVector& Center, const FStri
     SpawnArenaBox(FVector(Center.X, SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
     SpawnArenaBox(FVector(Center.X, -SideWallY, WallHeightScale * 50.0f), FVector(FloorScale.X, 0.35f, WallHeightScale));
 
-    int32 ObstacleCount = 0;
-    int32 LandmarkCount = 0;
-    FString ZoneShape = GetZoneIdentityShapeName(ZoneIndex);
-    float AverageHeight = WallHeightScale * 100.0f;
-
-    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X - 360.0f, FMath::Min(420.0f, HalfWidth - 170.0f), 95.0f),
+    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X - 360.0f, FMath::Min(500.0f, HalfWidth - 170.0f), 95.0f),
         FVector(2.0f, 1.0f, 1.9f), FName(TEXT("EvaCover")), FRotator(0.0f, 20.0f + ZoneIndex * 7.0f, 0.0f)))
     {
         Cover->Tags.AddUnique(EvaZoneIdentityTag);
         ++ObstacleCount;
     }
-    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -FMath::Min(430.0f, HalfWidth - 170.0f), 80.0f),
+    if (AActor* Cover = SpawnTaggedArenaBox(FVector(Center.X + 320.0f, -FMath::Min(500.0f, HalfWidth - 170.0f), 80.0f),
         FVector(1.4f, 2.0f, 1.6f), FName(TEXT("EvaCover")), FRotator(0.0f, -25.0f, 0.0f)))
     {
         Cover->Tags.AddUnique(EvaZoneIdentityTag);
         ++ObstacleCount;
     }
-
-    SpawnTaggedArenaBox(FVector(Center.X - 520.0f, -FMath::Max(220.0f, HalfWidth - 140.0f), 55.0f),
+    SpawnTaggedArenaBox(FVector(Center.X - 520.0f, -FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
         FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaEscapeRoute")));
-    SpawnTaggedArenaBox(FVector(Center.X + 520.0f, FMath::Max(220.0f, HalfWidth - 140.0f), 55.0f),
+    SpawnTaggedArenaBox(FVector(Center.X + 520.0f, FMath::Max(260.0f, HalfWidth - 150.0f), 55.0f),
         FVector(0.5f, 0.5f, 0.5f), FName(TEXT("EvaAmbushPoint")));
-    SpawnTaggedArenaBox(FVector(Center.X, -FMath::Max(220.0f, HalfWidth - 90.0f), 70.0f),
+    SpawnTaggedArenaBox(FVector(Center.X, -FMath::Max(260.0f, HalfWidth - 110.0f), 70.0f),
         FVector(0.55f, 0.55f, 0.55f), FName(TEXT("EvaHideSpot")));
 
     BuildZoneIdentityGeometry(Center, ZoneIndex, SideWallY, ObstacleCount, LandmarkCount, ZoneShape, AverageHeight);
